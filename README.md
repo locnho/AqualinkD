@@ -5,6 +5,7 @@ Binaries are supplied for Raspberry Pi both 32 & 64 bit OS, Has been, and can be
 
 ### It does not, and will never provide any layer of security. NEVER directly expose the device running this software to the outside world; only indirectly through the use of Home Automation hub's or other security measures. e.g. VPNs.
 
+This fork supports PDA-PS6.
 
 ## Donation
 If you like this project, you can buy me a cup of coffee :)
