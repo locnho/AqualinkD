@@ -1302,7 +1302,35 @@ if (strlen(cleanwhitespace(value)) <= 0) {
       LOG(AQUA_LOG,LOG_ERR, "Config error, blank value for `%s`\n",param);
       rtn = false;
     }
-
+ #if AQ_PDA
+  } else if (strncasecmp(param, "pda_force_pool_heater_btn", 25) == 0) {
+    int num = strtoul(cleanwhitespace(value), NULL, 10) - 1;
+    if (num <= 0 || num >= aqdata->total_buttons) {
+      LOG(AQUA_LOG,LOG_ERR, "%s must be index of available button", param);
+      rtn=false;
+    } else {
+      aqdata->pool_heater_index = num;
+      rtn=true;
+    }
+  } else if (strncasecmp(param, "pda_force_spa_heater_btn", 24) == 0) {
+    int num = strtoul(cleanwhitespace(value), NULL, 10) - 1;
+    if (num <= 0 || num >= aqdata->total_buttons) {
+      LOG(AQUA_LOG,LOG_ERR, "%s must be index of available button", param);
+      rtn=false;
+    } else {
+      aqdata->spa_heater_index = num;
+      rtn=true;
+    }
+  } else if (strncasecmp(param, "pda_force_solar_heater_btn", 26) == 0) {
+    int num = strtoul(cleanwhitespace(value), NULL, 10) - 1;
+    if (num <= 0 || num >= aqdata->total_buttons) {
+      LOG(AQUA_LOG,LOG_ERR, "%s must be index of available button", param);
+      rtn=false;
+    } else {
+      aqdata->solar_heater_index = num;
+      rtn=true;
+    }
+ #endif
   }
 //#endif
 

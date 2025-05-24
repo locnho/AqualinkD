@@ -347,9 +347,16 @@ int build_device_JSON(struct aqualinkdata *aqdata, char* buffer, int size, bool 
 
   length += sprintf(buffer+length,  ", \"devices\": [");
 
+  char *btn_pool_heater_name = BTN_POOL_HTR;
+  char *btn_spa_heater_name = BTN_SPA_HTR;
+  #ifdef AQ_PDA
+    btn_pool_heater_name = aqdata->aqbuttons[aqdata->pool_heater_index].name;
+    btn_spa_heater_name = aqdata->aqbuttons[aqdata->spa_heater_index].name;
+  #endif
+  
   for (i=0; i < aqdata->total_buttons; i++) 
   {
-    if ( strcmp(BTN_POOL_HTR,aqdata->aqbuttons[i].name) == 0 && (ENABLE_HEATERS || aqdata->pool_htr_set_point != TEMP_UNKNOWN)) {
+    if ( strcmp(btn_pool_heater_name,aqdata->aqbuttons[i].name) == 0 && (ENABLE_HEATERS || aqdata->pool_htr_set_point != TEMP_UNKNOWN)) {
       length += sprintf(buffer+length, "{\"type\": \"setpoint_thermo\", \"id\": \"%s\", \"name\": \"%s\", \"state\": \"%s\", \"status\": \"%s\", \"spvalue\": \"%.*f\", \"value\": \"%.*f\", \"int_status\": \"%d\", \"timer_active\":\"%s\" },",
                                      aqdata->aqbuttons[i].name, 
                                      aqdata->aqbuttons[i].label,
@@ -362,7 +369,7 @@ int build_device_JSON(struct aqualinkdata *aqdata, char* buffer, int size, bool 
                                      LED2int(aqdata->aqbuttons[i].led->state),
                                      ((aqdata->aqbuttons[i].special_mask & TIMER_ACTIVE) == TIMER_ACTIVE?JSON_ON:JSON_OFF) );
 
-    } else if ( strcmp(BTN_SPA_HTR,aqdata->aqbuttons[i].name)==0 && (ENABLE_HEATERS || aqdata->spa_htr_set_point != TEMP_UNKNOWN)) {
+    } else if ( strcmp(btn_spa_heater_name,aqdata->aqbuttons[i].name)==0 && (ENABLE_HEATERS || aqdata->spa_htr_set_point != TEMP_UNKNOWN)) {
       length += sprintf(buffer+length, "{\"type\": \"setpoint_thermo\", \"id\": \"%s\", \"name\": \"%s\", \"state\": \"%s\", \"status\": \"%s\", \"spvalue\": \"%.*f\", \"value\": \"%.*f\", \"int_status\": \"%d\", \"timer_active\":\"%s\" },",
                                      aqdata->aqbuttons[i].name, 
                                      aqdata->aqbuttons[i].label,
