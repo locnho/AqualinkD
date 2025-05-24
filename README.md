@@ -1,10 +1,191 @@
 # Aqualinkd  
+
+This fork is tuned for PDA-PS6 Combo (Pool/SPA).
+
+Branch pda-ps6-main: This is the main stable branch.
+Branch pda-ps6-dev: This is the development branch.
+
+AquaLinkD Configuration:
+
+```
+socket_port=80
+serial_port=/dev/ttyUSB0
+log_level=NOTICE
+web_directory=/var/www/aqualinkd/
+panel_type=PD-6 Combo
+#panel_type_size=6
+#panel_type_combo=YES
+#panel_type_dual=NO
+#panel_type_pda=YES
+#panel_type_rs=NO
+
+device_id=0x60
+rssa_device_id=0x00
+extended_device_id=0x00
+enable_iaqualink=NO
+mqtt_address=127.0.0.1:1883
+mqtt_user=radxa
+mqtt_passwd=Your password
+mqtt_aq_topic=aqualinkd
+mqtt_ha_discover_topic=homeassistant
+mqtt_ha_discover_use_mac=YES
+mqtt_timed_update=YES
+mqtt_convert_temp_to_c=YES
+#mqtt_dz_sub_topic=
+#mqtt_dz_pub_topic=
+
+#dzidx_air_temp=
+#dzidx_pool_water_temp=
+#dzidx_spa_water_temp=
+#dzidx_SWG_percent=
+#dzidx_SWG_PPM=
+#dzidx_SWG_Status=
+dz_convert_temp_to_c=YES
+
+read_RS485_swg=YES
+read_RS485_ePump=YES
+read_RS485_vsfPump=YES
+read_RS485_JXi=YES
+read_RS485_LX=NO
+read_RS485_Chem=NO
+read_RS485_iAqualink=NO
+read_RS485_HeatPump=NO
+
+force_swg=YES
+force_ps_setpoints=YES
+force_frzprotect_setpoints=YES
+force_chem_feeder=NO
+force_chiller=NO
+
+enable_scheduler=YES
+event_check_use_scheduler_times=NO
+event_poweron_check_pump=NO
+event_freezeprotectoff_check_pump=NO
+event_boostoff_check_pump=NO
+event_check_pumpon_hour=0
+event_check_pumpoff_hour=0
+#event_booston_check_device=
+
+ftdi_low_latency=YES
+
+rs485_frame_delay=4
+
+sync_panel_time=YES
+
+display_warnings_in_web=YES
+
+override_freeze_protect=NO
+
+report_zero_spa_temp=YES
+report_zero_pool_temp=YES
+
+pda_sleep_mode=YES
+pda_bypass_info=YES
+
+button_01_label=Filter Pump
+button_01_pumpIndex=1
+button_01_pumpID=0x78
+button_01_pumpType=JANDY ePUMP
+button_02_label=Spa
+button_03_label=Cleaner
+button_04_label=Spa Light
+button_04_lightMode=0
+button_05_label=Pool Light
+button_05_lightMode=0
+button_06_label=Air Blower
+button_07_label=Deck Jets
+button_08_label=Pool Heat
+button_09_label=Spa Heat
+button_10_label=Solar Heat
+
+sensor_01_path=/sys/class/thermal/thermal_zone0/temp
+sensor_01_label=CPU
+sensor_01_factor=0.001000
+
+light_programming_mode=0
+light_programming_initial_on=15
+light_programming_initial_off=12
+light_program_00=SAm
+light_program_01=Party
+light_program_02=Romance
+light_program_03=Caribbean
+light_program_04=American
+light_program_05=Cal Sunset
+light_program_06=Royal
+light_program_07=Blue
+light_program_08=Green
+light_program_09=Red
+light_program_10=White
+light_program_11=Magenta
+
+```
+
+The pda_bypass_info is required to fix the error at startup.
+
+The pda_force_*heater_btn is used to indicate which button is used for pool, spa, and solar heater. This allows you to move them to any button (except button 1). The value is the button number. A value of 0 and 1 are ignored.
+
+For light control with Dimmer, you also need update Homebridge-aqualinkd (https://github.com/locnho/homebridge-aqualinkd/tree/pda-ps6-light-selection-fix)
+
+You will need to change this above configuration setting based on your equipment configuration.
+
+If you want to use your PDA remote, setup Homebridge with cmdswitch2 plugin to stop and start AquaLinkd service. 
+
+Here is the cmdswitch2 configuration
+```
+        {
+            "platform": "cmdSwitch2",
+            "name": "cmdSwitch2",
+            "switches": [
+                {
+                    "name": "AquaLink",
+                    "off_cmd": "sudo systemctl stop aqualinkd",
+                    "on_cmd": "sudo systemctl start aqualinkd",
+                    "state_cmd": "sudo systemctl status aqualinkd",
+                    "polling": false,
+                    "interval": 3,
+                    "timeout": 1000
+                }
+            ]
+        }
+```
+
+Here is the mosquitto.conf:
+```
+ # Place your local configuration in /etc/mosquitto/conf.d/
+ #
+ # A full description of the configuration file is at
+ # /usr/share/doc/mosquitto/examples/mosquitto.conf.example
+ 
+ per_listener_settings true
+ 
+ pid_file /run/mosquitto/mosquitto.pid
+ 
+ persistence true
+ persistence_location /var/lib/mosquitto/
+ 
+ log_dest file /var/log/mosquitto/mosquitto.log
+ 
+ include_dir /etc/mosquitto/conf.d
+  
+ allow_anonymous false
+ listener 1883
+ password_file /etc/mosquitto/password_file
+``` 
+
+Hardware
+
+The hardware that I used is "Radxa Zero 3W with 2GB RAM/16GB eMMC. For mounting, use this 3D model - https://github.com/locnho/AqualinkD/blob/master/extras/Radxa%20Zero%203W%20AquaLinkD%20mount.3mf.
+
+
+## AquaLinkd Info
+
 Linux daemon to control Aqualink RS pool controllers. Provides web UI, MQTT client & HTTP API endpoints. Control your pool equipment from any phone/tablet or computer.  Is also compatible with most Home control systems including Apple HomeKit, Home Assistant, Samsung, Alexa, Google, etc.
 <br>
 Binaries are supplied for Raspberry Pi both 32 & 64 bit OS, Has been, and can be compiled for many different SBC's, and a Docker is also available.
 
 ### It does not, and will never provide any layer of security. NEVER directly expose the device running this software to the outside world; only indirectly through the use of Home Automation hub's or other security measures. e.g. VPNs.
 
+This fork supports PDA-PS6.
 
 ## Donation
 If you like this project, you can buy me a cup of coffee :)
