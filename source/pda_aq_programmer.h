@@ -44,6 +44,7 @@ void *set_PDA_aqualink_boost(void *ptr);
 void *set_PDA_aqualink_time( void *ptr );
 
 void *set_aqualink_PDA_light_mode( void *ptr );
+void *set_PDA_light_programmode( void *ptr );
 
 /*
 // These are from aq_programmer.c , exposed here for PDA AQ PROGRAMMER

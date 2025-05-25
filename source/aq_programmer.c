@@ -110,13 +110,13 @@ const func_ptr _prog_functions[AQP_RSSADAPTER_MAX] = {
      [AQ_PDA_SET_TIME]                 = set_PDA_aqualink_time,
      [AQ_PDA_SET_LIGHT_MODE]           = set_aqualink_PDA_light_mode,
      //[AQ_PDA_GET_POOL_SPA_HEATER_TEMPS]= get_aqualink_PDA_pool_spa_heater_temps,
-     [AQ_PDA_GET_FREEZE_PROTECT_TEMP]  = get_PDA_aqualink_pool_spa_heater_temps
+     [AQ_PDA_GET_FREEZE_PROTECT_TEMP]  = get_PDA_aqualink_pool_spa_heater_temps,
+     [AQ_PDA_SET_LIGHTPROGRAM_MODE]    = set_PDA_light_programmode,
      /*
      [AQ_PDA_SET_BOOST]                = set_PDA_aqualink_boost
      [AQ_PDA_SET_SWG_PERCENT]          = set_PDA_aqualink_SWG_setpoint
      [AQ_PDA_GET_AUX_LABELS]           = get_PDA_aqualink_aux_labels
      */
-     
 };
 
 
@@ -329,7 +329,8 @@ bool in_light_programming_mode(struct aqualinkdata *aqdata)
   if ( ( aqdata->active_thread.thread_id != 0 ) &&
        ( aqdata->active_thread.ptype == AQ_SET_LIGHTPROGRAM_MODE ||
          aqdata->active_thread.ptype == AQ_SET_LIGHTCOLOR_MODE ||
-         aqdata->active_thread.ptype == AQ_SET_IAQTOUCH_LIGHTCOLOR_MODE)
+         aqdata->active_thread.ptype == AQ_SET_IAQTOUCH_LIGHTCOLOR_MODE ||
+	 aqdata->active_thread.ptype == AQ_PDA_SET_LIGHTPROGRAM_MODE)
   ) {
     return true;
   }
@@ -828,6 +829,7 @@ const char *ptypeName(program_type type)
       return "Get programs";
     break;
     case AQ_SET_LIGHTPROGRAM_MODE:
+    case AQ_PDA_SET_LIGHTPROGRAM_MODE:
       return "Set light color (using AqualinkD)";
     break;
     case AQ_SET_LIGHTCOLOR_MODE:
@@ -1042,6 +1044,7 @@ const char *programtypeDisplayName(program_type type)
       return "Programming: retrieving programs";
     break;
     case AQ_SET_LIGHTPROGRAM_MODE:
+    case AQ_PDA_SET_LIGHTPROGRAM_MODE:
     case AQ_SET_LIGHTCOLOR_MODE:
     case AQ_SET_IAQTOUCH_LIGHTCOLOR_MODE:
     case AQ_SET_LIGHTDIMMER:
