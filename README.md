@@ -1,4 +1,41 @@
 # Aqualinkd  
+
+This fork is tuned for PDA-PS6 Combo (Pool/SPA)
+
+
+Configuration:
+
+```
+button_01_label=Filter Pump
+button_01_pumpIndex=1
+button_01_pumpID=0x78
+button_01_pumpType=JANDY ePUMP
+button_02_label=Spa
+button_03_label=Pool Heat
+button_04_label=Spa Heat
+button_05_label=Solar Heat
+button_06_label=Cleaner
+button_07_label=Spa Light
+button_07_lightMode=2
+button_08_label=Pool Light
+button_08_lightMode=2
+button_09_label=Air Blower
+button_10_label=Deck Jets
+
+pda_sleep_mode=YES
+pda_force_pool_heater_btn=3
+pda_force_spa_heater_btn=4
+pda_force_solar_heater_btn=5
+pda_bypass_info=YES
+```
+
+The pda_bypass_info is required to fix the error at startup.
+
+The pda_force_*heater_btn is used to indicate which button is used for pool, spa, and solar heater. This allows you to move them to any button. The value is the button number. A value of 0 is ignored.
+
+
+## AquaLinkd Info
+
 Linux daemon to control Aqualink RS pool controllers. Provides web UI, MQTT client & HTTP API endpoints. Control your pool equipment from any phone/tablet or computer.  Is also compatible with most Home control systems including Apple HomeKit, Home Assistant, Samsung, Alexa, Google, etc.
 <br>
 Binaries are supplied for Raspberry Pi both 32 & 64 bit OS, Has been, and can be compiled for many different SBC's, and a Docker is also available.
