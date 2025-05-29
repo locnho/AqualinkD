@@ -31,7 +31,7 @@ pda_bypass_info=YES
 
 The pda_bypass_info is required to fix the error at startup.
 
-The pda_force_*heater_btn is used to indicate which button is used for pool, spa, and solar heater. This allows you to move them to any button. The value is the button number. A value of 0 is ignored.
+The pda_force_*heater_btn is used to indicate which button is used for pool, spa, and solar heater. This allows you to move them to any button (except button 1). The value is the button number. A value of 0 and 1 are ignored.
 
 
 ## AquaLinkd Info
