@@ -1325,7 +1325,7 @@ void programDeviceLightBrightness(struct aqualinkdata *aqdata, int value, int de
 {
   clight_detail *light = getProgramableLight(aqdata, deviceIndex);
 
-  if (!isRSSA_ENABLED) {
+  if (!isRSSA_ENABLED && !AQ_PDA) {
     LOG(PANL_LOG,LOG_ERR, "Light mode brightness is only supported with `rssa_device_id` set\n");
     return;
   }
@@ -1363,11 +1363,13 @@ void programDeviceLightBrightness(struct aqualinkdata *aqdata, int value, int de
 //void programDeviceLightMode(struct aqualinkdata *aqdata, int value, int button) 
 void programDeviceLightMode(struct aqualinkdata *aqdata, int value, int deviceIndex) 
 {
+#if 0
 #ifdef AQ_PDA
   if (isPDA_PANEL && !isPDA_IAQT) {
     LOG(PANL_LOG,LOG_ERR, "Light mode control not supported in PDA mode\n");
     return;
   }
+#endif
 #endif
   /*
   int i;
@@ -1396,6 +1398,11 @@ void programDeviceLightMode(struct aqualinkdata *aqdata, int value, int deviceIn
                                       _aqconfig_.light_programming_initial_on,
                                       _aqconfig_.light_programming_initial_off,
                                       _aqconfig_.light_programming_mode );
+#ifdef AQ_PDA
+    if (isPDA_PANEL)
+      aq_programmer(AQ_PDA_SET_LIGHTPROGRAM_MODE, buf, aqdata);
+    else
+#endif
     aq_programmer(AQ_SET_LIGHTPROGRAM_MODE, buf, aqdata);
   } else if (isRSSA_ENABLED) {
     // If we are using rs-serial then turn light on first.
