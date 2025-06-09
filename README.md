@@ -175,6 +175,11 @@ Here is the mosquitto.conf:
  password_file /etc/mosquitto/password_file
 ``` 
 
+Hardware
+
+The hardware that I used is "Radxa Zero 3W with 2GB RAM/16GB eMMC. For mounting, use this 3D model - https://github.com/locnho/AqualinkD/blob/master/extras/Radxa%20Zero%203W%20AquaLinkD%20mount.3mf.
+
+
 ## AquaLinkd Info
 
 Linux daemon to control Aqualink RS pool controllers. Provides web UI, MQTT client & HTTP API endpoints. Control your pool equipment from any phone/tablet or computer.  Is also compatible with most Home control systems including Apple HomeKit, Home Assistant, Samsung, Alexa, Google, etc.
