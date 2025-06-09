@@ -2,7 +2,6 @@
 
 This fork is tuned for PDA-PS6 Combo (Pool/SPA)
 
-
 AquaLinkD Configuration:
 
 ```
@@ -39,10 +38,6 @@ mqtt_convert_temp_to_c=YES
 #dzidx_SWG_PPM=
 #dzidx_SWG_Status=
 dz_convert_temp_to_c=YES
-
-light_programming_mode=0.000000
-light_programming_initial_on=15
-light_programming_initial_off=12
 
 read_RS485_swg=YES
 read_RS485_ePump=YES
@@ -107,11 +102,29 @@ sensor_01_path=/sys/class/thermal/thermal_zone0/temp
 sensor_01_label=CPU
 sensor_01_factor=0.001000
 
+light_programming_mode=0
+light_programming_initial_on=15
+light_programming_initial_off=12
+light_program_00=SAm
+light_program_01=Party
+light_program_02=Romance
+light_program_03=Caribbean
+light_program_04=American
+light_program_05=Cal Sunset
+light_program_06=Royal
+light_program_07=Blue
+light_program_08=Green
+light_program_09=Red
+light_program_10=White
+light_program_11=Magenta
+
 ```
 
 The pda_bypass_info is required to fix the error at startup.
 
 The pda_force_*heater_btn is used to indicate which button is used for pool, spa, and solar heater. This allows you to move them to any button (except button 1). The value is the button number. A value of 0 and 1 are ignored.
+
+For light control with Dimmer, you also need update Homebridge-aqualinkd (https://github.com/locnho/homebridge-aqualinkd/tree/pda-ps6-light-selection-fix)
 
 You will need to change this above configuration setting based on your equipment configuration.
 
