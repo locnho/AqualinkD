@@ -1,6 +1,9 @@
 # Aqualinkd  
 
-This fork is tuned for PDA-PS6 Combo (Pool/SPA)
+This fork is tuned for PDA-PS6 Combo (Pool/SPA).
+
+Branch pda-ps6-main: This is the main stable branch.
+Branch pda-ps6-dev: This is the development branch.
 
 AquaLinkD Configuration:
 
