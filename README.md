@@ -3,6 +3,7 @@
 This fork is tuned for PDA-PS6 Combo (Pool/SPA).
 
 Branch pda-ps6-main: This is the main stable branch.
+
 Branch pda-ps6-dev: This is the development branch.
 
 AquaLinkD Configuration:
@@ -27,8 +28,8 @@ mqtt_address=127.0.0.1:1883
 mqtt_user=radxa
 mqtt_passwd=Your password
 mqtt_aq_topic=aqualinkd
-mqtt_ha_discover_topic=homeassistant
-mqtt_ha_discover_use_mac=YES
+#mqtt_ha_discover_topic=homeassistant
+#mqtt_ha_discover_use_mac=YES
 mqtt_timed_update=YES
 mqtt_convert_temp_to_c=YES
 #mqtt_dz_sub_topic=
@@ -122,8 +123,6 @@ light_program_11=Magenta
 
 The pda_bypass_info is required to fix the error at startup.
 
-The pda_force_*heater_btn is used to indicate which button is used for pool, spa, and solar heater. This allows you to move them to any button (except button 1). The value is the button number. A value of 0 and 1 are ignored.
-
 For light control with Dimmer, you also need update Homebridge-aqualinkd (https://github.com/locnho/homebridge-aqualinkd/tree/pda-ps6-light-selection-fix)
 
 You will need to change this above configuration setting based on your equipment configuration.
@@ -150,6 +149,7 @@ Here is the cmdswitch2 configuration
 ```
 
 Here is the mosquitto.conf:
+
 ```
  # Place your local configuration in /etc/mosquitto/conf.d/
  #
