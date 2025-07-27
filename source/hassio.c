@@ -725,14 +725,29 @@ void publish_mqtt_hassio_discover(struct aqualinkdata *aqdata, struct mg_connect
 
   for (i=0; i < aqdata->num_sensors; i++) {
     //sprintf(idbuf, "%s_%s","sensor",aqdata->sensors[i].label);
-    sprintf(topic, "%s/%s",SENSOR_TOPIC,aqdata->sensors[i].label);
+    //sprintf(topic, "%s/%s",SENSOR_TOPIC,aqdata->sensors[i].label);
+    sprintf(topic, "%s/%s",SENSOR_TOPIC,aqdata->sensors[i].ID);
     rsm_char_replace(idbuf, topic, "/", "_");
     //sprintf(msg, HASSIO_SENSOR_DISCOVER,connections,_aqconfig_.mqtt_aq_topic,idbuf,aqdata->sensors[i].label,_aqconfig_.mqtt_aq_topic,topic, "°C", "mdi:thermometer");
     // Use HASSIO_TEMP_SENSOR_DISCOVER over HASSIO_SENSOR_DISCOVER since it has device class temperature and HA will convert automatically.
+    //sprintf(msg, HASSIO_TEMP_SENSOR_DISCOVER,connections,_aqconfig_.mqtt_aq_topic,idbuf,aqdata->sensors[i].label,_aqconfig_.mqtt_aq_topic,topic, "°C", "mdi:thermometer");
+
     sprintf(msg, HASSIO_TEMP_SENSOR_DISCOVER,connections,_aqconfig_.mqtt_aq_topic,idbuf,aqdata->sensors[i].label,_aqconfig_.mqtt_aq_topic,topic, "°C", "mdi:thermometer");
+    
+    if (aqdata->sensors[i].uom != NULL) {
+      if (isUomTemperature(aqdata->sensors[i].uom) ) {
+        sprintf(msg, HASSIO_TEMP_SENSOR_DISCOVER,connections,_aqconfig_.mqtt_aq_topic,idbuf,aqdata->sensors[i].label,_aqconfig_.mqtt_aq_topic,topic, aqdata->sensors[i].uom, "mdi:thermometer");
+      } else {
+        sprintf(msg, HASSIO_SENSOR_DISCOVER,connections,_aqconfig_.mqtt_aq_topic,idbuf,aqdata->sensors[i].label,_aqconfig_.mqtt_aq_topic,topic, aqdata->sensors[i].uom, "mdi:thermometer-water");
+      }
+    } else {
+      sprintf(msg, HASSIO_TEMP_SENSOR_DISCOVER,connections,_aqconfig_.mqtt_aq_topic,idbuf,aqdata->sensors[i].label,_aqconfig_.mqtt_aq_topic,topic, "°C", "mdi:thermometer");
+    }
+
 
     sprintf(topic, "%s/sensor/aqualinkd/aqualinkd_%s/config", _aqconfig_.mqtt_hass_discover_topic, idbuf);
     send_mqtt(nc, topic, msg);
   }
    
 }
+

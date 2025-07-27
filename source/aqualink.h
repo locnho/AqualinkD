@@ -83,12 +83,13 @@ bool isVirtualButtonEnabled();
 #define PUMP_GPM_MAX 130
 #define PUMP_GPM_MIN 15
 
-
-enum {
+/*
+typedef enum temperatureUOM {
  FAHRENHEIT,
  CELSIUS,
  UNKNOWN
-};
+} temperatureUOM;
+*/
 
 typedef struct aqualinkkey
 {
@@ -258,7 +259,7 @@ typedef enum clight_type {
   LC_CLOGIG, 
   LC_INTELLIB,
   LC_HAYWCL,
-  LC_SPARE_1,
+  LC_JANDYINFINATE,  // was SPARE_1 (Infinate watercolors LED)
   LC_SPARE_2,
   LC_SPARE_3,
   LC_DIMMER,  // use 0, 25, 50, 100
@@ -295,6 +296,7 @@ typedef struct clightd
 {
   clight_type lightType;
   aqkey *button;
+  unsigned char lightID; // RS485 ID (only Jandy infinate watercolor)
   int currentValue;
   int lastValue;         // Used for AqualinkD self programming
   aqledstate RSSDstate;  // state from rs serial adapter

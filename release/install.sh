@@ -210,19 +210,12 @@ fi
 
 
 # Check cron.d options
-if [ ! -d "/etc/cron.d" ]; then
-  log "The version of Cron may not support chron.d, if so AqualinkD Scheduler will not work"
-  log "Please check before starting"
-else
-  if [ -f "/etc/default/cron" ]; then
-    CD=$(cat /etc/default/cron | grep -v ^# | grep "\-l")
-    if [ -z "$CD" ]; then
-      log "Please enabled cron.d support, if not AqualinkD Scheduler will not work"
-      log "Edit /etc/default/cron and look for the -l option, usually in EXTRA_OPTS"
-    fi
-  else
-    log "Please make sure the version if Cron supports chron.d, if not the AqualinkD Scheduler will not work"
+if systemctl is-active --quiet cron.service; then
+  if [ ! -d "/etc/cron.d" ]; then
+    log "The version of cron installed may not support chron.d, if so AqualinkD Scheduler will not work"
   fi
+else
+ log "Please install cron, if not the AqualinkD Scheduler will not work"
 fi
 
 # V2.3.9 & V2.6.0 has kind-a breaking change for config.js, so check existing and rename if needed
@@ -232,7 +225,8 @@ if [ -f "$WEBLocation/config.js" ]; then
   # Version 2.6.0 added Chiller as well
   if  ! grep -q '"Aux_V1"' "$WEBLocation/config.js" || 
       ! grep -q '"Spa"' "$WEBLocation/config.js" || 
-      ! grep -q '"Chiller"' "$WEBLocation/config.js"; then
+      ! grep -q '"Chiller"' "$WEBLocation/config.js" ||
+      ! grep -q '"Aux_S1"' "$WEBLocation/config.js"; then
     dateext=`date +%Y%m%d_%H_%M_%S`
     log "AqualinkD web config is old, making copy to $WEBLocation/config.js.$dateext"
     log "Please make changes to new version $WEBLocation/config.js"

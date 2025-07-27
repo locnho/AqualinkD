@@ -965,3 +965,61 @@ char *prittyString(char *str)
   return str;
 }
 
+
+
+temperatureUOM getTemperatureUOM(const char *uom) {
+
+  if (uom == NULL)
+    return UNKNOWN;
+
+  if (uom[0] == 194 && uom[1] == 176) { // Deg symbol is 2 chars '°'
+    switch (uom[2]) {
+      case 'F':
+      case 'f':
+        //printf("UOM %s is FAHRENHEIT\n", uom);
+        return FAHRENHEIT;
+      break;
+      case 'C':
+      case 'c':
+         //printf("UOM %s is CELSIUS\n", uom);
+        return CELSIUS;
+      break;
+    }
+  }
+
+  //printf("UOM %s is UNKNOWN\n", uom);
+  return UNKNOWN;
+}
+
+bool isUomTemperature( const char *uom) {
+  
+  /*
+  for (int i=0; i<strlen(uom); i++) {
+    printf(" %d |",uom[i]);
+  }
+  printf("\n");
+  */
+  if (uom == NULL)
+    return false;
+
+  if (uom[0] == 194 && uom[1] == 176) { // Deg symbol is 2 chars '°' 
+    //printf("UOM %s is temp\n", uom);
+    return true;
+  }
+
+  if (strlen(uom) == 1) {
+    switch (uom[0]) {
+      case 'F':
+      case 'f':
+      case 'C':
+      case 'c':
+        //printf("UOM %s is temp\n", uom);
+        return true;
+      break;
+    }
+  }
+
+  //printf("UOM %s is NOT temp %d %c\n", uom, uom[0], uom[0]);
+
+  return false;
+}

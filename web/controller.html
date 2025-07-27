@@ -1050,8 +1050,8 @@
             setTileOn(id, 'on');
         }
       } catch (e) {
-          // NSF Do we need to create the device?
-          console.log('ERROR id=' + id + ' Line '+new Error().lineNumber+' | element = '+document.getElementById(id));
+          // Devices that are hidden are not found
+          //console.log('ERROR id=' + id + ' Line '+new Error().lineNumber+' | element = '+document.getElementById(id));
       }
       //document.getElementById(id + '_tile_icon_value').textContent = value;
       var tile;
@@ -2372,7 +2372,8 @@
 
       for (var obj in data.sensors) {
         //console.log("Set Value `Sensor/"+obj.toString()+"' to "+data.sensors[obj]);
-        setTileValue("Sensor/"+obj.toString(), data.sensors[obj]);
+        //setTileValue("Sensor/"+obj.toString(), data.sensors[obj]);
+        setTileValue(obj.toString(), data.sensors[obj]);
       }
 
       for (var obj in data.alternate_modes) {

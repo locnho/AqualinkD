@@ -130,7 +130,7 @@ const char *getJandyDeviceName(emulation_type etype) {
   }
 }
 
-const char* get_pentair_packet_type(unsigned char* packet , int length)
+const char* get_pentair_packet_type(const unsigned char* packet , int length)
 {
   static char buf[15];
 
@@ -168,7 +168,7 @@ const char* get_pentair_packet_type(unsigned char* packet , int length)
     break;
   }
 }
-const char* get_jandy_packet_type(unsigned char* packet , int length)
+const char* get_jandy_packet_type(const unsigned char* packet , int length)
 {
   static char buf[15];
 
@@ -322,7 +322,7 @@ const char* get_jandy_packet_type(unsigned char* packet , int length)
   }
 }
 
-const char* get_packet_type(unsigned char* packet , int length)
+const char* get_packet_type(const unsigned char* packet , int length)
 {
   if (getProtocolType(packet)==PENTAIR) {
     return get_pentair_packet_type(packet, length);
@@ -412,7 +412,7 @@ void generate_pentair_checksum(unsigned char* packet, int length)
 
 }
 
-protocolType getProtocolType(unsigned char* packet) {
+protocolType getProtocolType(const unsigned char* packet) {
   if (packet[0] == DLE)
     return JANDY;
   else if (packet[0] == PP1)
@@ -1033,6 +1033,114 @@ int get_packet_lograw(int fd, unsigned char* packet)
 int _get_packet(int fd, unsigned char* packet, bool rawlog)
 */
 
+#ifdef DUMMY_READER
+
+int fix_packet(unsigned char *packet_buffer, int packet_length, bool getCached) {
+  
+  static unsigned char saved_buffer[AQ_MAXPKTLEN+1];
+  static int saved_buffer_length = 0;
+
+  if (getCached) {
+    if (saved_buffer_length > 0) {
+      memcpy(packet_buffer, saved_buffer, saved_buffer_length);
+      LOG(RSSD_LOG,LOG_DEBUG, "2nd part of fixed frame\n");
+      logPacket(RSSD_LOG, LOG_DEBUG, packet_buffer, saved_buffer_length, true);
+      debuglogPacket(RSSD_LOG, packet_buffer, saved_buffer_length, true, true);
+    } else {
+      printf("NO 2nd PACKET %d\n",saved_buffer_length );
+    }
+    return saved_buffer_length;
+  }
+
+  char pbuf[256];
+  int rtn = 0;
+
+  memset(saved_buffer, 0, sizeof(saved_buffer));
+  saved_buffer_length = 0;
+
+  //LOG(RSSD_LOG,LOG_DEBUG, "Trying to fix bad packet\n");
+  LOG(RSSD_LOG,LOG_WARNING, "Serial read bad Jandy checksum, Trying to fix bad packet\n");
+  // Check end is valid
+
+  if ( packet_buffer[packet_length-2] == DLE  && packet_buffer[packet_length-1] == ETX ) {
+    //LOG(RSSD_LOG,LOG_DEBUG, "Packet Fix: good end\n");
+  } else {
+    LOG(RSSD_LOG,LOG_DEBUG, "Packet Fix: bad end\n");
+    return 0;
+  }
+
+  // Specific fix for 2 frames where the first didn't end (but still holds the checksum)
+  // HEX: 0x10|0x02|0x00|0x0d|0x40|0x00|0x00|0x5f|0x10|0x02|0x84|0x00|0x96|0x10|0x03|       <- no end 0x10|0x03, start 0x10|0x02 in middle
+  // HEX: 0x10|0x02|0x00|0x0d|0x40|0x00|0x00|0x5f|0x10|0x10|0x02|0x33|0x30|0x75|0x10|0x03|  <- no 0x03 for end, start 0x10|0x02 in middle
+
+  // Run over the packet, see if their is a start in the middle.
+  // Ignore the first two bytes, assuming they are 0x10, 0x02
+  
+
+  for (int i=2; i <= packet_length; i++ ) {
+    if (packet_buffer[i] == DLE && packet_buffer[i+1] == STX) {
+      LOG(RSSD_LOG,LOG_DEBUG, "Packet Fix: found start in middle of frame\n");
+      int p1_length = i;
+      int p2_length = packet_length-i;
+      unsigned char *p2_start =  &packet_buffer[i];
+      bool validstart=FALSE;
+      bool validend=FALSE;
+      // Something we catch the end DLE as well as start DLE
+      while (packet_buffer[p1_length] == DLE) {
+        p1_length--;
+      }
+
+      beautifyPacket(pbuf, 256, packet_buffer, packet_length, TRUE);
+      LOG(RSSD_LOG,LOG_DEBUG, "Packet Fix: SPLITTING start to: %s\n",pbuf);
+      LOG(RSSD_LOG,LOG_DEBUG, "Packet Fix: Check 0x%02hhx (%d)\n",packet_buffer[p1_length], p1_length);
+      
+        // see if we have a valid end
+      if (check_jandy_checksum(p2_start, p2_length) == true){
+          //LOG(RSSD_LOG,LOG_DEBUG, "Valid packet found at end\n");
+        beautifyPacket(pbuf, 256, p2_start, p2_length, TRUE);
+        LOG(RSSD_LOG,LOG_DEBUG, "Packet Fix: FIXED end to:   %s\n",pbuf);
+        validend=TRUE;
+      }
+
+      if (check_jandy_checksum(packet_buffer, p1_length+3) == true){
+        //LOG(RSSD_LOG,LOG_DEBUG, "Valid packet found at start\n");
+        beautifyPacket(pbuf, 256, packet_buffer, p1_length, TRUE);
+        LOG(RSSD_LOG,LOG_DEBUG, "Packet Fix: FIXED start to: %s\n",pbuf);
+        validstart=TRUE;
+      }
+      
+      if (validstart && validend) {
+        // Save the 2nd frame
+        memcpy(saved_buffer, p2_start, p2_length);
+        saved_buffer_length = p2_length;
+        // correct the 1st frame
+        packet_buffer[p1_length+1] = DLE;
+        packet_buffer[p1_length+2] = ETX;
+        rtn = p1_length+3;
+      } else if (validend) {
+        // Return the valid part of the packet.
+        memcpy(packet_buffer, p2_start, p2_length);
+        rtn = p2_length;
+      } else if (validstart) {
+        // correct the 1st frame
+        packet_buffer[p1_length+1] = DLE;
+        packet_buffer[p1_length+2] = ETX;
+        rtn = p1_length+3;
+      }
+      // Try the start.
+      //memcpy(new_buffer, packet_buffer, i);
+      
+      break;
+    }
+  }
+
+  beautifyPacket(pbuf, 256, packet_buffer, rtn, TRUE);
+  LOG(RSSD_LOG,LOG_DEBUG, "Packet Fix: RETURNING:   %s\n",pbuf);
+
+  return rtn;
+}
+
+#endif
 
 int get_packet(int fd, unsigned char* packet)
 {
@@ -1053,6 +1161,17 @@ int get_packet(int fd, unsigned char* packet)
 
   memset(packet, 0, AQ_MAXPKTLEN);
 
+#ifdef DUMMY_READER
+  static bool haveFixedPacket = false;
+  if (haveFixedPacket) {
+    haveFixedPacket = false;
+    int rtn = fix_packet(packet, AQ_MAXPKTLEN, true);
+    if (rtn > 0) {
+      LOG(RSSD_LOG,LOG_DEBUG, "RETURNING PART 2 OF FIXED PACKET:\n");
+      return rtn;
+    }
+  }
+#endif
   // Read packet in byte order below
   // DLE STX ........ ETX DLE
   // sometimes we get ETX DLE and no start, so for now just ignoring that.  Seem to be more applicable when busy RS485 traffic
@@ -1201,11 +1320,19 @@ int get_packet(int fd, unsigned char* packet)
 
   //LOG(RSSD_LOG,LOG_DEBUG, "Serial checksum, length %d got 0x%02hhx expected 0x%02hhx\n", index, packet[index-3], generate_checksum(packet, index));
   if (jandyPacketStarted) {
-    if (check_jandy_checksum(packet, index) != true){
-      LOG(RSSD_LOG,LOG_WARNING, "Serial read bad Jandy checksum, ignoring\n");
-      logPacketError(packet, index);
-      //log_packet(LOG_WARNING, "Bad receive packet ", packet, index);
-      return AQSERR_CHKSUM;
+    if (check_jandy_checksum(packet, index) != true) {
+#ifdef DUMMY_READER
+      int size = fix_packet(packet, index, false);
+      if (size > 0) {
+        haveFixedPacket = true;
+        index = size;
+      } else
+#endif
+      {
+        LOG(RSSD_LOG,LOG_WARNING, "Serial read bad Jandy checksum, ignoring\n");
+        logPacketError(packet, index);
+        return AQSERR_CHKSUM;
+      }
     }
   } else if (pentairPacketStarted) {
     if (check_pentair_checksum(packet, index) != true){

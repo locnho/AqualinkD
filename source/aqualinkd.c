@@ -761,6 +761,8 @@ bool auto_configure(unsigned char* packet, int rs_fd) {
 
   static bool gotRev = false;
   static unsigned char gettingRevID = 0xFF;
+
+  static int loopsCompleted=0;
   //static char message[AQ_MSGLONGLEN + 1];
 
   if (++packetsReceived >= MAX_AUTO_PACKETS ) {
@@ -854,7 +856,13 @@ bool auto_configure(unsigned char* packet, int rs_fd) {
     return false;
   }
 
-  if ( foundIDs >= 3 || (packet[PKT_DEST] == firstprobe && packet[PKT_CMD] == CMD_PROBE) ) {
+  if (packet[PKT_DEST] == firstprobe && packet[PKT_CMD] == CMD_PROBE) {
+    loopsCompleted++;
+    //LOG(AQUA_LOG,LOG_DEBUG, "***** Loop %d *****\n",loopsCompleted);
+  }
+
+  //if ( foundIDs >= 3 || (packet[PKT_DEST] == firstprobe && packet[PKT_CMD] == CMD_PROBE) ) {
+  if ( (foundIDs >= 3 && gotRev) || loopsCompleted == 2 ) {
     // We should have seen one complete probe cycle my now.
     LOG(AQUA_LOG,LOG_NOTICE, "Finished Autoconfigure using device_id=0x%02hhx rssa_device_id=0x%02hhx extended_device_id=0x%02hhx (%s iAqualink2/3)\n",
                               _aqconfig_.device_id,_aqconfig_.rssa_device_id,_aqconfig_.extended_device_id,  _aqconfig_.enable_iaqualink?"Enable":"Disable");
@@ -1108,6 +1116,7 @@ void main_loop()
       stopPacketLogger();
       close_serial_port(rs_fd);
       stop_net_services();
+      stop_sensors_thread();
       return;
     }
 /*
@@ -1207,6 +1216,7 @@ void main_loop()
         stopPacketLogger();
         close_serial_port(rs_fd);
         stop_net_services();
+        stop_sensors_thread();
         return;
       }
     }
@@ -1252,6 +1262,12 @@ void main_loop()
     _aqconfig_.extended_device_id_programming = false;
   }
 
+
+
+  if ( _aqualink_data.num_sensors > 0){
+    start_sensors_thread(&_aqualink_data);
+  }
+
   /*
    *
    *    This is the main loop  
@@ -1268,7 +1284,7 @@ void main_loop()
     blank_read_reconnect = blank_read_reconnect * 50;
 #endif
 
-  int loopnum=0;
+  //int loopnum=0;
   blank_read = 0;
   // OK, Now go into infinate loop
   while (_keepRunning == true)
@@ -1477,6 +1493,7 @@ void main_loop()
       }
     }
 
+    /*
     if ( _aqualink_data.num_sensors > 0 && ++loopnum >= 200 ) {
       loopnum=0;
       for (int i=0; i < _aqualink_data.num_sensors; i++) {
@@ -1484,7 +1501,8 @@ void main_loop()
           _aqualink_data.updated = true;
         }
       }
-    }    
+    }
+      */  
 
     //tcdrain(rs_fd); // Make sure buffer has been sent.
     //delay(10);
@@ -1495,6 +1513,7 @@ void main_loop()
 
   if (! _restart) { // Stop network if we are not restarting
      stop_net_services();
+     stop_sensors_thread();
   }
 
   // Reset and close the port.

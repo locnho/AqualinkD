@@ -23,6 +23,8 @@
 
 #include <libgen.h>
 
+//#include <locale.h>
+
 #include <sys/ioctl.h>
 //#include <sys/socket.h>
 //#include <sys/time.h>
@@ -57,7 +59,9 @@
 char *generate_mqtt_id(char *buf, int len);
 pump_detail *getpump(struct aqualinkdata *aqdata, int button);
 bool populatePumpData(struct aqualinkdata *aqdata, char *pumpcfg ,aqkey *button, char *value);
+bool populateLightData(struct aqualinkdata *aqdata, char *lightcfg ,aqkey *button, char *value);
 pump_detail *getPumpFromButtonID(struct aqualinkdata *aqdata, aqkey *button);
+clight_detail *getLightFromButtonID(struct aqualinkdata *aqdata, aqkey *button);
 aqkey *getVirtualButton(struct aqualinkdata *aqdata, int num);
 struct aqualinkdata *_aqdata = NULL;
 
@@ -164,6 +168,7 @@ const int           _dcfg_light_programming_mode = 0;
 const int           _dcfg_light_programming_initial_on = 15;
 const int           _dcfg_light_programming_initial_off = 12;
 
+const int           _dcfg_sensor_poll_time = 300;
 
 void init_parameters (struct aqconfig * parms)
 {
@@ -205,6 +210,7 @@ void init_parameters (struct aqconfig * parms)
   //_cfgParams[_numCfgParams].advanced = true;
   _cfgParams[_numCfgParams].config_mask |= CFG_GRP_ADVANCED;
   _cfgParams[_numCfgParams].config_mask |= CFG_READONLY;
+  _cfgParams[_numCfgParams].config_mask |= CFG_FORCE_RESTART;
   _cfgParams[_numCfgParams].default_value = NULL;
 
   _numCfgParams++;
@@ -212,6 +218,7 @@ void init_parameters (struct aqconfig * parms)
   _cfgParams[_numCfgParams].value_type = CFG_SPECIAL;
   _cfgParams[_numCfgParams].name = CFG_N_panel_type;
   _cfgParams[_numCfgParams].default_value = NULL;
+  _cfgParams[_numCfgParams].config_mask |= CFG_FORCE_RESTART;
 
   _numCfgParams++;
   _cfgParams[_numCfgParams].value_ptr = &_aqconfig_.device_id;
@@ -219,6 +226,7 @@ void init_parameters (struct aqconfig * parms)
   _cfgParams[_numCfgParams].name = CFG_N_device_id;
   _cfgParams[_numCfgParams].valid_values = CFG_V_device_id;
   _cfgParams[_numCfgParams].default_value = (void *)&_dcfg_findIDHex;
+  _cfgParams[_numCfgParams].config_mask |= CFG_FORCE_RESTART;
 
   _numCfgParams++;
   _cfgParams[_numCfgParams].value_ptr = &_aqconfig_.rssa_device_id;
@@ -530,6 +538,7 @@ void init_parameters (struct aqconfig * parms)
   _cfgParams[_numCfgParams].name = CFG_N_event_check_usecron;
   _cfgParams[_numCfgParams].mask = AQS_USE_CRON_PUMP_TIME;
   _cfgParams[_numCfgParams].default_value = (void *)&_dcfg_false;
+   _cfgParams[_numCfgParams].config_mask |= CFG_GRP_ADVANCED;
 
   _numCfgParams++;
   _cfgParams[_numCfgParams].value_ptr = &_aqconfig_.schedule_event_mask;
@@ -537,6 +546,7 @@ void init_parameters (struct aqconfig * parms)
   _cfgParams[_numCfgParams].name = CFG_N_event_check_poweron;
   _cfgParams[_numCfgParams].mask = AQS_POWER_ON;
   _cfgParams[_numCfgParams].default_value = (void *)&_dcfg_false;
+   _cfgParams[_numCfgParams].config_mask |= CFG_GRP_ADVANCED;
 
   _numCfgParams++;
   _cfgParams[_numCfgParams].value_ptr = &_aqconfig_.schedule_event_mask;
@@ -544,6 +554,7 @@ void init_parameters (struct aqconfig * parms)
   _cfgParams[_numCfgParams].name = CFG_N_event_check_freezeprotectoff;
   _cfgParams[_numCfgParams].mask = AQS_FRZ_PROTECT_OFF;
   _cfgParams[_numCfgParams].default_value = (void *)&_dcfg_false;
+   _cfgParams[_numCfgParams].config_mask |= CFG_GRP_ADVANCED;
 
   _numCfgParams++;
   _cfgParams[_numCfgParams].value_ptr = &_aqconfig_.schedule_event_mask;
@@ -551,24 +562,28 @@ void init_parameters (struct aqconfig * parms)
   _cfgParams[_numCfgParams].name = CFG_N_event_check_boostoff;
   _cfgParams[_numCfgParams].mask = AQS_BOOST_OFF;
   _cfgParams[_numCfgParams].default_value = (void *)&_dcfg_false;
+   _cfgParams[_numCfgParams].config_mask |= CFG_GRP_ADVANCED;
 
   _numCfgParams++;
   _cfgParams[_numCfgParams].value_ptr = &_aqconfig_.sched_chk_pumpon_hour;
   _cfgParams[_numCfgParams].value_type = CFG_INT;
   _cfgParams[_numCfgParams].name = CFG_N_event_check_pumpon_hour;
   _cfgParams[_numCfgParams].default_value = (void *)&_dcfg_zero;
+   _cfgParams[_numCfgParams].config_mask |= CFG_GRP_ADVANCED;
 
   _numCfgParams++;
   _cfgParams[_numCfgParams].value_ptr = &_aqconfig_.sched_chk_pumpoff_hour;
   _cfgParams[_numCfgParams].value_type = CFG_INT;
   _cfgParams[_numCfgParams].name = CFG_N_event_check_pumpoff_hour;
   _cfgParams[_numCfgParams].default_value = (void *)&_dcfg_zero;
+   _cfgParams[_numCfgParams].config_mask |= CFG_GRP_ADVANCED;
   
   _numCfgParams++;
   _cfgParams[_numCfgParams].value_ptr = &_aqconfig_.sched_chk_booston_device;
   _cfgParams[_numCfgParams].value_type = CFG_STRING;
   _cfgParams[_numCfgParams].name = CFG_N_event_check_booston_device;
   _cfgParams[_numCfgParams].default_value = NULL;
+   _cfgParams[_numCfgParams].config_mask |= CFG_GRP_ADVANCED;
 
   _numCfgParams++;
   _cfgParams[_numCfgParams].value_ptr = &_aqconfig_.ftdi_low_latency;
@@ -626,6 +641,15 @@ void init_parameters (struct aqconfig * parms)
   _cfgParams[_numCfgParams].name = CFG_N_pda_sleep_mode;
   _cfgParams[_numCfgParams].default_value = (void *)&_dcfg_true;
 #endif
+
+  // Sensor poll time
+  _numCfgParams++;
+  _cfgParams[_numCfgParams].value_ptr = &_aqconfig_.sensor_poll_time;
+  _cfgParams[_numCfgParams].value_type = CFG_INT;
+  _cfgParams[_numCfgParams].name =  "sensor_poll_time";
+  _cfgParams[_numCfgParams].default_value = (void *)&_dcfg_sensor_poll_time;
+  _cfgParams[_numCfgParams].config_mask |= CFG_GRP_ADVANCED;
+
 
   // Optional values to store in config
   _numCfgParams++;
@@ -1190,6 +1214,7 @@ if (strlen(cleanwhitespace(value)) <= 0) {
       aqdata->aqbuttons[num].label = cleanalloc(value);
       rtn=true;
 #endif
+    /*
     } else if (strncasecmp(param + 9, "_lightModeCacheValue", 20) == 0) {
       if (isPLIGHT(aqdata->aqbuttons[num].special_mask)) {
         if (  ((clight_detail *)aqdata->aqbuttons[num].special_mask_ptr)->lightType == LC_PROGRAMABLE ) {
@@ -1230,6 +1255,16 @@ if (strlen(cleanwhitespace(value)) <= 0) {
         LOG(AQUA_LOG,LOG_ERR, "Config error, (colored|programmable) Lights limited to %d, ignoring %s'\n",MAX_LIGHTS,param);
       }
       rtn=true;
+      */
+    } else if (strncasecmp(param + 9, "_light", 6) == 0) {
+
+      if ( ! populateLightData(aqdata, param + 10, &aqdata->aqbuttons[num], value) ) 
+      {
+        LOG(AQUA_LOG,LOG_ERR, "Config error, %s=%s Ignored!",param,value);
+      }
+
+      rtn=true;
+     
       /*
     } else if (strncasecmp(param + 9, "_lightModeCacheValue", 20) == 0) {
       int val = strtoul(value, NULL, 20);
@@ -1253,7 +1288,7 @@ if (strlen(cleanwhitespace(value)) <= 0) {
     } 
 //#if defined AQ_IAQTOUCH
   } else if (strncasecmp(param, "virtual_button_", 15) == 0) {
-    rtn=true;
+    
     int num = strtoul(param + 15, NULL, 10);
     if (_aqconfig_.paneltype_mask == 0) {
       // ERROR the vbutton will be irnored.
@@ -1268,6 +1303,7 @@ if (strlen(cleanwhitespace(value)) <= 0) {
       } else {
         LOG(AQUA_LOG,LOG_WARNING, "Error with '%s', total buttons=%d, config has %d already, ignoring!\n",param, TOTAL_BUTTONS, aqdata->total_buttons);
       }
+      rtn=true;
     } else if (strncasecmp(param + 17, "_altLabel", 9) == 0) {
       char *label = cleanalloc(value);
       aqkey *button = getVirtualButton(aqdata, num);
@@ -1276,6 +1312,7 @@ if (strlen(cleanwhitespace(value)) <= 0) {
       } else {
         LOG(AQUA_LOG,LOG_WARNING, "Error with '%s', total buttons=%d, config has %d already, ignoring!\n",param, TOTAL_BUTTONS, aqdata->total_buttons);
       }
+      rtn=true;
     } else if (strncasecmp(param + 17, "_pump", 5) == 0) {
       aqkey *vbutton = getVirtualButton(aqdata, num);
       if (vbutton != NULL) {
@@ -1287,6 +1324,18 @@ if (strlen(cleanwhitespace(value)) <= 0) {
       } else {
         LOG(AQUA_LOG,LOG_ERR, "Config error, could not find vitrual button for `%s`",param);
       }
+      rtn=true;
+    } else if (strncasecmp(param + 17, "_light", 6) == 0) {
+      aqkey *vbutton = getVirtualButton(aqdata, num);
+      if (vbutton != NULL) {
+        if ( ! populateLightData(aqdata, param + 18, vbutton, value) ) 
+        {
+          LOG(AQUA_LOG,LOG_ERR, "Config error, %s=%s Ignored!",param,value);
+        }
+      } else {
+        LOG(AQUA_LOG,LOG_ERR, "Config error, could not find vitrual button for `%s`",param);
+      }
+      rtn=true;
     } else if (strncasecmp(param + 17, "_onetouchID", 11) == 0) {
       aqkey *vbutton = getVirtualButton(aqdata, num);
       if (vbutton != NULL) {
@@ -1324,6 +1373,7 @@ if (strlen(cleanwhitespace(value)) <= 0) {
       } else {
         LOG(AQUA_LOG,LOG_ERR, "Config error, could not find vitrual button for `%s`",param);
       }
+      rtn=true;
     }
   } else if (strncasecmp(param, "sensor_", 7) == 0) {
     int num = strtoul(param + 7, NULL, 10) - 1;
@@ -1333,6 +1383,7 @@ if (strlen(cleanwhitespace(value)) <= 0) {
       if ( num + 1 > aqdata->num_sensors ) {
         aqdata->num_sensors = num + 1;
       }
+      sprintf(aqdata->sensors[num].ID, "Aux_S%d", num+1);
       if (strncasecmp(param + 9, "_label", 6) == 0) {
         aqdata->sensors[num].label = ncleanalloc(value, AQ_MSGLEN);
         rtn=true;
@@ -1346,8 +1397,14 @@ if (strlen(cleanwhitespace(value)) <= 0) {
           LOG(AQUA_LOG,LOG_ERR, "Config error, couldn't understand `%s` from `%s`, using `1.0`!",value,param);
           aqdata->sensors[num].factor = 1;
         }
+        rtn=true;
+      } else if (strncasecmp(param + 9, "_regex", 5) == 0) {
+        aqdata->sensors[num].regex = cleanalloc(value);
+        rtn=true;
+      } else if (strncasecmp(param + 9, "_uom", 3) == 0) {
+        aqdata->sensors[num].uom = cleanalloc(value);
+        rtn=true;
       }
-      rtn=true;
     } else {
       LOG(AQUA_LOG,LOG_ERR, "Config error, blank value for `%s`\n",param);
       rtn = false;
@@ -1423,9 +1480,44 @@ bool populatePumpData(struct aqualinkdata *aqdata, char *pumpcfg ,aqkey *button,
     pump->maxSpeed = strtoul(value, NULL, 10);
   } else if (strncasecmp(pumpcfg, "pumpMinSpeed", 12) == 0) {
     pump->minSpeed = strtoul(value, NULL, 10);
+  } else {
+    return false;
   }
 
   return true;
+}
+
+// lightcfg is pointer to lightMode, lightID, lightModeCacheValue  (ie pull off button_??_ or vurtual_button_??_)
+bool populateLightData(struct aqualinkdata *aqdata, char *lightcfg ,aqkey *button, char *value)
+{
+
+  clight_detail *light = getLightFromButtonID(aqdata, button);
+  if (light == NULL) {
+    return false;
+  }
+
+  if (strncasecmp(lightcfg, "lightModeCacheValue", 19) == 0) {
+    light->lastValue = strtoul(value, NULL, 10);
+    return true;
+  } else if (strncasecmp(lightcfg, "lightMode", 9) == 0) {
+    light->lightType = strtoul(value, NULL, 10);
+    if (light->lightType < LC_PROGRAMABLE || light->lightType >= NUMBER_LIGHT_COLOR_TYPES) {
+      LOG(AQUA_LOG,LOG_ERR, "Config error, unknown light mode '%d'\n",light->lightType);
+    }
+    if ( light->lightType == LC_DIMMER2 && _aqconfig_.rssa_device_id != 0x48 ) {
+      LOG(AQUA_LOG,LOG_ERR, "Config error, button '%s' has light mode '%d' set. This only supported when 'rssa_device_id' is enabled, changing to light mode '%d'\n",
+                button->label, LC_DIMMER2,LC_DIMMER);
+      light->lightType = LC_DIMMER;
+    }
+    return true;
+  } else if (strncasecmp(lightcfg, "lightID", 7) == 0) {
+    light->lightID = strtoul(cleanwhitespace(value), NULL, 16);
+    return true;
+  } else {
+    return false;
+  }
+
+  return false;
 }
 
 pump_detail *getPumpFromButtonID(struct aqualinkdata *aqdata, aqkey *button)
@@ -1457,6 +1549,29 @@ pump_detail *getPumpFromButtonID(struct aqualinkdata *aqdata, aqkey *button)
     aqdata->pumps[aqdata->num_pumps].pumpName[0] = '\0';
     aqdata->num_pumps++;
     return &aqdata->pumps[aqdata->num_pumps-1];
+  }
+
+  return NULL;
+}
+
+clight_detail *getLightFromButtonID(struct aqualinkdata *aqdata, aqkey *button)
+{
+  int li;
+
+  // Does it exist
+  for (li=0; li < aqdata->num_lights; li++) {
+    if (aqdata->lights[li].button == button) {
+      return &aqdata->lights[li];
+    }
+  }
+
+  // Create new entry
+  if (aqdata->num_lights < MAX_LIGHTS) {
+    button->special_mask |= PROGRAM_LIGHT;
+    button->special_mask_ptr = (void*)&aqdata->lights[aqdata->num_lights];
+    aqdata->lights[aqdata->num_lights].button = button;
+    aqdata->num_lights++;
+    return &aqdata->lights[aqdata->num_lights-1];
   }
 
   return NULL;
@@ -1516,6 +1631,9 @@ void read_config (struct aqualinkdata *aqdata, char *cfgFile)
   //int line = 0;
   //int tokenindex = 0;
   char *b_ptr;
+
+
+  //setlocale(LC_ALL, "en_US.UTF-8"); 
 
   _aqconfig_.config_file = cleanalloc(cfgFile);
 
@@ -1607,6 +1725,9 @@ void check_print_config (struct aqualinkdata *aqdata)
 
   // Make sure all sensors are fully populated
   for (i=0; i < aqdata->num_sensors; i++ ) {
+    //if (aqdata->sensors[i].uom == NULL) {
+    //  aqdata->sensors[i].uom = cleanalloc("°C");
+    //}
     if ( aqdata->sensors[i].label == NULL ||  aqdata->sensors[i].path == NULL ) {
       LOG(AQUA_LOG,LOG_ERR, "Invalid sensor %d, removing!\n",i+1);
       if (i == (aqdata->num_sensors-1) ) { // last sensor
@@ -1616,6 +1737,8 @@ void check_print_config (struct aqualinkdata *aqdata)
           aqdata->sensors[j].label = aqdata->sensors[j+1].label;
           aqdata->sensors[j].path = aqdata->sensors[j+1].path;
           aqdata->sensors[j].factor = aqdata->sensors[j+1].factor;
+          aqdata->sensors[j].regex = aqdata->sensors[j+1].regex;
+          aqdata->sensors[j].uom = aqdata->sensors[j+1].uom;
         }
       }
       aqdata->num_sensors --;
@@ -1758,6 +1881,28 @@ void check_print_config (struct aqualinkdata *aqdata)
 
 
   for ( i=0; i <= _numCfgParams; i++) {
+
+    // Reconfigure some CFG values depending on PDA
+    if ( strcmp(_cfgParams[i].name, CFG_N_device_id) == 0 ) {
+      if (isPDA_PANEL) {
+        _cfgParams[i].valid_values = CFG_V_device_id_PDA; 
+      } else {
+        _cfgParams[i].valid_values = CFG_V_device_id_RS; 
+      }
+    }
+    if ( strcmp(_cfgParams[i].name, CFG_N_rssa_device_id) == 0 && isPDA_PANEL) {
+      _cfgParams[i].config_mask |= CFG_GREYED_OUT;
+    }
+    if ( strcmp(_cfgParams[i].name, CFG_N_extended_device_id) == 0 && isPDA_PANEL) {
+      _cfgParams[i].config_mask |= CFG_GREYED_OUT;
+    }
+
+    // Don't show PDA stuff on RS panel
+    if ( strcmp(_cfgParams[i].name, CFG_N_pda_sleep_mode) == 0 && !isPDA_PANEL) {
+      _cfgParams[i].config_mask |= CFG_GREYED_OUT;
+      _cfgParams[i].config_mask |= CFG_READONLY;
+    }
+
     rsm_nchar_replace(name, MAX_PRINTLEN, _cfgParams[i].name, "_", " ");
     switch (_cfgParams[i].value_type) {
       case CFG_STRING:
@@ -1853,14 +1998,21 @@ void check_print_config (struct aqualinkdata *aqdata)
     if ( ((aqdata->aqbuttons[i].special_mask & VIRTUAL_BUTTON) == VIRTUAL_BUTTON)  && 
          ((aqdata->aqbuttons[i].special_mask & VS_PUMP ) != VS_PUMP) &&
           (_aqconfig_.extended_device_id < 0x30 || _aqconfig_.extended_device_id > 0x33 ) ){
-      LOG(AQUA_LOG,LOG_WARNING, "Config error, extended_device_id must be on of the folowing (0x30,0x31,0x32,0x33) to use virtual button : '%s'",aqdata->aqbuttons[i].label);
+      LOG(AQUA_LOG,LOG_WARNING, "Config error, extended_device_id must be one of the folowing (0x30,0x31,0x32,0x33) to use virtual button : '%s'",aqdata->aqbuttons[i].label);
     }
 
   }
 
   for (i = 0; i < aqdata->num_sensors; i++)
   {
-    LOG(AQUA_LOG,LOG_NOTICE, "Config Sensor %02d     = label %-15s | %s\n", i+1, aqdata->sensors[i].label,aqdata->sensors[i].path);
+    //LOG(AQUA_LOG,LOG_NOTICE, "Sensor %-13s = label %-15s | %s\n", aqdata->sensors[i].ID, aqdata->sensors[i].label,aqdata->sensors[i].path);
+    LOG(AQUA_LOG,LOG_NOTICE, "Sensor %-13s = label %-15s | %s | %s%s %s\n", 
+         aqdata->sensors[i].ID, 
+         aqdata->sensors[i].label,
+         aqdata->sensors[i].path,
+         (aqdata->sensors[i].uom==NULL?"":aqdata->sensors[i].uom),
+         (aqdata->sensors[i].uom==NULL?"":" |"),
+         (aqdata->sensors[i].regex==NULL?"":aqdata->sensors[i].regex));
   }
 
   
@@ -1920,7 +2072,7 @@ int save_config_js(const char* inBuf, int inSize, char* outBuf, int outSize, str
   regmatch_t groupArray[maxGroups];
   regex_t regexCompiled;
   int rc;
-  char * cursor = (char *)inBuf;;
+  char * cursor = (char *)inBuf;
   unsigned int m;
   char key[64];
   char value[64];
@@ -1956,6 +2108,11 @@ int save_config_js(const char* inBuf, int inSize, char* outBuf, int outSize, str
     free(aqdata->sensors[i].path);
     aqdata->sensors[i].label = NULL;
     aqdata->sensors[i].path = NULL;
+    // NSF When fixed the JSON & config editor, put these lines back.
+    //free(aqdata->sensors[i].regex);
+    //aqdata->sensors[i].regex = NULL;
+    free(aqdata->sensors[i].uom);
+    aqdata->sensors[i].uom = NULL;
   }
   aqdata->num_sensors=0;
 
@@ -2167,6 +2324,17 @@ bool writeCfg (struct aqualinkdata *aqdata)
     fprintf(fp,"\nsensor_%.2d_path=%s\n",i,aqdata->sensors[i-1].path);
     fprintf(fp,"sensor_%.2d_label=%s\n",i,aqdata->sensors[i-1].label);
     fprintf(fp,"sensor_%.2d_factor=%f\n",i,aqdata->sensors[i-1].factor);
+    if (aqdata->sensors[i-1].regex != NULL) {
+      fprintf(fp,"sensor_%.2d_regex=%s\n",i,aqdata->sensors[i-1].regex);
+    }
+    if (aqdata->sensors[i-1].uom != NULL) {
+      fprintf(fp,"sensor_%.2d_uom=%s\n",i,aqdata->sensors[i-1].uom);
+    }
+    /*
+    if (aqdata->sensors[i-1].regex != NULL) {
+      fprintf(fp,"sensor_%.2d_regex=%f\n",i,aqdata->sensors[i-1].regex);
+    }
+    */
   }
 
   fprintf(fp,"\n");

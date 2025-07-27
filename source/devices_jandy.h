@@ -25,6 +25,9 @@ bool processPacketToJandyChemFeeder(unsigned char *packet_buffer, int packet_len
 bool processPacketToHeatPump(unsigned char *packet_buffer, int packet_length, struct aqualinkdata *aqdata);
 bool processPacketFromHeatPump(unsigned char *packet_buffer, int packet_length, struct aqualinkdata *aqdata, const unsigned char previous_packet_to);
 
+bool processPacketToJandyLight(unsigned char *packet_buffer, int packet_length, struct aqualinkdata *aqdata);
+bool processPacketFromJandyLight(unsigned char *packet_buffer, int packet_length, struct aqualinkdata *aqdata, const unsigned char previous_packet_to);
+
 void get_swg_status_mqtt(struct aqualinkdata *aqdata, char *message, int *status, int *dzalert);
 aqledstate get_swg_led_state(struct aqualinkdata *aqdata);
 

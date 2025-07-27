@@ -16,15 +16,17 @@ void startPacketLogging(bool debug_protocol_packets, bool debug_raw_bytes); // S
 void stopPacketLogger();
 //void logPacket(unsigned char *packet_buffer, int packet_length, bool checksumerror);
 //void logPacket(unsigned char *packet_buffer, int packet_length);
-void logPacketRead(unsigned char *packet_buffer, int packet_length);
-void logPacketWrite(unsigned char *packet_buffer, int packet_length);
-void logPacketError(unsigned char *packet_buffer, int packet_length);
-void logPacketByte(unsigned char *byte);
-void logPacket(logmask_t from, int level, unsigned char *packet_buffer, int packet_length, bool is_read) ;
-int beautifyPacket(char *buff, int buff_size, unsigned char *packet_buffer, int packet_length, bool is_read);
+void logPacketRead(const unsigned char *packet_buffer, int packet_length);
+void logPacketWrite(const unsigned char *packet_buffer, int packet_length);
+void logPacketError(const unsigned char *packet_buffer, int packet_length);
+void logPacketByte(const unsigned char *byte);
+void logPacket(logmask_t from, int level, const unsigned char *packet_buffer, int packet_length, bool is_read) ;
+int beautifyPacket(char *buff, int buff_size, const unsigned char *packet_buffer, int packet_length, bool is_read);
+
+int sprintFrame(char *buff, int buff_size, const unsigned char *packet_buffer, int packet_length);
 
 // Only use for manual debugging
-void debuglogPacket(logmask_t from, unsigned char *packet_buffer, int packet_length, bool is_read, bool forcelog);
+void debuglogPacket(logmask_t from, const unsigned char *packet_buffer, int packet_length, bool is_read, bool forcelog);
 
 
 #endif //PACKETLOGGER_H_

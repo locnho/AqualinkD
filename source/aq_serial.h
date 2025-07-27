@@ -48,7 +48,7 @@ const char *getJandyDeviceName(emulation_type etype);
 #define JANDY_DEC_PUMP_MAX    123   // 0x7b
 // Have also seen epump at 0xe0 with panel rev W that supports more pumps
 #define JANDY_DEC_PUMP2_MIN    224   // 0xe0
-#define JANDY_DEC_PUMP2_MAX    228   // 0xe3 // Their are probably more, but this is a guess
+#define JANDY_DEC_PUMP2_MAX    228   // 0xe3 // (should be 0xEF?????) Their are probably more, but this is a guess
 
 #define JANDY_DEC_JXI_MIN     104   // 0x68
 #define JANDY_DEC_JXI_MAX     107   // 0x6B
@@ -65,6 +65,9 @@ const char *getJandyDeviceName(emulation_type etype);
 
 #define JANDY_DEV_HPUMP_MIN    0x70
 #define JANDY_DEV_HPUMP_MAX    0x73
+
+#define JANDY_DEV_JLIGHT_MIN    0xF0
+#define JANDY_DEV_JLIGHT_MAX    0xF4 // 0xF4 is total guess.
 /*
 //===== Device ID's =====//
 //=========================================================================//
@@ -524,7 +527,8 @@ typedef enum {
   DRS_JXI,
   DRS_LX,
   DRS_CHEM,
-  DRS_HEATPUMP
+  DRS_HEATPUMP,
+  DRS_JLIGHT
 } rsDeviceType;
 
 typedef enum {
@@ -567,7 +571,7 @@ bool serial_blockingmode();
 //bool pda_mode();
 //#endif
 int generate_checksum(unsigned char* packet, int length);
-protocolType getProtocolType(unsigned char* packet);
+protocolType getProtocolType(const unsigned char* packet);
 bool check_jandy_checksum(unsigned char* packet, int length);
 bool check_pentair_checksum(unsigned char* packet, int length);
 void send_ack(int file_descriptor, unsigned char command);
@@ -582,7 +586,7 @@ int is_valid_port(int fd);
 //void close_serial_port(int file_descriptor, struct termios* oldtio);
 //void process_status(void const * const ptr);
 void process_status(unsigned char* ptr);
-const char* get_packet_type(unsigned char* packet , int length);
+const char* get_packet_type(const unsigned char* packet , int length);
 /*
 void set_onetouch_enabled(bool mode);
 bool onetouch_enabled();

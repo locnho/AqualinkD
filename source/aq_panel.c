@@ -185,7 +185,7 @@ pull board CPU, revision & panel string from strings like
 uint8_t setPanelInformationFromPanelMsg(struct aqualinkdata *aqdata, const char *input, uint8_t type, emulation_type source) {
     const char *rev_pos = NULL;
     uint8_t rtn = 0;
-
+printf("Calculate panel from %s\n",input);
     //const char *rev_pos = strstr(input, "REV");  // Find the position of "REV"
     const char *sp;
     int length = 0;
@@ -625,7 +625,7 @@ void setPanelByName(struct aqualinkdata *aqdata, const char *str)
     rs = false;
     if (str[2] == '-' || str[2] == ' ') // Account for PD-8
       size = atoi(&str[3]);
-    if (str[3] == '-' || str[4] == 'P') // PDA-PS6 Combo
+    if (str[3] == '-' && str[4] == 'P') // PDA-PS6 Combo
       size = atoi(&str[6]);
     else // Account for PDA-8
       size = atoi(&str[4]);

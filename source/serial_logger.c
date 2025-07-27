@@ -163,6 +163,8 @@ int serial_logger (int rs_fd, char *port_name, int logLevel, int slogger_packets
 #define HEAT_PUMP " <-- Heat Pump"
 #define REM_PWR_CENT " <-- Remote Power Center"
 
+#define JWC_LIGHTS " <-- Jandy WaterColor Lights"
+
 #define UNKNOWN " <-- Unknown Device"
 
 #define P_VSP " <-- Pentair VSP"
@@ -225,9 +227,11 @@ const char *getDevice(unsigned char ID) {
   if (ID >= 0x28 && ID <= 0x2B)
     return REM_PWR_CENT;
 
-  if (ID >= 0xE0 && ID <= 0xEF) // this could end at 0xF0
+  if (ID >= 0xE0 && ID <= 0xEF)
     return EPUMP2;
 
+  if (ID >= 0xF0 && ID <= 0xF4) // 0xF4 is total guess.
+    return JWC_LIGHTS;
   //if (ID == 0x08)
   //  return KEYPAD;
 

@@ -50,6 +50,24 @@ typedef enum heatpumpmsgfrom{
 
 void updateHeatPumpLed(heatpumpstate state, aqledstate ledstate, struct aqualinkdata *aqdata, heatpumpmsgfrom from);
 
+
+void printJandyDebugPacket (const char *msg, const unsigned char *packet, int packet_length)
+{
+  // Only log if we are jandy debug mode and not serial debug (otherwise it'll print twice)
+  if (getLogLevel(DJAN_LOG) == LOG_DEBUG && getLogLevel(RSSD_LOG) < LOG_DEBUG ) {
+    char frame[1024];
+    //beautifyPacket(frame, 1024, packet, packet_length, true);
+
+    sprintFrame(frame, 1024, packet, packet_length);
+    LOG(DJAN_LOG, LOG_DEBUG, "%-4s %-6s: 0x%02hhx of type %16.16s | HEX: %s", 
+                            (packet[PKT_DEST]==0x00?"From":"To"),
+                            msg,
+                            packet[PKT_DEST],
+                            get_packet_type(packet, packet_length),
+                            frame);
+  }
+}
+
 bool processJandyPacket(unsigned char *packet_buffer, int packet_length, struct aqualinkdata *aqdata)
 {
   static rsDeviceType interestedInNextAck = DRS_NONE;
@@ -61,27 +79,38 @@ bool processJandyPacket(unsigned char *packet_buffer, int packet_length, struct 
   {
     if (interestedInNextAck == DRS_SWG)
     {
+      printJandyDebugPacket("SWG", packet_buffer, packet_length);
       rtn = processPacketFromSWG(packet_buffer, packet_length, aqdata, previous_packet_to);
     }
     else if (interestedInNextAck == DRS_EPUMP)
     {
+      printJandyDebugPacket("EPump", packet_buffer, packet_length);
       rtn = processPacketFromJandyPump(packet_buffer, packet_length, aqdata, previous_packet_to);
     }
     else if (interestedInNextAck == DRS_JXI)
     {
+      printJandyDebugPacket("JXi", packet_buffer, packet_length);
       rtn = processPacketFromJandyJXiHeater(packet_buffer, packet_length, aqdata, previous_packet_to);
     }
     else if (interestedInNextAck == DRS_LX)
     {
+      printJandyDebugPacket("LX", packet_buffer, packet_length);
       rtn = processPacketFromJandyLXHeater(packet_buffer, packet_length, aqdata, previous_packet_to);
     }
     else if (interestedInNextAck == DRS_CHEM)
     {
+      printJandyDebugPacket("CHEM", packet_buffer, packet_length);
       rtn = processPacketFromJandyChemFeeder(packet_buffer, packet_length, aqdata, previous_packet_to);
     }
     else if (interestedInNextAck == DRS_HEATPUMP)
     {
+      printJandyDebugPacket("HPump", packet_buffer, packet_length);
       rtn = processPacketFromHeatPump(packet_buffer, packet_length, aqdata, previous_packet_to);
+    }
+    else if (interestedInNextAck == DRS_JLIGHT)
+    {
+      printJandyDebugPacket("JLight", packet_buffer, packet_length);
+      rtn = processPacketFromJandyLight(packet_buffer, packet_length, aqdata, previous_packet_to);
     }
     interestedInNextAck = DRS_NONE;
     previous_packet_to = NUL;
@@ -103,6 +132,7 @@ bool processJandyPacket(unsigned char *packet_buffer, int packet_length, struct 
   else if (READ_RSDEV_SWG && packet_buffer[PKT_DEST] >= JANDY_DEC_SWG_MIN && packet_buffer[PKT_DEST] <= JANDY_DEC_SWG_MAX)
   {
     interestedInNextAck = DRS_SWG;
+    printJandyDebugPacket("SWG", packet_buffer, packet_length);
     rtn = processPacketToSWG(packet_buffer, packet_length, aqdata/*, _aqconfig_.swg_zero_ignore*/);
     previous_packet_to = packet_buffer[PKT_DEST];
   }
@@ -110,24 +140,28 @@ bool processJandyPacket(unsigned char *packet_buffer, int packet_length, struct 
                                ||  (packet_buffer[PKT_DEST] >= JANDY_DEC_PUMP2_MIN && packet_buffer[PKT_DEST] <= JANDY_DEC_PUMP2_MAX) ) )
   {
     interestedInNextAck = DRS_EPUMP;
+    printJandyDebugPacket("EPump", packet_buffer, packet_length);
     rtn = processPacketToJandyPump(packet_buffer, packet_length, aqdata);
     previous_packet_to = packet_buffer[PKT_DEST];
   }
   else if (READ_RSDEV_JXI && packet_buffer[PKT_DEST] >= JANDY_DEC_JXI_MIN && packet_buffer[PKT_DEST] <= JANDY_DEC_JXI_MAX)
   {
     interestedInNextAck = DRS_JXI;
+    printJandyDebugPacket("JXi", packet_buffer, packet_length);
     rtn = processPacketToJandyJXiHeater(packet_buffer, packet_length, aqdata);
     previous_packet_to = packet_buffer[PKT_DEST];
   }
   else if (READ_RSDEV_LX && packet_buffer[PKT_DEST] >= JANDY_DEC_LX_MIN && packet_buffer[PKT_DEST] <= JANDY_DEC_LX_MAX)
   {
     interestedInNextAck = DRS_LX;
+    printJandyDebugPacket("LX", packet_buffer, packet_length);
     rtn = processPacketToJandyLXHeater(packet_buffer, packet_length, aqdata);
     previous_packet_to = packet_buffer[PKT_DEST];
   }
   else if (READ_RSDEV_CHEM && packet_buffer[PKT_DEST] >= JANDY_DEC_CHEM_MIN && packet_buffer[PKT_DEST] <= JANDY_DEC_CHEM_MAX)
   {
     interestedInNextAck = DRS_CHEM;
+    printJandyDebugPacket("CHEM", packet_buffer, packet_length);
     rtn = processPacketToJandyChemFeeder(packet_buffer, packet_length, aqdata);
     previous_packet_to = packet_buffer[PKT_DEST];
   }
@@ -139,7 +173,15 @@ bool processJandyPacket(unsigned char *packet_buffer, int packet_length, struct 
   else if (READ_RSDEV_HPUMP && packet_buffer[PKT_DEST] >= JANDY_DEV_HPUMP_MIN && packet_buffer[PKT_DEST] <= JANDY_DEV_HPUMP_MAX)
   {
     interestedInNextAck = DRS_HEATPUMP;
+    printJandyDebugPacket("HPump", packet_buffer, packet_length);
     rtn = processPacketToHeatPump(packet_buffer, packet_length, aqdata);
+    previous_packet_to = packet_buffer[PKT_DEST];
+  }
+  else if (READ_RSDEV_JLIGHT && packet_buffer[PKT_DEST] >= JANDY_DEV_JLIGHT_MIN && packet_buffer[PKT_DEST] <= JANDY_DEV_JLIGHT_MAX)
+  {
+    interestedInNextAck = DRS_JLIGHT;
+    printJandyDebugPacket("JLight", packet_buffer, packet_length);
+    rtn = processPacketToJandyLight(packet_buffer, packet_length, aqdata);
     previous_packet_to = packet_buffer[PKT_DEST];
   }
   else
@@ -157,16 +199,16 @@ bool processJandyPacket(unsigned char *packet_buffer, int packet_length, struct 
   return rtn;
 }
 
+
+
+
+
+
+
 bool processPacketToSWG(unsigned char *packet, int packet_length, struct aqualinkdata *aqdata /*, int swg_zero_ignore*/) {
   //static int swg_zero_cnt = 0;
   bool changedAnything = false;
 
-  // Only log if we are jandy debug move and not serial (otherwise it'll print twice)
-  if (getLogLevel(DJAN_LOG) == LOG_DEBUG && getLogLevel(RSSD_LOG) < LOG_DEBUG ) {
-    char buff[1024];
-    beautifyPacket(buff, 1024, packet, packet_length, true);
-    LOG(DJAN_LOG,LOG_DEBUG, "To     SWG: %s", buff);
-  }
 
   // Only read message from controller to SWG to set SWG Percent if we are not programming, as we might be changing this
   if (packet[3] == CMD_PERCENT && aqdata->active_thread.thread_id == 0 && packet[4] != 0xFF) {
@@ -223,13 +265,6 @@ bool processPacketFromSWG(unsigned char *packet, int packet_length, struct aqual
   } else if (_SWG_ID != NUL && _SWG_ID != previous_packet_to) {
     LOG(DJAN_LOG, LOG_WARNING, "We have two SWG, AqualinkD only supports one. using ID 0x%02hhx, ignoring 0x%02hhx\n", _SWG_ID, previous_packet_to);
     return changedAnything;
-  }
-
-  // Only log if we are jandy debug move and not serial (otherwise it'll print twice)
-  if (getLogLevel(DJAN_LOG) == LOG_DEBUG && getLogLevel(RSSD_LOG) < LOG_DEBUG ) {
-    char buff[1024];
-    beautifyPacket(buff, 1024, packet, packet_length, true);
-    LOG(DJAN_LOG,LOG_DEBUG, "From   SWG: %s", buff);
   }
 
   if (packet[PKT_CMD] == CMD_PPM) {
@@ -594,12 +629,6 @@ bool processPacketToJandyPump(unsigned char *packet_buffer, int packet_length, s
 
   Type 0x1F and cmd 0x45 is RPM = 39 * (256) + 96 / 4 = 2520  or  Byte 8 * 265 + Byte 7 / 4
  */
-   // Only log if we are jandy debug move and not serial (otherwise it'll print twice)
-  if (getLogLevel(DJAN_LOG) == LOG_DEBUG && getLogLevel(RSSD_LOG) < LOG_DEBUG ) {
-    char msg[1024];
-    beautifyPacket(msg, 1024, packet_buffer, packet_length, true);
-    LOG(DJAN_LOG, LOG_DEBUG, "To   ePump: %s", msg);
-  }
 
   // If type 0x45 and 0x44 set to interested in next command.
   if (packet_buffer[3] == CMD_EPUMP_RPM) {
@@ -625,14 +654,6 @@ bool processPacketToJandyPump(unsigned char *packet_buffer, int packet_length, s
 bool processPacketFromJandyPump(unsigned char *packet_buffer, int packet_length, struct aqualinkdata *aqdata, const unsigned char previous_packet_to)
 {
   bool found=false;
-
-  // Only log if we are jandy debug move and not serial (otherwise it'll print twice)
-  if (getLogLevel(DJAN_LOG) == LOG_DEBUG && getLogLevel(RSSD_LOG) < LOG_DEBUG ) {
-    char msg[1024];
-    //logMessage(LOG_DEBUG, "Need to log ePump message here for future\n");
-    beautifyPacket(msg, 1024, packet_buffer, packet_length, true);
-    LOG(DJAN_LOG, LOG_DEBUG, "From ePump: %s", msg);
-  }
 
   if (packet_buffer[3] == CMD_EPUMP_STATUS && packet_buffer[4] == CMD_EPUMP_RPM) {
     for (int i = 0; i < MAX_PUMPS; i++) {
@@ -691,13 +712,6 @@ int getPumpStatus(int pumpIndex, struct aqualinkdata *aqdata)
 
 bool processPacketToJandyJXiHeater(unsigned char *packet_buffer, int packet_length, struct aqualinkdata *aqdata)
 {
-
-  if (getLogLevel(DJAN_LOG) == LOG_DEBUG && getLogLevel(RSSD_LOG) < LOG_DEBUG ) {
-    char msg[1024];
-    //logMessage(LOG_DEBUG, "Need to log ePump message here for future\n");
-    beautifyPacket(msg, 1024, packet_buffer, packet_length, true);
-    LOG(DJAN_LOG, LOG_DEBUG, "To     JXi: %s", msg);
-  }
 
   if (packet_buffer[3] != CMD_JXI_PING) {
     // Not sure what this message is, so ignore
@@ -825,12 +839,6 @@ void getJandyHeaterErrorMQTT(struct aqualinkdata *aqdata, char *message)
 
 bool processPacketFromJandyJXiHeater(unsigned char *packet_buffer, int packet_length, struct aqualinkdata *aqdata, const unsigned char previous_packet_to)
 {
-  if (getLogLevel(DJAN_LOG) == LOG_DEBUG && getLogLevel(RSSD_LOG) < LOG_DEBUG ) {
-    char msg[1024];
-    //logMessage(LOG_DEBUG, "Need to log ePump message here for future\n");
-    beautifyPacket(msg, 1024, packet_buffer, packet_length, true);
-    LOG(DJAN_LOG, LOG_DEBUG, "From   JXi: %s", msg);
-  }
 
   if (packet_buffer[3] != CMD_JXI_STATUS) {
     // Not sure what this message is, so ignore
@@ -885,9 +893,6 @@ bool processPacketToJandyLXHeater(unsigned char *packet_buffer, int packet_lengt
   char msg[1024];
   int length = 0;
 
-  beautifyPacket(msg, 1024, packet_buffer, packet_length, true);
-  LOG(DJAN_LOG, LOG_INFO, "To      LX: %s", msg);
-
   length += sprintf(msg+length, "Last panel info ");
 
   for (int i=0; i < aqdata->total_buttons; i++) 
@@ -913,9 +918,6 @@ bool processPacketFromJandyLXHeater(unsigned char *packet_buffer, int packet_len
 {
   char msg[1024];
   int length = 0;   
-
-  beautifyPacket(msg, 1024, packet_buffer, packet_length, true);
-  LOG(DJAN_LOG, LOG_INFO, "From    LX: %s", msg);
 
   length += sprintf(msg+length, "Last panel info ");
 
@@ -943,9 +945,6 @@ bool processPacketToJandyChemFeeder(unsigned char *packet_buffer, int packet_len
   char msg[1024];
   int length = 0;
 
-  beautifyPacket(msg, 1024, packet_buffer, packet_length, true);
-  LOG(DJAN_LOG, LOG_INFO, "To    Chem: %s", msg);
-
   length += sprintf(msg+length, "Last panel info ");
 
   length += sprintf(msg+length, ", pH=%f, ORP=%d",aqdata->ph, aqdata->orp);
@@ -958,9 +957,6 @@ bool processPacketToJandyChemFeeder(unsigned char *packet_buffer, int packet_len
 bool processPacketFromJandyChemFeeder(unsigned char *packet_buffer, int packet_length, struct aqualinkdata *aqdata, const unsigned char previous_packet_to){
   char msg[1024];
   int length = 0;
-
-  beautifyPacket(msg, 1024, packet_buffer, packet_length, true);
-  LOG(DJAN_LOG, LOG_INFO, "From  Chem: %s", msg);
 
   length += sprintf(msg+length, "Last panel info ");
 
@@ -980,10 +976,6 @@ bool processPacketFromJandyChemFeeder(unsigned char *packet_buffer, int packet_l
 
 bool processPacketToHeatPump(unsigned char *packet_buffer, int packet_length, struct aqualinkdata *aqdata)
 {
-  char msg[1024];
-
-  beautifyPacket(msg, 1024, packet_buffer, packet_length, true);
-  LOG(DJAN_LOG, LOG_INFO, "To   HPump: %s", msg);
 /* Byted 3 and 4
   0x0c|0x01 = Heat Pump Enabled
   0x0c|0x29 = Chiller on
@@ -1038,7 +1030,6 @@ bool processPacketToHeatPump(unsigned char *packet_buffer, int packet_length, st
 }
 bool processPacketFromHeatPump(unsigned char *packet_buffer, int packet_length, struct aqualinkdata *aqdata, const unsigned char previous_packet_to)
 {
-  char msg[1024];
 /*
   HEX: 0x10|0x02|0x00|0x0d|0x40|0x00|0x00|0x5f|0x10|0x03|
   HEX: 0x10|0x02|0x00|0x0d|0x48|0x00|0x00|0x67|0x10|0x03|
@@ -1065,9 +1056,6 @@ bool processPacketFromHeatPump(unsigned char *packet_buffer, int packet_length, 
   } else {
     LOG(DJAN_LOG, LOG_INFO, "Heat Pump 0x%02hhx returned unknown information 0x%02hhx 0x%02hhx\n",packet_buffer[PKT_DEST], packet_buffer[3], packet_buffer[4]);
   }
-
-  beautifyPacket(msg, 1024, packet_buffer, packet_length, true);
-  LOG(DJAN_LOG, LOG_INFO, "From HPump: %s", msg);
 
   return false;
 }
@@ -1144,6 +1132,34 @@ void updateHeatPumpLed(heatpumpstate state, aqledstate ledstate, struct aqualink
   }
     */
 }
+
+
+bool processPacketToJandyLight(unsigned char *packet_buffer, int packet_length, struct aqualinkdata *aqdata)
+{
+  if (packet_buffer[3] == 0x4b) {
+    LOG(DJAN_LOG, LOG_INFO, "Request to set Jandy Light brightness to %d\n", packet_buffer[6]);
+  } else if (packet_buffer[3] == 0x3a) {
+    LOG(DJAN_LOG, LOG_INFO, "Request to set Jandy Light RGB to %d:%d:%d\n", packet_buffer[6],packet_buffer[7],packet_buffer[8]);
+  }
+
+  logPacket(DJAN_LOG, LOG_INFO, packet_buffer, packet_length, true);
+  
+  return true;
+}
+
+bool processPacketFromJandyLight(unsigned char *packet_buffer, int packet_length, struct aqualinkdata *aqdata, const unsigned char previous_packet_to)
+{
+  if (packet_buffer[3] == 0x31 ) {
+    // This has most of the info.
+    LOG(DJAN_LOG, LOG_INFO, "Light brightness=%d\n", packet_buffer[38]);
+  }
+
+  logPacket(DJAN_LOG, LOG_INFO, packet_buffer, packet_length, true);
+  
+  return true;
+}
+
+
 /*
 
 // JXi Heater
@@ -1236,5 +1252,99 @@ JandyDvce: From HPump: Read  Jandy   packet To 0x00 of type       LXi status | H
 Heat Pump Off
 JandyDvce: To   HPump: Read  Jandy   packet To 0x70 of type  LXi heater ping | HEX: 0x10|0x02|0x70|0x0c|0x00|0x00|0x00|0x00|0x8e|0x10|0x03|
 JandyDvce: From HPump: Read  Jandy   packet To 0x00 of type       LXi status | HEX: 0x10|0x02|0x00|0x0d|0x40|0x00|0x00|0x5f|0x10|0x03|
+
+*/
+
+
+
+/*
+RS485 Color Lights.
+
+Turned lights on (was already set to "America the Beautiful")     <-  USA?? index 12
+Switch color to "Alpine White".                                   <-  index 1
+Turned brightness down to 50%
+Turned brightness down to 25%
+Turned off
+
+
+packet To 0xf0 of type   Unknown '0x32' | HEX: 0x10|0x02|0xf0|0x32|0x00|0x34|0x10|0x03|
+packet To 0x00 of type   Unknown '0x33' | HEX: 0x10|0x02|0x00|0x33|0x2d|0x00|0x72|0x10|0x03|
+--
+packet To 0xf0 of type   Unknown '0x32' | HEX: 0x10|0x02|0xf0|0x32|0x00|0x34|0x10|0x03|
+packet To 0x00 of type   Unknown '0x33' | HEX: 0x10|0x02|0x00|0x33|0x2d|0x10|0x82|0x10|0x03|
+--
+******. Below reply byte 11 = 0x23 (color mode)????
+packet To 0xf0 of type         iAq Poll | HEX: 0x10|0x02|0xf0|0x30|0x00|0x32|0x10|0x03|
+packet To 0x00 of type iAq receive read | HEX: 0x10|0x02|0x00|0x31|0x2d|0x06|0x02|0x22|0x02|0x21|0x01|0x23|0x02|0x21|0x01|0x23|0x01|0x24|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0x64|0x64|0x64|0x64|0x00|0x00|0x00|0x81|0x0c|0x0f|0x03|0x72|0x10|0x03|
+--
+packet To 0xf0 of type   Unknown '0x32' | HEX: 0x10|0x02|0xf0|0x32|0x00|0x34|0x10|0x03|
+packet To 0x00 of type   Unknown '0x33' | HEX: 0x10|0x02|0x00|0x33|0x2d|0x00|0x72|0x10|0x03|
+--
+packet To 0xf0 of type   Unknown '0x32' | HEX: 0x10|0x02|0xf0|0x32|0x00|0x34|0x10|0x03|
+packet To 0x00 of type   Unknown '0x33' | HEX: 0x10|0x02|0x00|0x33|0x2d|0x10|0x82|0x10|0x03|
+--
+***** Below reply packed 38 is 0x64 (brightness 100%)
+***** Below reply packet 11 = 0x24 (color mode)?????
+packet To 0xf0 of type         iAq Poll | HEX: 0x10|0x02|0xf0|0x30|0x00|0x32|0x10|0x03|
+packet To 0x00 of type iAq receive read | HEX: 0x10|0x02|0x00|0x31|0x2d|0x06|0x02|0x22|0x02|0x21|0x01|0x24|0x02|0x21|0x01|0x24|0x01|0x24|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0x64|0x64|0x64|0x64|0x00|0x00|0x00|0x81|0x0c|0x0f|0x03|0x74|0x10|0x03|
+--
+packet To 0xf0 of type   Unknown '0x32' | HEX: 0x10|0x02|0xf0|0x32|0x00|0x34|0x10|0x03|
+packet To 0x00 of type   Unknown '0x33' | HEX: 0x10|0x02|0x00|0x33|0x2d|0x00|0x72|0x10|0x03|
+--
+packet To 0xf0 of type   Unknown '0x32' | HEX: 0x10|0x02|0xf0|0x32|0x00|0x34|0x10|0x03|
+packet To 0x00 of type   Unknown '0x33' | HEX: 0x10|0x02|0x00|0x33|0x2d|0x00|0x72|0x10|0x03|
+--
+packet To 0xf0 of type   Unknown '0x32' | HEX: 0x10|0x02|0xf0|0x32|0x00|0x34|0x10|0x03|
+packet To 0x00 of type   Unknown '0x33' | HEX: 0x10|0x02|0x00|0x33|0x2d|0x00|0x72|0x10|0x03|
+--
+********** Below Change to 50% ***********
+packet To 0xf0 of type   Unknown '0x4b' | HEX: 0x10|0x02|0xf0|0x4b|0x00|0x01|0x32|0x00|0x00|0x00|0x00|0x80|0x10|0x03|
+packet To 0x00 of type              Ack | HEX: 0x10|0x02|0x00|0x01|0x4b|0x00|0x5e|0x10|0x03|
+--
+packet To 0xf0 of type   Unknown '0x32' | HEX: 0x10|0x02|0xf0|0x32|0x00|0x34|0x10|0x03|
+packet To 0x00 of type   Unknown '0x33' | HEX: 0x10|0x02|0x00|0x33|0x2d|0x50|0xc2|0x10|0x03|
+--
+***** Below reply packed 38 is 0x32 (brightness 50%)
+packet To 0xf0 of type         iAq Poll | HEX: 0x10|0x02|0xf0|0x30|0x00|0x32|0x10|0x03|
+packet To 0x00 of type iAq receive read | HEX: 0x10|0x02|0x00|0x31|0x2d|0x06|0x02|0x22|0x02|0x21|0x01|0x23|0x02|0x21|0x01|0x23|0x01|0x24|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0x32|0x64|0x64|0x64|0x00|0x00|0x00|0x81|0x0c|0x0f|0x03|0x40|0x10|0x03|
+--
+packet To 0xf0 of type   Unknown '0x32' | HEX: 0x10|0x02|0xf0|0x32|0x00|0x34|0x10|0x03|
+packet To 0x00 of type   Unknown '0x33' | HEX: 0x10|0x02|0x00|0x33|0x2d|0x02|0x74|0x10|0x03|
+--
+packet To 0xf0 of type   Unknown '0x32' | HEX: 0x10|0x02|0xf0|0x32|0x00|0x34|0x10|0x03|
+packet To 0x00 of type   Unknown '0x33' | HEX: 0x10|0x02|0x00|0x33|0x2d|0x00|0x72|0x10|0x03|
+--
+***** Below reply packed 38 is 0x19 (brightness 25%)
+*********** Below Change to 25% ************
+packet To 0xf0 of type   Unknown '0x4b' | HEX: 0x10|0x02|0xf0|0x4b|0x00|0x01|0x19|0x00|0x00|0x00|0x00|0x67|0x10|0x03|
+packet To 0x00 of type              Ack | HEX: 0x10|0x02|0x00|0x01|0x4b|0x00|0x5e|0x10|0x03|
+--
+packet To 0xf0 of type   Unknown '0x32' | HEX: 0x10|0x02|0xf0|0x32|0x00|0x34|0x10|0x03|
+packet To 0x00 of type   Unknown '0x33' | HEX: 0x10|0x02|0x00|0x33|0x2d|0x50|0xc2|0x10|0x03|
+--
+packet To 0xf0 of type         iAq Poll | HEX: 0x10|0x02|0xf0|0x30|0x00|0x32|0x10|0x03|
+packet To 0x00 of type iAq receive read | HEX: 0x10|0x02|0x00|0x31|0x2d|0x06|0x02|0x22|0x02|0x21|0x01|0x23|0x02|0x21|0x01|0x23|0x01|0x23|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0x19|0x64|0x64|0x64|0x00|0x00|0x00|0x81|0x0c|0x0f|0x03|0x26|0x10|0x03|
+--
+packet To 0xf0 of type   Unknown '0x32' | HEX: 0x10|0x02|0xf0|0x32|0x00|0x34|0x10|0x03|
+packet To 0x00 of type   Unknown '0x33' | HEX: 0x10|0x02|0x00|0x33|0x2d|0x00|0x72|0x10|0x03|
+--
+packet To 0xf0 of type   Unknown '0x32' | HEX: 0x10|0x02|0xf0|0x32|0x00|0x34|0x10|0x03|
+packet To 0x00 of type   Unknown '0x33' | HEX: 0x10|0x02|0x00|0x33|0x2d|0x00|0x72|0x10|0x03|
+--
+packet To 0xf0 of type   Unknown '0x32' | HEX: 0x10|0x02|0xf0|0x32|0x00|0x34|0x10|0x03|
+packet To 0x00 of type   Unknown '0x33' | HEX: 0x10|0x02|0x00|0x33|0x2d|0x40|0xb2|0x10|0x03|
+--
+packet To 0xf0 of type         iAq Poll | HEX: 0x10|0x02|0xf0|0x30|0x00|0x32|0x10|0x03|
+packet To 0x00 of type iAq receive read | HEX: 0x10|0x02|0x00|0x31|0x2d|0x06|0x02|0x22|0x02|0x21|0x01|0x23|0x02|0x21|0x01|0x23|0x01|0x23|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0x19|0x64|0x64|0x64|0x00|0x00|0x00|0x01|0x0c|0x0f|0x03|0xa6|0x10|0x03|
+--
+packet To 0xf0 of type   Unknown '0x32' | HEX: 0x10|0x02|0xf0|0x32|0x00|0x34|0x10|0x03|
+packet To 0x00 of type   Unknown '0x33' | HEX: 0x10|0x02|0x00|0x33|0x2d|0x10|0x82|0x10|0x03|
+--
+packet To 0xf0 of type         iAq Poll | HEX: 0x10|0x02|0xf0|0x30|0x00|0x32|0x10|0x03|
+packet To 0x00 of type iAq receive read | HEX: 0x10|0x02|0x00|0x31|0x2d|0x06|0x02|0x22|0x02|0x21|0x01|0x22|0x02|0x21|0x01|0x23|0x01|0x23|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0x19|0x64|0x64|0x64|0x00|0x00|0x00|0x01|0x0c|0x0f|0x03|0xa5|0x10|0x03|
+
+
+
+
 
 */

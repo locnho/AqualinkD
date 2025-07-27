@@ -91,6 +91,7 @@ Designed to mimic AqualinkRS devices, used to fully configure the master control
 # ToDo (future release)
 * Create iAqualink Touch Simulator
 * AqualinkD to self configure. (Done for ID's, need to do for Panel type/size)
+* Support for (non Jandy) external ORP and Ph sensors
 
 
 <!--
@@ -134,6 +135,16 @@ NEED TO FIX FOR THIS RELEASE.
 
 
 -->
+
+# Updates in 2.6.9 (July 26 2025)
+* Config fixes for 0x33 ID / PDA
+* Changes to virtual buttons and light modes
+* Updates to aqmanager & config editor
+* Updates to jandy device logging & heatpump performance.
+* Increased performance of external sensors
+* Added unit of measure for External sensors
+* External sensors now have rexexp support (good for onewire devices)
+
 # Updates in 2.6.8 (June 29 2025)
 * Fixed some UI bugs, added download config option
 * Changes to config options & config editor

@@ -221,14 +221,20 @@ sd_journal *open_journal() {
   return journal;
 }
 
-void find_aqualinkd_startupmsg(sd_journal *journal)
+void find_aqualinkd_startupmsg(sd_journal *journal, int fallbacklines)
 {
   static bool once=false;
   const void *log;
   size_t len;
 
+  if (fallbacklines == 0) {
+    return;
+  }
+
   // Only going to do this one time, incase re reset while reading.
   if (once) {
+    // Simply go back number of lines since we have already gone back to startup message
+    sd_journal_previous_skip(journal, fallbacklines);
     return;
   }
   once=true;
@@ -276,8 +282,8 @@ bool _broadcast_systemd_logmessages(bool aqMgrActive, bool reOpenStaleConnection
     } else {
       sd_journal_close(journal);
       active = false;
-      return true;
       cursor = NULL;
+      return true;
     }
   } 
   // aqManager is active
@@ -299,8 +305,9 @@ bool _broadcast_systemd_logmessages(bool aqMgrActive, bool reOpenStaleConnection
       if (cursor != NULL) {
         sd_journal_seek_cursor(journal, cursor);
         sd_journal_next(journal);
-      } else
-        find_aqualinkd_startupmsg(journal);
+      } else {
+        find_aqualinkd_startupmsg(journal, (reOpenStaleConnection?0:10) );
+      }
 
       active = true;
   }
@@ -1020,7 +1027,7 @@ void mqtt_broadcast_aqualinkstate(struct mg_connection *nc)
   for (i=0; i < _aqualink_data->num_sensors; i++) {
     if ( _aqualink_data->sensors[i].value != TEMP_UNKNOWN && _last_mqtt_aqualinkdata.sensors[i].value != _aqualink_data->sensors[i].value) {
       char topic[50];
-      sprintf(topic, "%s/%s", SENSOR_TOPIC, _aqualink_data->sensors[i].label);
+      sprintf(topic, "%s/%s", SENSOR_TOPIC, _aqualink_data->sensors[i].ID);
       send_mqtt_float_msg(nc, topic, _aqualink_data->sensors[i].value);
       _last_mqtt_aqualinkdata.sensors[i].value = _aqualink_data->sensors[i].value;
     }

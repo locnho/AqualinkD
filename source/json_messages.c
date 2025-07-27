@@ -545,12 +545,36 @@ int build_device_JSON(struct aqualinkdata *aqdata, char* buffer, int size, bool 
   {
     if (aqdata->sensors[i].value != TEMP_UNKNOWN) {
        //length += sprintf(buffer+length, "\"%s\": \"%.2f\",", aqdata->sensors[i].label, aqdata->sensors[i].value );
+       /*
       length += sprintf(buffer+length, "{\"type\": \"temperature\", \"id\": \"%s/%s\", \"name\": \"%s\", \"state\": \"%s\", \"value\": \"%.*f\" },",
         SENSOR_TOPIC,aqdata->sensors[i].label,
         aqdata->sensors[i].label,
         "on",
         ((homekit)?2:0),
+        ((homekit_f)?aqdata->sensors[i].value:aqdata->sensors[i].value));*/
+
+      temperatureUOM uom = getTemperatureUOM(aqdata->sensors[i].uom);
+
+      if (uom == UNKNOWN) {
+        length += sprintf(buffer+length, "{\"type\": \"value\", \"id\": \"%s\", \"name\": \"%s\", \"state\": \"on\", \"value\": \"%.*f\" },",
+        aqdata->sensors[i].ID,
+        aqdata->sensors[i].label,
+        2,
+        aqdata->sensors[i].value);
+      } else if ( !homekit && (aqdata->temp_units == FAHRENHEIT && uom == CELSIUS) ) {
+        length += sprintf(buffer+length, "{\"type\": \"temperature\", \"id\": \"%s\", \"name\": \"%s\", \"state\": \"on\", \"value\": \"%.*f\" },",
+        aqdata->sensors[i].ID,
+        aqdata->sensors[i].label,
+        2,
+        degCtoF(aqdata->sensors[i].value));
+      } else {
+        length += sprintf(buffer+length, "{\"type\": \"temperature\", \"id\": \"%s\", \"name\": \"%s\", \"state\": \"%s\", \"value\": \"%.*f\" },",
+        aqdata->sensors[i].ID,
+        aqdata->sensors[i].label,
+        "on",
+        ((homekit)?2:0),
         ((homekit_f)?aqdata->sensors[i].value:aqdata->sensors[i].value));
+      }
     }
   }
 /*
@@ -848,8 +872,14 @@ printf("Pump Type %d\n",aqdata->pumps[i].pumpType);
   for (i=0; i < aqdata->num_sensors; i++) 
   {
     //printf("Sensor value %f %.2f\n",aqdata->sensors[i].value,aqdata->sensors[i].value);
+    
     if (aqdata->sensors[i].value != TEMP_UNKNOWN) {
-      length += sprintf(buffer+length, "\"%s\": \"%.2f\",", aqdata->sensors[i].label, aqdata->sensors[i].value );
+      //length += sprintf(buffer+length, "\"%s\": \"%.2f\",", aqdata->sensors[i].label, aqdata->sensors[i].value );
+      if ( aqdata->temp_units == FAHRENHEIT && getTemperatureUOM(aqdata->sensors[i].uom) == CELSIUS ) {
+        length += sprintf(buffer+length, "\"%s\": \"%.1f\",", aqdata->sensors[i].ID, degCtoF(aqdata->sensors[i].value) );
+      } else {
+        length += sprintf(buffer+length, "\"%s\": \"%.1f\",", aqdata->sensors[i].ID, aqdata->sensors[i].value );
+      }
     }
   }
   if (buffer[length-1] == ',')
@@ -1187,7 +1217,7 @@ int json_cfg_element(char* buffer, int size, const char *name, const void *value
   int result = 0;
 
   char valid_values[256];
-  char adv[128];
+  char adv[256];
   int adv_size=0;
 
   // We shouldn't get CFG_HIDE here. Since we can't exit with 0, simply add a space
@@ -1204,11 +1234,19 @@ int json_cfg_element(char* buffer, int size, const char *name, const void *value
   if (isMASKSET(config_mask, CFG_READONLY))
     adv_size += sprintf(adv+adv_size,",\"readonly\": \"yes\"");
 
-  if (isMASKSET(config_mask, CFG_FORCE_RESTART))
+  if (isMASKSET(config_mask, CFG_FORCE_RESTART)) {
     adv_size += sprintf(adv+adv_size,",\"force_restart\": \"yes\"");
+    if ( strcmp(name, CFG_N_panel_type) == 0 ) {
+      adv_size += sprintf(adv+adv_size,",\"force_restart_msg\": \"If you panel_type, you must save and reload config for correct config options to show, and must also restart AqualinkD once finished!\"");
+    }
+
+  }
 
   if (isMASKSET(config_mask, CFG_ALLOW_BLANK))
     adv_size += sprintf(adv+adv_size,",\"allow_blank\": \"yes\"");
+
+   if (isMASKSET(config_mask, CFG_GREYED_OUT))
+    adv_size += sprintf(adv+adv_size,",\"greyed_out\": \"yes\"");
   
 
   switch(type){
@@ -1323,18 +1361,11 @@ int build_aqualink_config_JSON(char* buffer, int size, struct aqualinkdata *aq_d
 
   //#ifdef CONFIG_DEV_TEST
   for (int i=0; i <= _numCfgParams; i++) {
+
     if (isMASK_SET(_cfgParams[i].config_mask, CFG_HIDE) ) {
       continue;
     }
-    // We can't change web_directory or port while running, so don;t even chow those options.
-    // mongoose holds a pointer to the string web_directoy, so can;t change that easily while running
-    // web port = well derr we are using that currently
-    /*
-    if ( strncasecmp(_cfgParams[i].name, CFG_N_socket_port, strlen(CFG_N_socket_port)) == 0 || 
-         strncasecmp(_cfgParams[i].name, CFG_N_web_directory, strlen(CFG_N_web_directory)) == 0 ) {
-      continue;
-    }
-    */
+
     if (isMASK_SET(_cfgParams[i].config_mask, CFG_READONLY) ) {
       // NSF in the future we should allow these to pass, but set the UI as readonly.
       continue;
@@ -1374,6 +1405,25 @@ int build_aqualink_config_JSON(char* buffer, int size, struct aqualinkdata *aq_d
       return length;
     else
       length += result;
+
+    sprintf(buf,"sensor_%.2d_uom", i);
+    if ((result = json_cfg_element(buffer+length, size-length, buf, &aq_data->sensors[i-1].uom, CFG_STRING, 0, NULL, CFG_GRP_ADVANCED)) <= 0)
+      return length;
+    else
+      length += result;
+      //(&aq_data->sensors[i-1].uom==NULL ? "" : &aq_data->sensors[i-1].uom)
+
+    /*
+    // Need to escape / with /// for this to work, and fix the disply that will show // for ////
+    // Don;t forget config.c, Line 2096, search comment // NSF When fixed the JSON & config editor, put these lines back.
+    if (&aq_data->sensors[i-1].regex != NULL) {
+      sprintf(buf,"sensor_%.2d_regex", i);
+      if ((result = json_cfg_element(buffer+length, size-length, buf, &aq_data->sensors[i-1].regex, CFG_STRING, 0, NULL, CFG_GRP_ADVANCED)) <= 0)
+        return length;
+      else
+        length += result;
+    }
+    */
 
     length += sprintf(buffer+length, "}" );
     if (delectCharAt != 0) {

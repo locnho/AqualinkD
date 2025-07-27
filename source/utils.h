@@ -3,6 +3,9 @@
 #include <stdint.h>
 #include <time.h>
 
+//#include "aqualink.h"
+
+
 #ifndef UTILS_H_
 #define UTILS_H_
 
@@ -17,6 +20,12 @@
   #define TRUE 1
   #define FALSE 0
 #endif
+
+typedef enum tempUOM {
+ FAHRENHEIT,
+ CELSIUS,
+ UNKNOWN
+} temperatureUOM;
 
 #define LOGBUFFER 256
 #define LARGELOGBUFFER 1400 // / Must be at least AQ_MAXPKTLEN * 5 + 100
@@ -129,6 +138,10 @@ char *prittyString(char *str);
 //void writePacketLog(char *buff);
 //void closePacketLog();
 float timespec2float(const struct timespec *elapsed);
+bool isUomTemperature( const char *uom);
+
+
+temperatureUOM getTemperatureUOM(const char *uom);
 
 #ifdef AQ_MANAGER
 //void startInlineLog2File();

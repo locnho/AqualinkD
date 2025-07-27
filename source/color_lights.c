@@ -52,7 +52,7 @@ char *_color_light_options[NUMBER_LIGHT_COLOR_TYPES][LIGHT_COLOR_OPTIONS] =
         "Violet",
         "Slow Splash",
         "Fast Splash",
-        "USA",
+        "USA",         // America the Beautiful  <- Think this is Infinite Water Colors. Need to check what version that changed.
         "Fat Tuesday",
         "Disco Tech"
   },
@@ -116,7 +116,24 @@ char *_color_light_options[NUMBER_LIGHT_COLOR_TYPES][LIGHT_COLOR_OPTIONS] =
         "Mardi Gras",      // 0x50 (home panel) // 0x4b (simulator)
         "Cool Cabaret"     // 0x51 (home panel) // 0x4c
   },
-  {/*Spare 1*/},
+  {// Jandy Infinate Water Colors (RS485)
+        "Off",
+        "Alpine White",
+        "Sky Blue",
+        "Cobalt Blue",
+        "Caribbean Blue",
+        "Spring Green",
+        "Emerald Green",
+        "Emerald Rose",
+        "Ruby Red",    // Added over Jandy LED
+        "Magenta",
+        "Violet",
+        "Slow Splash",
+        "Fast Splash",
+        "America The Beautiful",         // America the Beautiful  <- Think this is Infinite Water Colors. Need to check what version that changed.
+        "Fat Tuesday",
+        "Disco Tech"
+  },
   {/*Spare 2*/},
   {/*Spare 3*/},
   { // Dimmer    // From manual this is 0 for off, 128+<value%> so 153 = 25%  = 0x99
@@ -309,7 +326,7 @@ int build_color_lights_js(struct aqualinkdata *aqdata, char* buffer, int size)
   length += sprintf(buffer+length, "var _light_program = [];\n");
 
   if ( _color_light_options[0][1] == NULL || strcmp(_color_light_options[0][1], "1") == 0) {
-    length += sprintf(buffer+length, "_light_program[0] = light_program;\n");
+    length += sprintf(buffer+length, "_light_program[0] = [];\n");
     i=1;
   } else {
     i=0;

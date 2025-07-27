@@ -40,6 +40,7 @@
         "CHEM/ORP",
         "Solar_Heater",
         "Extra_Aux",
+        "Chiller",
         "Aux_V1",
         "Aux_V2",
         "Aux_V3",
@@ -55,32 +56,18 @@
         "Aux_V13",
         "Aux_V14",
         "Aux_V15",
-        "Chiller",
-        "Sensor/CPU",
+        "Aux_S1",
+        "Aux_S2",
+        "Aux_S3",
+        "Aux_S4",
+        "Aux_S5",
+        "Aux_S6",
+        "Aux_S7",
+        "Aux_S8",
+        "Aux_S9",
+        "Aux_S10",
       ];
   
-      // This get's picked up by dynamic_config.js and used as mode 0
-      // As version 2.5.0 Please use aqualinkd.conf for this configuration.
-      var light_program = [
-        "Voodoo Lounge - Show",
-        "Blue Sea",
-        "Royal Blue",
-        "Afternoon Skies",
-        "Aqua Green",
-        "Emerald",
-        "Cloud White",
-        "Warm Red",
-        "Flamingo",
-        "Vivid Violet",
-        "Sangria",
-        "Twilight - Show",
-        "Tranquility - Show",
-        "Gemstone - Show",
-        "USA - Show",
-        "Mardi Gras - Show",
-        "Cool Cabaret - Show"
-      ];
-
       // all SWG return a status number, some have different meanings. Change the text below to suit, NOT THE NUMBER.
       var swgStatus = {
           0: "On",

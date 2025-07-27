@@ -15,8 +15,8 @@ static bool _logfile_packets = false;
 //static bool _includePentair = false;
 //static unsigned char _lastReadFrom = NUL;
 
-void _logPacket(logmask_t from, unsigned char *packet_buffer, int packet_length, bool error, bool force, bool is_read);
-int _beautifyPacket(char *buff, int buff_size, unsigned char *packet_buffer, int packet_length, bool error, bool is_read);
+void _logPacket(logmask_t from, const unsigned char *packet_buffer, int packet_length, bool error, bool force, bool is_read);
+int _beautifyPacket(char *buff, int buff_size, const unsigned char *packet_buffer, int packet_length, bool error, bool is_read);
 
 //void startPacketLogger(bool debug_RSProtocol_packets) {
 void startPacketLogger() {
@@ -56,7 +56,7 @@ void writePacketLog(char *buffer) {
 }
 
 // Log Raw Bytes
-void logPacketByte(unsigned char *byte)
+void logPacketByte(const unsigned char *byte)
 {
   if (!_logfile_raw)
     return;
@@ -77,24 +77,24 @@ void logPacket(unsigned char *packet_buffer, int packet_length) {
   _logPacket(RSSD_LOG, packet_buffer, packet_length, false, false);
 }
 */
-void logPacketRead(unsigned char *packet_buffer, int packet_length) {
+void logPacketRead(const unsigned char *packet_buffer, int packet_length) {
   _logPacket(RSSD_LOG, packet_buffer, packet_length, false, false, true);
 }
-void logPacketWrite(unsigned char *packet_buffer, int packet_length) {
+void logPacketWrite(const unsigned char *packet_buffer, int packet_length) {
   _logPacket(RSSD_LOG, packet_buffer, packet_length, false, false, false);
 }
 
-void logPacketError(unsigned char *packet_buffer, int packet_length) {
+void logPacketError(const unsigned char *packet_buffer, int packet_length) {
   _logPacket(RSSD_LOG, packet_buffer, packet_length, true, false, true);
 }
 
 /* This should never be used in production */
-void debuglogPacket(logmask_t from, unsigned char *packet_buffer, int packet_length, bool is_read, bool forcelog) {
+void debuglogPacket(logmask_t from, const unsigned char *packet_buffer, int packet_length, bool is_read, bool forcelog) {
   if ( forcelog == true || getLogLevel(from) >= LOG_DEBUG )
     _logPacket(from, packet_buffer, packet_length, false, forcelog, is_read);
 }
 
-void logPacket(logmask_t from, int level, unsigned char *packet_buffer, int packet_length, bool is_read) {
+void logPacket(logmask_t from, int level, const unsigned char *packet_buffer, int packet_length, bool is_read) {
   if ( getLogLevel(from) >= level )
     _logPacket(from, packet_buffer, packet_length, false, false, is_read);
 }
@@ -108,7 +108,7 @@ bool RSSD_LOG_filter_match(unsigned char ID) {
   return false;
 }
 
-void _logPacket(logmask_t from, unsigned char *packet_buffer, int packet_length, bool error, bool force, bool is_read)
+void _logPacket(logmask_t from, const unsigned char *packet_buffer, int packet_length, bool error, bool force, bool is_read)
 {
   static unsigned char lastPacketTo = NUL;
 
@@ -164,13 +164,13 @@ void _logPacket(logmask_t from, unsigned char *packet_buffer, int packet_length,
   }
 }
 
-int beautifyPacket(char *buff, int buff_size, unsigned char *packet_buffer, int packet_length, bool is_read)
+int beautifyPacket(char *buff, int buff_size, const unsigned char *packet_buffer, int packet_length, bool is_read)
 {
   return _beautifyPacket(buff, buff_size, packet_buffer, packet_length, false, is_read);
 }
-int _beautifyPacket(char *buff, int buff_size, unsigned char *packet_buffer, int packet_length, bool error, bool is_read)
+int _beautifyPacket(char *buff, int buff_size, const unsigned char *packet_buffer, int packet_length, bool error, bool is_read)
 {
-  int i = 0;
+  //int i = 0;
   int cnt = 0;
   protocolType ptype = getProtocolType(packet_buffer);
 
@@ -188,6 +188,27 @@ int _beautifyPacket(char *buff, int buff_size, unsigned char *packet_buffer, int
     cnt = sprintf(buff, "%5.5s %sTo 0x%02hhx of type %16.16s | HEX: ",(is_read?"Read":"Write"),(error?"BAD PACKET ":""), packet_buffer[PKT_DEST], get_packet_type(packet_buffer, packet_length));
   }
 */
+  return cnt + ( sprintFrame( (buff + cnt), (buff_size - cnt), packet_buffer, packet_length));
+
+  /*
+  for (i = 0; i < packet_length; i++) {
+    // Check we have enough space for next set of chars
+    if ( (cnt + 6) > buff_size)
+      break;
+
+    cnt += sprintf(buff + cnt, "0x%02hhx|", packet_buffer[i]);
+  }
+
+  cnt += sprintf(buff + cnt, "\n");
+
+  return cnt;*/
+}
+
+int sprintFrame(char *buff, int buff_size, const unsigned char *packet_buffer, int packet_length)
+{
+  int i = 0;
+  int cnt = 0;
+
   for (i = 0; i < packet_length; i++) {
     // Check we have enough space for next set of chars
     if ( (cnt + 6) > buff_size)

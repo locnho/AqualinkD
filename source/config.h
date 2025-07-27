@@ -35,6 +35,7 @@
 #define READ_RS485_JAN_CHEM (1 << 5) //     Jandy Chemical Feeder
 #define READ_RS485_IAQUALNK (1 << 6) // Read iAqualink messages 
 #define READ_RS485_HEATPUMP (1 << 7) // Read HeatPump messages
+#define READ_RS485_JLIGHT   (1 << 8) // Read Jandy infinite watercolor light
 
 #define MAX_RSSD_LOG_FILTERS 4
 
@@ -109,6 +110,7 @@ struct aqconfig
   bool device_pre_state;
   bool save_debug_log_masks;
   bool save_light_programming_value;
+  int sensor_poll_time;
 #ifdef AQ_NO_THREAD_NETSERVICE
   int rs_poll_speed; // Need to remove
   bool thread_netservices; // Need to remove
@@ -130,6 +132,7 @@ struct aqconfig _aqconfig_;
 #define READ_RSDEV_CHEM ((_aqconfig_.read_RS485_devmask & READ_RS485_JAN_CHEM) == READ_RS485_JAN_CHEM)
 #define READ_RSDEV_iAQLNK ((_aqconfig_.read_RS485_devmask & READ_RS485_IAQUALNK) == READ_RS485_IAQUALNK)
 #define READ_RSDEV_HPUMP ((_aqconfig_.read_RS485_devmask & READ_RS485_HEATPUMP) == READ_RS485_HEATPUMP)
+#define READ_RSDEV_JLIGHT ((_aqconfig_.read_RS485_devmask & READ_RS485_JLIGHT) == READ_RS485_JLIGHT)
 
 #define isPDA_IAQT (_aqconfig_.device_id == 0x33)
 //#define isPDA ((_aqconfig_.paneltype_mask & RSP_PDA) == RSP_PDA)
@@ -195,6 +198,7 @@ typedef enum cfg_value_type{
 #define CFG_PASSWD_MASK       (1 << 4) // Mask password with *****
 #define CFG_FORCE_RESTART     (1 << 5) // Force aqualinkd to restart
 #define CFG_ALLOW_BLANK       (1 << 6) // Allow blank entry
+#define CFG_GREYED_OUT        (1 << 7) // Greyout in UI, show but not editable
 //#define CFG_      (1 << 3)
 
 // Text to show when CFG_PASSWD_MASK is set
@@ -234,7 +238,11 @@ int _numCfgParams;
 #define CFG_N_socket_port                       "socket_port" 
 #define CFG_N_web_directory                     "web_directory"
 #define CFG_N_device_id                         "device_id"
-#define CFG_V_device_id                         "[\"0x0a\", \"0x0b\", \"0x09\", \"0x08\", \"0x60\", \"0xFF\"]"
+
+#define CFG_V_device_id                         "[\"0x0a\", \"0x0b\", \"0x09\", \"0x08\", \"0x60\", \"0x33\", \"0xFF\"]"
+#define CFG_V_device_id_RS                      "[\"0x0a\", \"0x0b\", \"0x09\", \"0x08\", \"0xFF\"]"
+#define CFG_V_device_id_PDA                     "[\"0x60\", \"0x33\", \"0xFF\"]"
+
 #define CFG_N_rssa_device_id                    "rssa_device_id"
 #define CFG_V_rssa_device_id                    "[\"0x00\", \"0x48\"]"
 
@@ -311,5 +319,8 @@ int _numCfgParams;
 
 #define CFG_N_save_debug_log_masks              "save_debug_log_masks"
 #define CFG_N_save_light_programming_value      "save_light_programming_value"
+
+
+//#define CFG_V_UOM "[\"°C\", \"°F\", \"K\", \"Hz\", \"GHz\", \"Pa\", \"0x41\", \"hPa\", \"bar\", \"mbar\", \"inHg\", \"psi\", \"L\", \"mL\", \"m³\", \"ft³\", \"fl. oz.\", \"m³/h\", \"ft³/m\"]"
 
 #endif
