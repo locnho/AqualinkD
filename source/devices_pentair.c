@@ -70,6 +70,15 @@ bool processPentairPacket(unsigned char *packet, int packet_length, struct aqual
         aqdata->pumps[i].status = (packet[PEN_HI_B_STATUS] * 256) + packet[PEN_LO_B_STATUS];
         aqdata->pumps[i].pressureCurve = packet[PEN_PPC];
 
+        // This is for RS485 mode only (no info from OneTouch or iAqualinkTouch)
+        if (!isONET_ENABLED && !isIAQT_ENABLED) {
+          if ( /*aqdata->pumps[i].mode > 0 ||*/ aqdata->pumps[i].rpm > 0 || aqdata->pumps[i].gpm > 0 || aqdata->pumps[i].watts > 0) {
+            aqdata->pumps[i].pStatus = PS_OK;
+          } else {
+            aqdata->pumps[i].pStatus = PS_OFF;
+          }
+        }
+
         changedAnything = true;
         break;
       }

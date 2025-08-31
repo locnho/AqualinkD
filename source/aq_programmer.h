@@ -56,7 +56,8 @@ typedef enum {
   AQ_GET_DIAGNOSTICS_MODEL,
   AQ_GET_PROGRAMS,
   AQ_SET_LIGHTPROGRAM_MODE,
-  AQ_SET_LIGHTCOLOR_MODE, 
+  AQ_SET_LIGHTCOLOR_MODE,
+  AQ_SET_LIGHTDIMMER, 
   AQ_SET_SWG_PERCENT,
   AQ_GET_AUX_LABELS,
   AQ_SET_BOOST,
@@ -144,13 +145,35 @@ typedef enum {
 #define AQP_RSSADAPTER_MAX   AQ_ADD_RSSADAPTER_SPA_HEATER_TEMP
 
 
+
+struct aqualinkdata;
+typedef struct aqualinkkey aqkey;
+
+/*
+struct aqualinkkey;
+typedef struct aqualinkkey aqkey;
+*/
+/*
+struct aqualinkdata;
+struct programmingThreadCtrl;
+*/
+
+
+struct programmerArgs {
+  aqkey *button;
+  int value;
+  int alt_value;
+  //char cval[PTHREAD_ARG];
+};
+
 struct programmingThreadCtrl {
   pthread_t thread_id;
   //void *thread_args;
+  struct programmerArgs pArgs;
   char thread_args[PTHREAD_ARG];
   struct aqualinkdata *aq_data;
 };
-
+ 
 
 typedef enum pump_type {
   PT_UNKNOWN = -1,
@@ -162,7 +185,10 @@ typedef enum pump_type {
 
 //void aq_programmer(program_type type, void *args, struct aqualinkdata *aq_data);
 void aq_programmer(program_type type, char *args, struct aqualinkdata *aq_data);
-//void kick_aq_program_thread(struct aqualinkdata *aq_data);
+// Below is NEW version of above.
+void aq_program(program_type r_type, aqkey *button, int value, int value2, struct aqualinkdata *aq_data);
+
+//void kick_aq_program_thread(struct aqualinkdata *aq_data); 
 void kick_aq_program_thread(struct aqualinkdata *aq_data, emulation_type source_type);
 bool in_programming_mode(struct aqualinkdata *aq_data);
 bool in_ot_programming_mode(struct aqualinkdata *aq_data);

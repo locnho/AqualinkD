@@ -1030,7 +1030,9 @@
         if (value == undefined || value.startsWith("-999") || value.startsWith(" ")) {
           value = '--';
         } else {
-          if ((type = document.getElementById(id).getAttribute('type')) != null) { 
+          if ((uom = document.getElementById(id).getAttribute('UOM')) != null) {
+            ext = uom;
+          } else if ((type = document.getElementById(id).getAttribute('type')) != null) { 
             if (type == 'temperature' || type == 'setpoint_thermo' || type == 'setpoint_freeze' || type == 'setpoint_chiller')
               ext = '&deg;';
             else if (type == 'setpoint_swg')
@@ -1057,6 +1059,13 @@
       var tile;
       if ((tile = document.getElementById(id + '_tile_icon_value')) != null)
         tile.innerHTML = value + ext;
+    }
+
+    function setTileUOM(id, uom) {
+      try {
+        type = document.getElementById(id).setAttribute('UOM', uom);
+        console.log("Set UOM to "+uom+" for "+id);
+      } catch (e) {}
     }
 
     function setTileOnText(id, text) {
@@ -1347,6 +1356,10 @@
         }
       } else if (object.type == 'value' || object.type == 'temperature') {
         add_tile(object.id, object.name, object.state, 'value', object.type);
+
+        if (object.uom !== undefined) {
+          setTileUOM(object.id, object.uom);
+        }
         setTileValue(object.id, object.value);
       } else if (object.type == 'setpoint_thermo' || object.type == 'setpoint_swg' || object.type == 'setpoint_freeze' || object.type == 'setpoint_chiller') {
         add_tile(object.id, object.name, object.state, 'thermostat', object.type);

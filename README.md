@@ -124,7 +124,6 @@ NEED TO FIX FOR THIS RELEASE.
 
 * Heat Pump / Chiller for OneTouch
 
-* Try an auto-update
 * Update Mongoose
 
 * PDA Crap.
@@ -133,8 +132,15 @@ NEED TO FIX FOR THIS RELEASE.
 
 * FIX Panel name in config to accept output from panel actual name
 
+* Move all programming threads over to using struct programmerArgs.
+* Use set_allbutton_light_dimmer for all lights (ie color lights)
 
 -->
+# Updates in 2.6.10 (DEV)
+* UI now supports UOM for external sensors
+* Updates to VSP status
+* Fix for Jandy Panel Rev T dimmer lights bug.
+* Autoconfig changes for older panels.
 
 # Updates in 2.6.9 (July 26 2025)
 * Config fixes for 0x33 ID / PDA

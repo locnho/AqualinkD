@@ -556,11 +556,12 @@ int build_device_JSON(struct aqualinkdata *aqdata, char* buffer, int size, bool 
       temperatureUOM uom = getTemperatureUOM(aqdata->sensors[i].uom);
 
       if (uom == UNKNOWN) {
-        length += sprintf(buffer+length, "{\"type\": \"value\", \"id\": \"%s\", \"name\": \"%s\", \"state\": \"on\", \"value\": \"%.*f\" },",
+        length += sprintf(buffer+length, "{\"type\": \"value\", \"id\": \"%s\", \"name\": \"%s\", \"state\": \"on\", \"value\": \"%.*f\", \"uom\": \"%s\" },",
         aqdata->sensors[i].ID,
         aqdata->sensors[i].label,
         2,
-        aqdata->sensors[i].value);
+        aqdata->sensors[i].value,
+        aqdata->sensors[i].uom);
       } else if ( !homekit && (aqdata->temp_units == FAHRENHEIT && uom == CELSIUS) ) {
         length += sprintf(buffer+length, "{\"type\": \"temperature\", \"id\": \"%s\", \"name\": \"%s\", \"state\": \"on\", \"value\": \"%.*f\" },",
         aqdata->sensors[i].ID,

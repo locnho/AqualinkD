@@ -30,6 +30,7 @@
 
 void initPanelButtons(struct aqualinkdata *aqdata, bool rspda, int size, bool combo, bool dual);
 void programDeviceLightMode(struct aqualinkdata *aqdata, int value, int button);
+void programDeviceLightBrightness(struct aqualinkdata *aqdata, int value, int deviceIndex, bool expectMultiple, request_source source);
 void printPanelSupport(struct aqualinkdata *aqdata);
 uint16_t setPanelSupport(struct aqualinkdata *aqdata);
 
@@ -185,7 +186,7 @@ pull board CPU, revision & panel string from strings like
 uint8_t setPanelInformationFromPanelMsg(struct aqualinkdata *aqdata, const char *input, uint8_t type, emulation_type source) {
     const char *rev_pos = NULL;
     uint8_t rtn = 0;
-printf("Calculate panel from %s\n",input);
+//printf("Calculate panel from %s\n",input);
     //const char *rev_pos = strstr(input, "REV");  // Find the position of "REV"
     const char *sp;
     int length = 0;
@@ -282,7 +283,7 @@ uint16_t setPanelSupport(struct aqualinkdata *aqdata)
 
     // Rev >= F Dimmer.  But need serial protocol so set to I
     // Rev >= H (Think this was first RS485)
-    // Rev >= HH Serial Adapter. (first support)
+    // Rev >= HH - (some panels support serial adapter, some don't)
     // Rev >= I Serial Adapter.
     // Rev >= I One Touch protocol
     // Rev >= L JandyColors Smart Light Control
@@ -310,10 +311,10 @@ uint16_t setPanelSupport(struct aqualinkdata *aqdata)
     // Rev >= Y TruSense Water Chemistry Analyzer
     // Rev >= Yg Virtual Device called Label Auxiliraries
 
-
+/*
     if (aqdata->panel_rev[0] >= 79) // O in ascii
       aqdata->panel_support_options |= RSP_SUP_VSP;
-
+*/
     if (aqdata->panel_rev[0] >= 73){ // I in ascii
       aqdata->panel_support_options |= RSP_SUP_ONET;
       aqdata->panel_support_options |= RSP_SUP_RSSA;
@@ -1160,6 +1161,7 @@ int getWaterTemp(struct aqualinkdata *aqdata)
 bool setDeviceState(struct aqualinkdata *aqdata, int deviceIndex, bool isON, request_source source)
 {
   aqkey *button = &aqdata->aqbuttons[deviceIndex];
+  bool set_pre_state = true;
 
   //if ( button->special_mask & VIRTUAL_BUTTON  && button->special_mask & VS_PUMP) {
   if ( isVS_PUMP(button->special_mask) && isVBUTTON(button->special_mask)) {
@@ -1197,17 +1199,30 @@ bool setDeviceState(struct aqualinkdata *aqdata, int deviceIndex, bool isON, req
       // Check for panel programmable light. if so simple ON isn't going to work well
       // Could also add "light mode" check, as this is only valid for panel configured light not aqualinkd configured light.
       if (isPLIGHT(button->special_mask) && button->led->state == OFF) {
+        // Full range dimmer can get stuck off on rev T.2 (maybe others), to overcome use allbutton with any % other than 0
+        if ( ((clight_detail *)button->special_mask_ptr)->lightType == LC_DIMMER2 ||
+             ((clight_detail *)button->special_mask_ptr)->lightType == LC_DIMMER ) // NSF should remove this once figured out Line #1354 programDeviceLightBrightness()
+        {
+          // programLightBrightness has appropiate code to call allbutton programmer.
+          /* 
+          int val = ((clight_detail *)button->special_mask_ptr)->lastValue>0?((clight_detail *)button->special_mask_ptr)->lastValue:100;
+          programDeviceLightBrightness(aqdata, val, deviceIndex, (source==NET_MQTT?true:false), source);
+          */
+          programDeviceLightBrightness(aqdata, 101, deviceIndex, (source==NET_MQTT?true:false), source);
+          set_pre_state = false;
+        }
         // OK Programable light, and no light mode selected. Now let's work out best way to turn it on. serial_adapter protocol will to it without questions,
         // all other will require programmig.
-        if (isRSSA_ENABLED) {
+        else if (isRSSA_ENABLED) {
           set_aqualink_rssadapter_aux_state(button, true);
         } else {
           //set_light_mode("0", deviceIndex); // 0 means use current light mode
           programDeviceLightMode(aqdata, 0, deviceIndex); // 0 means use current light mode
+          set_pre_state = false;
         }
 
         // If aqualinkd programmable light, it will come on at last state, so set that.
-        if ( /*isPLIGHT(button->special_mask) &&*/ ((clight_detail *)button->special_mask_ptr)->lightType == LC_PROGRAMABLE ) {
+        if ( ((clight_detail *)button->special_mask_ptr)->lightType == LC_PROGRAMABLE ) {
           ((clight_detail *)button->special_mask_ptr)->currentValue = ((clight_detail *)button->special_mask_ptr)->lastValue;
         }
       } else if (isVBUTTON(button->special_mask)) {
@@ -1226,6 +1241,7 @@ bool setDeviceState(struct aqualinkdata *aqdata, int deviceIndex, bool isON, req
             //if (button->rssd_code != VBUTTON_RSSD) {
             //LOG(PANL_LOG, LOG_NOTICE, "********** USE AQ_SET_IAQTOUCH_DEVICE_ON_OFF ********\n");
               aq_programmer(AQ_SET_IAQTOUCH_DEVICE_ON_OFF, msg, aqdata);
+              set_pre_state = false;
             //} else if (button->rssd_code != VBUTTON_ONETOUCH_RSSD) {
             //  LOG(PANL_LOG, LOG_NOTICE, "********** USE AQ_SET_IAQTOUCH_ONETOUCH_ON_OFF ********\n");
             //  aq_programmer(AQ_SET_IAQTOUCH_ONETOUCH_ON_OFF, msg, aqdata);
@@ -1266,7 +1282,7 @@ bool setDeviceState(struct aqualinkdata *aqdata, int deviceIndex, bool isON, req
 
 // Pre set device to state, next status will correct if state didn't take, but this will stop multiple ON messages setting on/off
 //#ifdef PRESTATE_ONOFF
-      if (_aqconfig_.device_pre_state) {
+      if (_aqconfig_.device_pre_state && set_pre_state) {
         if ((button->code == KEY_POOL_HTR || button->code == KEY_SPA_HTR ||
              button->code == KEY_EXT_AUX) &&
             isON > 0) {
@@ -1325,7 +1341,66 @@ bool programDeviceValue(struct aqualinkdata *aqdata, action_type type, int value
 
 void programDeviceLightBrightness(struct aqualinkdata *aqdata, int value, int deviceIndex, bool expectMultiple, request_source source) 
 {
+  // If Value is 101
+
   clight_detail *light = getProgramableLight(aqdata, deviceIndex);
+  // Light mode 10
+
+  //printf("******* Light Brightness *** value=%d device=%d multiple=%d\n",value,deviceIndex,expectMultiple);
+  //printf("****** Light %s on/off=%d %s\n",aqdata->aqbuttons[deviceIndex].label, aqdata->aqbuttons[deviceIndex].led->state, aqdata->aqbuttons[deviceIndex].led->state==ON?"on":"off");
+
+  // With changes to fix LC_DIMMER2, LC_DIMMER has now started having similar issues. 
+  // Need to come back and look at why, LC_DIMMER should be removed from below IF once sorted./
+  if ( (light->lightType == LC_DIMMER2 || light->lightType == LC_DIMMER) && aqdata->aqbuttons[deviceIndex].led->state == OFF ) {
+    // Light is off, we will turn in on but due to Jandy bug on rev T, have to use all button so values of 25/50/75/100.
+    // value = 101, means use default (if if it comes on at 33% leave that, if not 100%).
+    // value != 25/50/75/100 use all button to turn on, then reset with rssserial adapter.
+    LOG(PANL_LOG,LOG_DEBUG, "Using allbutton programmer to set light dimmer\n");
+
+    if (value == 101) {
+      aq_program(AQ_SET_LIGHTDIMMER, &aqdata->aqbuttons[deviceIndex], 4, true, aqdata); // 4 = 100% since it uses light mode name
+    } else {
+      int calVal = round( (value+12) / 25);  // Round up/down 
+      if (calVal > 4 ) {calVal=4;}
+      LOG(PANL_LOG,LOG_INFO, "Rounded dimmer value to %d for on command\n",calVal * 25);
+      aq_program(AQ_SET_LIGHTDIMMER, &aqdata->aqbuttons[deviceIndex], calVal, false, aqdata);
+
+      if (light->lightType == LC_DIMMER2 ) {
+       if (value != 25 && value !=50 && value !=75 && value != 100) {
+        // Setup the rssd to set the light to the right value. 
+        //printf("Second programming for %%%d\n",value);
+        time(&aqdata->unactioned.requested);
+        aqdata->unactioned.requested += 5;
+        aqdata->unactioned.value = value;
+        aqdata->unactioned.type = LIGHT_MODE;
+        aqdata->unactioned.id = deviceIndex;
+       }
+      }
+    }
+
+    /*
+    int calVal = round(value / 25);
+    LOG(PANL_LOG,LOG_DEBUG, "Using allbutton programmer to set light\n");
+    if (calVal > 4 ) {calVal=4;}
+    LOG(PANL_LOG,LOG_INFO, "Rounded dimmer value to %d for on command\n",calVal * 25);
+    if (value != 25 && value !=50 && value !=75 && value != 100) {
+      aq_program(AQ_SET_LIGHTDIMMER, &aqdata->aqbuttons[deviceIndex], calVal, false, aqdata);
+    } else {
+      aq_program(AQ_SET_LIGHTDIMMER, &aqdata->aqbuttons[deviceIndex], calVal, true, aqdata);
+    }*/
+    /*
+    if (value != 25 && value !=50 && value !=75 && value != 100) {
+      printf("Second programming for %%%d\n",value);
+      time(&aqdata->unactioned.requested);
+      aqdata->unactioned.requested += 5;
+      aqdata->unactioned.value = value;
+      aqdata->unactioned.type = LIGHT_MODE;
+      aqdata->unactioned.id = deviceIndex;
+    }
+    */
+    return;
+  }
+  
 
   if (!isRSSA_ENABLED) {
     LOG(PANL_LOG,LOG_ERR, "Light mode brightness is only supported with `rssa_device_id` set\n");
@@ -1340,6 +1415,10 @@ void programDeviceLightBrightness(struct aqualinkdata *aqdata, int value, int de
   // DIMMER is 0,25,50,100 DIMMER2 is range
   if (light->lightType == LC_DIMMER) {
     value = round(value / 25);
+    if (value > 4 ) {value=4;}
+    LOG(PANL_LOG,LOG_INFO, "Rounded dimmer value to %d\n",value * 25);
+  } else {
+
   }
 
   if (!expectMultiple) {
@@ -1416,6 +1495,7 @@ void programDeviceLightMode(struct aqualinkdata *aqdata, int value, int deviceIn
         // Value 1 = 25, 2 = 50, 3 = 75, 4 = 100 (need to convert value into binary)
       if (value >= 1 && value <= 4) {
         unsigned char rssd_value = value * 25;
+        //rssd_value +=128;
         set_aqualink_rssadapter_aux_extended_state(light->button, rssd_value);
       } else {
         LOG(PANL_LOG,LOG_ERR, "Light mode %d is not valid for '%s'\n",value, light->button->label);
@@ -1423,7 +1503,7 @@ void programDeviceLightMode(struct aqualinkdata *aqdata, int value, int deviceIn
       }
     } else {
       // Dimmer or any color light can simply be set with value
-      set_aqualink_rssadapter_aux_extended_state(light->button, value);
+      set_aqualink_rssadapter_aux_extended_state(light->button, value + 128);
     }
   /*
   } else if (isRSSA_ENABLED && light->lightType == LC_DIMMER2) {
@@ -1533,6 +1613,18 @@ bool panel_device_request(struct aqualinkdata *aqdata, action_type type, int dev
 
 
 // Programmable light has been updated, so update the status in AqualinkD
+void updateLightProgram(struct aqualinkdata *aqdata, int value, clight_detail *light)
+{
+  light->currentValue = value;
+  if (value > 0 && light->lastValue != value) {
+    light->lastValue = value;
+    if (_aqconfig_.save_light_programming_value && light->lightType == LC_PROGRAMABLE ) {
+      LOG(PANL_LOG,LOG_NOTICE, "Writing light programming value to config for %s\n",light->button->label);
+      writeCfg(aqdata);
+    }
+  }
+}
+
 void updateButtonLightProgram(struct aqualinkdata *aqdata, int value, int button)
 {
   /*
@@ -1554,6 +1646,9 @@ void updateButtonLightProgram(struct aqualinkdata *aqdata, int value, int button
     return;
   }
 
+  updateLightProgram(aqdata, value, light);
+
+  /*
   light->currentValue = value;
   if (value > 0 && light->lastValue != value) {
     light->lastValue = value;
@@ -1562,6 +1657,7 @@ void updateButtonLightProgram(struct aqualinkdata *aqdata, int value, int button
       writeCfg(aqdata);
     }
   }
+    */
 }
 
 clight_detail *getProgramableLight(struct aqualinkdata *aqdata, int button) 

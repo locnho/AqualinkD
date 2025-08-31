@@ -531,6 +531,7 @@ typedef enum {
   DRS_JLIGHT
 } rsDeviceType;
 
+/*
 typedef enum {
   ON,
   OFF,
@@ -544,7 +545,7 @@ typedef struct aqualinkled
   //int number;
   aqledstate state;
 } aqled;
-
+*/
 // Battery Status Identifiers
 enum {
 	OK = 0,

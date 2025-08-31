@@ -91,10 +91,24 @@ typedef enum temperatureUOM {
 } temperatureUOM;
 */
 
+typedef enum {
+  ON,
+  OFF,
+  FLASH,
+  ENABLE,
+  LED_S_UNKNOWN
+} aqledstate;
+
+typedef struct aqualinkled
+{
+  //int number;
+  aqledstate state;
+} aqled;
+
 typedef struct aqualinkkey
 {
   //int number;
-  //aqledstate *state;
+  //aqledstate ledstate; // In the future there is no need to aqled struct so move code over to this.
   aqled *led;
   char *label;
   char *name;
@@ -107,6 +121,9 @@ typedef struct aqualinkkey
   uint8_t special_mask;
   void *special_mask_ptr;
 } aqkey;
+
+
+//#include "aq_programmer.h"
 
 // special_mask for above aqualinkkey structure.
 #define VS_PUMP        (1 << 0)
@@ -126,7 +143,21 @@ struct programmingthread {
   program_type ptype;
   //void *thread_args;
 };
+/*
+struct programmerArgs {
+  aqkey *button;
+  int value;
+  //char cval[PTHREAD_ARG];
+};
 
+struct programmingThreadCtrl {
+  pthread_t thread_id;
+  //void *thread_args;
+  struct programmerArgs pArgs;
+  char thread_args[PTHREAD_ARG];
+  struct aqualinkdata *aq_data;
+};
+*/
 /*
 typedef enum panel_status {
   CONNECTED,

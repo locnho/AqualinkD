@@ -68,7 +68,8 @@ const char* getShortPanelString();
 
 bool panel_device_request(struct aqualinkdata *aqdata, action_type type, int deviceIndex, int value, request_source source);
 
-void updateButtonLightProgram(struct aqualinkdata *aqdata, int value, int button); 
+void updateLightProgram(struct aqualinkdata *aqdata, int value, clight_detail *light);
+void updateButtonLightProgram(struct aqualinkdata *aqdata, int value, int button);
 
 int getWaterTemp(struct aqualinkdata *aqdata);
 

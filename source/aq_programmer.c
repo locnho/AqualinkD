@@ -68,7 +68,8 @@ const func_ptr _prog_functions[AQP_RSSADAPTER_MAX] = {
      [AQ_GET_DIAGNOSTICS_MODEL]        = get_allbutton_diag_model, 
      [AQ_GET_PROGRAMS]                 = get_allbutton_programs, 
      [AQ_SET_LIGHTPROGRAM_MODE]        = set_allbutton_light_programmode, 
-     [AQ_SET_LIGHTCOLOR_MODE]          = set_allbutton_light_colormode, 
+     [AQ_SET_LIGHTCOLOR_MODE]          = set_allbutton_light_colormode,
+     [AQ_SET_LIGHTDIMMER]              = set_allbutton_light_dimmer,
      [AQ_SET_SWG_PERCENT]              = set_allbutton_SWG, 
      [AQ_GET_AUX_LABELS]               = get_allbutton_aux_labels, 
      [AQ_SET_BOOST]                    = set_allbutton_boost, 
@@ -449,11 +450,22 @@ void kick_aq_program_thread(struct aqualinkdata *aq_data, emulation_type source_
   }
 }
 
+void _aq_programmer_(program_type r_type, char *args, aqkey *button, int value, int alt_value, struct aqualinkdata *aq_data, bool allowOveride);
+
+void aq_program(program_type r_type, aqkey *button, int value, int alt_value, struct aqualinkdata *aq_data){
+  _aq_programmer_(r_type, NULL, button, value, alt_value, aq_data, true);
+}
 
 void aq_programmer(program_type r_type, char *args, struct aqualinkdata *aq_data){
   _aq_programmer(r_type, args, aq_data, true);
 }
+
 void _aq_programmer(program_type r_type, char *args, struct aqualinkdata *aq_data, bool allowOveride)
+{
+  _aq_programmer_(r_type, args, NULL, -1, -1, aq_data, allowOveride);
+}
+
+void _aq_programmer_(program_type r_type, char *args, aqkey *button, int value, int alt_value, struct aqualinkdata *aq_data, bool allowOveride)
 {
   struct programmingThreadCtrl *programmingthread = malloc(sizeof(struct programmingThreadCtrl));
 
@@ -648,6 +660,11 @@ void _aq_programmer(program_type r_type, char *args, struct aqualinkdata *aq_dat
   if (args != NULL /*&& type != AQ_SEND_CMD*/)
     strncpy(programmingthread->thread_args, args, sizeof(programmingthread->thread_args)-1);
 
+  programmingthread->pArgs.button = button;
+  programmingthread->pArgs.value = value;
+  programmingthread->pArgs.alt_value = alt_value;
+
+
   switch(type) {
     case AQ_GET_RSSADAPTER_SETPOINTS:
       get_aqualink_rssadapter_setpoints();
@@ -814,6 +831,9 @@ const char *ptypeName(program_type type)
     break;
     case AQ_SET_LIGHTCOLOR_MODE:
       return "Set light color (using Panel)";
+    break;
+    case AQ_SET_LIGHTDIMMER:
+      return "Set light dimmer";
     break;
      case AQ_SET_SWG_PERCENT:
       return "Set SWG percent";
@@ -1023,7 +1043,8 @@ const char *programtypeDisplayName(program_type type)
     case AQ_SET_LIGHTPROGRAM_MODE:
     case AQ_SET_LIGHTCOLOR_MODE:
     case AQ_SET_IAQTOUCH_LIGHTCOLOR_MODE:
-      return "Programming: setting light color";
+    case AQ_SET_LIGHTDIMMER:
+      return "Programming: setting light mode";
     break;
     case AQ_SET_SWG_PERCENT:
     case AQ_SET_ONETOUCH_SWG_PERCENT:

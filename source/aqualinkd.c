@@ -756,6 +756,7 @@ bool auto_configure(unsigned char* packet, int rs_fd) {
   static unsigned char lastID = 0x00;
   static bool seen_iAqualink2 = false;
   static bool ignore_AqualinkTouch = false;
+  static bool ignore_OneTouch = false;
   static int foundIDs = 0;
   static int packetsReceived=0;
 
@@ -799,6 +800,17 @@ bool auto_configure(unsigned char* packet, int rs_fd) {
              foundIDs--;
           }
         }
+        if ( !isMASKSET(_aqualink_data.panel_support_options, RSP_SUP_ONET)) {
+          LOG(AQUA_LOG,LOG_NOTICE, "Ignoring OneTouch probes due to panel rev\n");
+          ignore_OneTouch = true;
+          if ( _aqconfig_.extended_device_id >= 0x40 && _aqconfig_.extended_device_id <= 0x43 ) {
+             _aqconfig_.extended_device_id = 0x00;
+             //_aqconfig_.enable_iaqualink = false;
+             //_aqconfig_.read_RS485_devmask &= ~ READ_RS485_IAQUALNK;
+             //firstprobe = 0x00;
+             foundIDs--;
+          }
+        }
       }
     }
     caculate_ack_packet(rs_fd, packet, ALLBUTTON);
@@ -833,14 +845,14 @@ bool auto_configure(unsigned char* packet, int rs_fd) {
       _aqconfig_.rssa_device_id = lastID;
       LOG(AQUA_LOG,LOG_NOTICE, "Found valid unused RSSA ID 0x%02hhx\n",lastID);
       foundIDs++;
-    } else if ( (lastID >= 0x40 && lastID <= 0x43) && 
+    } else if ( (lastID >= 0x40 && lastID <= 0x43) && ignore_OneTouch == false &&
                 (_aqconfig_.extended_device_id == 0x00 || _aqconfig_.extended_device_id == 0xFF) ) {
       _aqconfig_.extended_device_id = lastID;
       _aqconfig_.extended_device_id_programming = true;
       // Don't increase  foundIDs as we prefer not to use this one.
       LOG(AQUA_LOG,LOG_NOTICE, "Found valid unused extended ID 0x%02hhx\n",lastID);
     } else if ( (lastID >= 0x30 && lastID <= 0x33) && ignore_AqualinkTouch == false && 
-                  (_aqconfig_.extended_device_id < 0x30 || _aqconfig_.extended_device_id > 0x33)) { //Overide is it's been set to Touch or not set.
+                  (_aqconfig_.extended_device_id < 0x30 || _aqconfig_.extended_device_id > 0x33)) { //Overide if it's been set to Touch or not set.
       _aqconfig_.extended_device_id = lastID;
       _aqconfig_.extended_device_id_programming = true;
       if (!seen_iAqualink2) {
@@ -1205,19 +1217,30 @@ void main_loop()
       blank_read = 0;
       if (i++ > 1000) {
         if(!got_probe) {
-          LOG(AQUA_LOG,LOG_ERR, "No probe on '0x%02hhx', giving up! (please check config)\n",_aqconfig_.device_id);    
+          if (_aqconfig_.deamonize) {
+            LOG(AQUA_LOG,LOG_ERR, "No probe on device_id '0x%02hhx', Can't start! (please check config)\n",_aqconfig_.device_id);
+            i=0;
+          } else {
+            LOG(AQUA_LOG,LOG_ERR, "No probe on device_id '0x%02hhx', giving up! (please check config)\n",_aqconfig_.device_id);
+            stopPacketLogger();
+            close_serial_port(rs_fd);
+            stop_net_services();
+            stop_sensors_thread();
+            return;
+          }  
         }
         if(!got_probe_rssa) {
-          LOG(AQUA_LOG,LOG_ERR, "No probe on '0x%02hhx', giving up! (please check config)\n",_aqconfig_.rssa_device_id);    
+          LOG(AQUA_LOG,LOG_ERR, "No probe on '0x%02hhx', disabling rssa_device_id (please check config)\n",_aqconfig_.rssa_device_id);
+          _aqconfig_.rssa_device_id = 0x00;
+          got_probe_rssa = true;
         }
         if(!got_probe_extended) {
-          LOG(AQUA_LOG,LOG_ERR, "No probe on '0x%02hhx', giving up! (please check config)\n",_aqconfig_.extended_device_id);    
+          LOG(AQUA_LOG,LOG_ERR, "No probe on '0x%02hhx', disabling extended_device_id (please check config)\n",_aqconfig_.extended_device_id);
+          _aqconfig_.extended_device_id = 0x00;
+          _aqconfig_.extended_device_id_programming = false;
+          _aqconfig_.enable_iaqualink = false;
+          got_probe_extended = true;
         }
-        stopPacketLogger();
-        close_serial_port(rs_fd);
-        stop_net_services();
-        stop_sensors_thread();
-        return;
       }
     }
   }

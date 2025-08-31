@@ -1712,6 +1712,7 @@ void check_print_config (struct aqualinkdata *aqdata)
 {
   int i, j;
   char name[MAX_PRINTLEN];
+  bool dzset = true;
 
 
   // Sanity checks
@@ -1897,10 +1898,24 @@ void check_print_config (struct aqualinkdata *aqdata)
       _cfgParams[i].config_mask |= CFG_GREYED_OUT;
     }
 
-    // Don't show PDA stuff on RS panel
+    // Don't show PDA stuff in config editor on RS panel
     if ( strcmp(_cfgParams[i].name, CFG_N_pda_sleep_mode) == 0 && !isPDA_PANEL) {
       _cfgParams[i].config_mask |= CFG_GREYED_OUT;
       _cfgParams[i].config_mask |= CFG_READONLY;
+    }
+
+    // Don't print domoticz settings if off.
+    if ( strstr(_cfgParams[i].name, "dzidx" ) != NULL ||
+         strcmp(_cfgParams[i].name, CFG_N_convert_dz_temp) == 0 ) {
+      if (!dzset || ( _cfgParams[i].value_type == CFG_INT && *(int *)_cfgParams[i].value_ptr <= 0) ) {
+        continue;
+      }
+    } else if ( strcmp(_cfgParams[i].name, CFG_N_mqtt_dz_sub_topic) == 0 ||
+                strcmp(_cfgParams[i].name, CFG_N_mqtt_dz_pub_topic) == 0) {
+      if (*(char **)_cfgParams[i].value_ptr == NULL) {
+        dzset = false;
+        continue;
+      }
     }
 
     rsm_nchar_replace(name, MAX_PRINTLEN, _cfgParams[i].name, "_", " ");

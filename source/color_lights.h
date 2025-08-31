@@ -7,6 +7,7 @@
 
 #define LIGHT_COLOR_NAME    16
 #define LIGHT_COLOR_OPTIONS 19
+//#define LIGHT_DIMER_OPTIONS 4
 //#define LIGHT_COLOR_TYPES   LC_DIMMER+1
 
 // The status returned from RS Serial Adapter has this added as a base.  

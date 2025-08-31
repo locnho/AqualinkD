@@ -14,6 +14,7 @@ void *get_allbutton_aux_labels( void *ptr );
 //void *threadded_send_cmd( void *ptr );
 void *set_allbutton_light_programmode( void *ptr );
 void *set_allbutton_light_colormode( void *ptr );
+void *set_allbutton_light_dimmer( void *ptr );
 void *set_allbutton_SWG( void *ptr );
 void *set_allbutton_boost( void *ptr );
 

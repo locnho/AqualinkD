@@ -13,6 +13,8 @@
 #include "color_lights.h"
 #include "devices_jandy.h"
 
+
+
 bool waitForButtonState(struct aqualinkdata *aq_data, aqkey* button, aqledstate state, int numMessageReceived);
 bool waitForMessage(struct aqualinkdata *aq_data, char* message, int numMessageReceived);
 bool waitForEitherMessage(struct aqualinkdata *aq_data, char* message1, char* message2, int numMessageReceived);
@@ -638,6 +640,153 @@ void *set_allbutton_light_programmode( void *ptr )
   // just stop compiler error, ptr is not valid as it's just been freed
   return ptr;
 }
+
+void *set_allbutton_light_dimmer( void *ptr )
+{
+  int i;
+  struct programmingThreadCtrl *threadCtrl;
+  threadCtrl = (struct programmingThreadCtrl *) ptr;
+  struct aqualinkdata *aq_data = threadCtrl->aq_data;
+  
+  waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_LIGHTDIMMER);
+
+  /*
+  char *buf = (char*)threadCtrl->thread_args;
+  const char *mode_name;
+  int val = atoi(&buf[0]);
+  int btn = atoi(&buf[5]);
+  int typ = atoi(&buf[10]);
+  bool use_current_mode = false;
+
+  if (btn < 0 || btn >= aq_data->total_buttons ) {
+    LOG(ALLB_LOG, LOG_ERR, "Can't program light dimmer on button %d\n", btn);
+    cleanAndTerminateThread(threadCtrl);
+    return ptr;
+  }
+
+  aqkey *button = &aq_data->aqbuttons[btn];
+  unsigned char code = button->code;
+  */
+
+  struct programmerArgs *pargs = &threadCtrl->pArgs;
+  //unsigned char code = threadCtrl->pArgs.button.code;
+  //aqkey *button2 = pargs->button;
+  aqkey *button = threadCtrl->pArgs.button;
+  //unsigned char code = pargs->button->code;
+  int val = pargs->value;
+  bool useDefaultIfValid = pargs->alt_value;
+  bool use_current_mode = false;
+  const char *mode_name;
+
+  //printf("****** set_allbutton_light_dimmer Light %s on/off=%s use-current-state=%s\n",button->label, button->led->state==ON?"on":"off", use_current_mode==false?"no":"yes");
+
+  if (!isPLIGHT(button->special_mask)) {
+    LOG(ALLB_LOG, LOG_ERR, "Can't program light for button '%d', configuration is incorrect\n", button->label);
+    cleanAndTerminateThread(threadCtrl);
+    return ptr;
+  }
+
+  clight_detail *light = (clight_detail *)button->special_mask_ptr;
+
+  if (pargs->value <= 0) {
+    use_current_mode = true;
+    LOG(ALLB_LOG, LOG_INFO, "Light Dimmer Programming #: %d, on button: %s, using current mode\n", val, button->label);
+  } else {
+    //mode_name = light_mode_name(typ, val-1, ALLBUTTON);
+    //mode_name = light_mode_name(((clight_detail *)button->special_mask_ptr)->lightType, val, ALLBUTTON);
+    mode_name = light_mode_name(LC_DIMMER, val, ALLBUTTON);
+    use_current_mode = false;
+    if (mode_name == NULL) {
+      LOG(ALLB_LOG, LOG_ERR, "Light Dimmer Programming #: %d, on button: %s, couldn't find mode name '%s'\n", val, button->label, mode_name);
+      cleanAndTerminateThread(threadCtrl);
+      return ptr;
+    } else {
+      LOG(ALLB_LOG, LOG_INFO, "Light Dimmer Programming #: %d, on button: %s, name '%s'\n", val, button->label, mode_name);
+    }
+  }
+
+  //printf("****** set_allbutton_light_dimmer Light %s on/off=%d %s\n",button->label, pargs->button->led->state, button->led->state==ON?"on":"off");
+  // Needs to start programming sequence with light off
+
+  if ( button->led->state == ON ) {
+    LOG(ALLB_LOG, LOG_INFO, "Light Programming Initial state on, turning off\n");
+    send_cmd(button->code);
+    waitfor_queue2empty();
+    if ( !waitForMessage(threadCtrl->aq_data, "OFF", 5)) // Message like 'Aux3 Off'
+      LOG(ALLB_LOG, LOG_ERR, "Light Programming didn't receive OFF message\n");
+  }
+
+  // Look for <>*
+  // Now turn on and wait for the message "color mode name<>*"
+  send_cmd(button->code);
+  waitfor_queue2empty();
+  i=0;
+  int waitCounter=12;
+
+  do{
+    LOG(ALLB_LOG, LOG_INFO,"Light program wait for message\n");
+    if ( !waitForMessage(threadCtrl->aq_data, "~*", waitCounter))
+      LOG(ALLB_LOG, LOG_ERR, "Light Programming didn't receive light mode message\n");
+    
+    // Wait for less messages after first try. We get a lot of repeat messages before the one we need.
+    waitCounter = 3;
+    
+    if (useDefaultIfValid) {
+      // If 0 in last message then it's NOT valid and we will change to 100% (5 char =0, 6 char=%)
+      if (aq_data->last_message[0] == '0' && aq_data->last_message[1] == '%' ) {
+        //printf("******** Light stuck ************\n");
+        LOG(ALLB_LOG, LOG_WARNING, "Light Programming detected Jandy panel light%% bug, re-setting to %d%%\n",val * 25);
+        useDefaultIfValid=false;
+      } else {
+        // printf("******** Light good ************ '%c' '%c'\n",aq_data->last_message[0],aq_data->last_message[1]);
+        send_cmd(KEY_ENTER);
+        waitfor_queue2empty();
+        break;
+      }
+    } else if (use_current_mode) {
+      LOG(ALLB_LOG, LOG_INFO, "Light Programming using mode %s\n",aq_data->last_message);
+      send_cmd(KEY_ENTER);
+      waitfor_queue2empty();
+      break;
+    } else if (strncasecmp(aq_data->last_message, mode_name, strlen(mode_name)) == 0) {
+      LOG(ALLB_LOG, LOG_INFO, "Light Programming found mode %s\n",mode_name);
+      send_cmd(KEY_ENTER);
+      waitfor_queue2empty();
+      break;
+    }
+
+    send_cmd(KEY_RIGHT);
+    waitfor_queue2empty();
+    // Just clear current message before waiting for next, since the test in the do can't distinguish
+    // as both messages end in "~*"
+    waitForMessage(threadCtrl->aq_data, NULL, 1); 
+
+    i++;
+  } while (i <= 8);
+
+  if (i == 8) {
+    LOG(ALLB_LOG, LOG_ERR, "Light Programming didn't receive light mode message for '%s'\n",use_current_mode?"light program":mode_name);
+  } else {
+    // update status before we are exit.
+    if (light->lightType == LC_DIMMER2 ) {
+      // value or Dimmer2 is the actual %, while Dimmer & colorlight is an index into an array
+      updateLightProgram(aq_data, val * 25, light);
+    } else {
+      updateLightProgram(aq_data, val, light);
+    }
+  }
+
+  cleanAndTerminateThread(threadCtrl);
+  
+  // just stop compiler error, ptr is not valid as it's just been freed
+  return ptr;
+}
+
+
+
+
+
+
 void *set_allbutton_pool_heater_temps( void *ptr )
 {
   struct programmingThreadCtrl *threadCtrl;
