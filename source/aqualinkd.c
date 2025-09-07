@@ -1097,7 +1097,7 @@ void main_loop()
 
   if (_aqconfig_.device_id == 0xFF) {
     LOG(AQUA_LOG,LOG_NOTICE, "Waiting for Control Panel information");
-    LOG(AQUA_LOG,LOG_WARNING, "Unsing Auto configure, this will take some time, (make sure to undate aqualinkd configuration to speed up startup!)\n");
+    LOG(AQUA_LOG,LOG_WARNING, "Using Auto configure, this will take some time, (make sure to update aqualinkd configuration to speed up startup!)\n");
     auto_config_complete = false;
     //_aqualink_data.panelstatus = LOOKING_IDS;
     AddAQDstatusMask(AUTOCONFIGURE_ID);
