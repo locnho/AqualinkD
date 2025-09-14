@@ -931,6 +931,7 @@ unsigned char find_unused_address(unsigned char* packet) {
 
 void main_loop()
 {
+  int exit_code = EXIT_SUCCESS;
   int rs_fd;
   int packet_length;
   unsigned char packet_buffer[AQ_MAXPKTLEN+1];
@@ -942,6 +943,7 @@ void main_loop()
   bool print_once = false;
   int blank_read_reconnect = MAX_ZERO_READ_BEFORE_RECONNECT_BLOCKING; // Will get reset if non blocking
   bool auto_config_complete = true;
+
 
   //_aqualink_data.panelstatus = STARTING;
   AddAQDstatusMask(CHECKING_CONFIG);
@@ -1129,6 +1131,8 @@ void main_loop()
       close_serial_port(rs_fd);
       stop_net_services();
       stop_sensors_thread();
+      exit_code=EXIT_FAILURE;
+      _keepRunning=false;
       return;
     }
 /*
@@ -1547,7 +1551,8 @@ void main_loop()
   if (! _restart) {
   // NSF need to run through config memory and clean up.
     LOG(AQUA_LOG,LOG_NOTICE, "Exit!\n");
-    exit(EXIT_FAILURE);
+    //exit(EXIT_FAILURE);
+    exit(exit_code);
   } else {
     LOG(AQUA_LOG,LOG_WARNING, "Waiting for process to fininish!\n");
     delay(5 * 1000);

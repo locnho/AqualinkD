@@ -53,7 +53,7 @@ ioctl(fd, TIOCSSERIAL, &serial);
 //#define BLOCKING_MODE
 
 static bool _blocking_mode = false;
-int _blocking_fds = -1;
+static int _blocking_fds = -1;
 
 static struct termios _oldtio;
 
@@ -587,7 +587,9 @@ int _init_serial_port(const char* tty, bool blocking, bool readahead)
   _blocking_mode = blocking;
 
   //int fd = open(tty, O_RDWR | O_NOCTTY | O_NONBLOCK | O_NDELAY);
+
   int fd = open(tty, O_RDWR | O_NOCTTY | O_NONBLOCK | O_NDELAY | O_CLOEXEC);
+  
 
   //int fd = open(tty, O_RDWR | O_NOCTTY | O_SYNC); // This is way to slow at reading
   if (fd < 0)  {
@@ -668,11 +670,11 @@ int _init_serial_port(const char* tty, bool blocking, bool readahead)
 
 void close_blocking_serial_port()
 {
-  if (_blocking_fds > 0) {
+  if (_blocking_fds >= 0) {
     LOG(RSSD_LOG,LOG_INFO, "Forcing close of blocking serial port, ignore following read errors\n");
     close_serial_port(_blocking_fds);
   } else {
-    LOG(RSSD_LOG,LOG_ERR, "Didn't find valid blocking serial port file descripter\n");
+    LOG(RSSD_LOG,LOG_ERR, "Didn't find valid blocking serial port file descriptor\n");
   }
 }
 /* close tty port */

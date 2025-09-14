@@ -14,6 +14,11 @@
 #include "version.h"
 
 
+// NSF To change this to support multiple AqualinkD instances.
+// In the identifyiers .   " \"name\": \"AqualinkD\"," SHOULD BE "AqualinkD-(Instance 1)"
+// each hardcode unique_id is "aqualinkd_%s" should be "aqualinkd-(Instance 1)_%s)"
+// Obviously change the aqualinkd/ MQTT 
+
 // NSF Need to find a better way, this is not thread safe, so don;t want to expost it from net_services.h.
 void send_mqtt(struct mg_connection *nc, const char *toppic, const char *message);
 

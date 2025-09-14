@@ -136,7 +136,12 @@ NEED TO FIX FOR THIS RELEASE.
 * Use set_allbutton_light_dimmer for all lights (ie color lights)
 
 -->
-# Updates in 2.6.10 (DEV)
+# Updates in 2.6.11 (Sept 14 2025)
+* Cleaned up exit codes.
+* Fixed delay in shutting down when no data received on RS485
+* Updated serial_logger to detect & overcome Jandy panel firmware issues
+
+# Updates in 2.6.10 (Sept 1 2025)
 * UI now supports UOM for external sensors
 * Updates to VSP status
 * Fix for Jandy Panel Rev T dimmer lights bug.

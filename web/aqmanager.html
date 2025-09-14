@@ -610,6 +610,13 @@
                         document.getElementById("slog_ids").disabled = false;
                     }
                 }
+                else if (caller.id == "slog_poll_cycle") {
+                  if (caller.checked) {
+                        document.getElementById("slog_packets").disabled = true;
+                    } else {
+                        document.getElementById("slog_packets").disabled = false;
+                    }
+                }
             } catch (Error) { }
         }
 
@@ -1834,6 +1841,9 @@
             disablebutton("restart");
             disablebutton("upgrade");
 
+            checkboxClick(document.getElementById("slog_debug"));
+            checkboxClick(document.getElementById("slog_poll_cycle"));
+
             startWebsockets();
             getLatestVersion();
         }
@@ -1900,7 +1910,12 @@
                       ids='--';
 
                     cmd.uri = "seriallogger/"+ids+"/"+document.getElementById("slog_debug").checked;
-                    cmd.value = document.getElementById("slog_packets").value
+
+                    if ( document.getElementById("slog_poll_cycle").checked ) {
+                      cmd.value = -1;
+                    } else {
+                      cmd.value = document.getElementById("slog_packets").value;
+                    }
                     //console.log("Command = "+cmd);
                     //console.log("Packets=" + document.getElementById("slog_packets").value );
                     //console.log("IDs=" + document.getElementById("slog_ids").value );
@@ -2029,6 +2044,10 @@
                         <tr>
                           <td>#Packets</td>
                           <td><input id="slog_packets" type="text" value="800" size="5"></input></td>
+                        </tr>
+                        <tr>
+                          <td>Poll cycle</td>
+                          <td><input id="slog_poll_cycle" type="checkbox" checked onload="checkboxClick(this)" onclick="checkboxClick(this)"></input></td>
                         </tr>
                         <tr>
                           <td>ID's <font size="-2">(Eg 0x08 0x10)</font></td>

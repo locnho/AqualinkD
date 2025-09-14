@@ -796,7 +796,10 @@ void *set_allbutton_pool_heater_temps( void *ptr )
   char *menu_name;
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_POOL_HEATER_TEMP);
   
+  // NSF When we move over to new structure use below
+  //int val = threadCtrl->pArgs.value;
   int val = atoi((char*)threadCtrl->thread_args);
+  
   /*
   if (val > HEATER_MAX) {
     val = HEATER_MAX;

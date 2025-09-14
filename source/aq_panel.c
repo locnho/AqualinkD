@@ -1358,6 +1358,8 @@ void programDeviceLightBrightness(struct aqualinkdata *aqdata, int value, int de
     LOG(PANL_LOG,LOG_DEBUG, "Using allbutton programmer to set light dimmer\n");
 
     if (value == 101) {
+      //Should probably try to get the last value in this case, and use the closest 25% rather than default to 100. (ie 4)
+      //int val = ((clight_detail *)button->special_mask_ptr)->lastValue>0?((clight_detail *)button->special_mask_ptr)->lastValue:100;
       aq_program(AQ_SET_LIGHTDIMMER, &aqdata->aqbuttons[deviceIndex], 4, true, aqdata); // 4 = 100% since it uses light mode name
     } else {
       int calVal = round( (value+12) / 25);  // Round up/down 

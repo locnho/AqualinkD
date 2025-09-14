@@ -40,8 +40,9 @@
 
 #define SLOG_MAX 80
 #define PACKET_MAX 1200
+#define PROBE_CYCLES 2
 
-#define VERSION "serial_logger V2.9"
+#define VERSION "serial_logger V2.10"
 
 /*
 typedef enum used {
@@ -118,7 +119,7 @@ int serial_logger (int rs_fd, char *port_name, int logLevel, int slogger_packets
   _pfilters=0;
   _keepRunning = true;
 
-  if (slogger_packets > 0)
+  if (slogger_packets >= -1)
      packets = slogger_packets;
 
   int id_len = strlen(slogger_ids)-4;
@@ -137,8 +138,11 @@ int serial_logger (int rs_fd, char *port_name, int logLevel, int slogger_packets
     }
   }
 
-  LOG(SLOG_LOG, LOG_NOTICE, "Running serial logger with %d pakets, loglevel %s\n",packets,elevel2text(logLevel>=LOG_NOTICE?logLevel:LOG_NOTICE) );
-  
+  if (slogger_packets > 0)
+    LOG(SLOG_LOG, LOG_NOTICE, "Running serial logger with %d pakets, loglevel %s\n",packets,elevel2text(logLevel>=LOG_NOTICE?logLevel:LOG_NOTICE) );
+  else
+    LOG(SLOG_LOG, LOG_NOTICE, "Running serial logger (complete poll cycle), loglevel %s\n",elevel2text(logLevel>=LOG_NOTICE?logLevel:LOG_NOTICE) );
+
   return _serial_logger(rs_fd,  port_name, packets, (logLevel>=LOG_NOTICE?logLevel:LOG_NOTICE), true, false, false, false, false);
 }
 
@@ -157,7 +161,7 @@ int serial_logger (int rs_fd, char *port_name, int logLevel, int slogger_packets
 #define EPUMP " <-- Jandy VSP ePump"
 #define EPUMP2 " <-- Jandy VSP (rev W or newer)"
 #define CHEM " <-- Chemlink"
-#define JXI_HEATER " <-- LXi / LRZ Heater"
+#define JXI_HEATER " <-- JXi / LRZ Heater"
 
 #define IAQLNK2 " <-- iAqualink 2.0"
 #define HEAT_PUMP " <-- Heat Pump"
@@ -353,6 +357,10 @@ void getPanelInfo(int rs_fd, unsigned char *packet_buffer, int packet_length)
   static unsigned char getPanelRev[] = {0x00,0x14,0x01};
   static unsigned char getPanelType[] = {0x00,0x14,0x02};
   static int msgcnt=0;
+  static int found=0;
+
+  if (found >= 2)
+    return;
 
   if (packet_buffer[PKT_CMD] == CMD_PROBE) {
     if (msgcnt == 0)
@@ -364,10 +372,13 @@ void getPanelInfo(int rs_fd, unsigned char *packet_buffer, int packet_length)
     msgcnt++;
   } else if (packet_buffer[PKT_CMD] == CMD_MSG) {
     send_ack(rs_fd, 0x00);
-    if (msgcnt == 2)
+    if (msgcnt == 2) {
       rsm_strncpy(_panelRev, packet_buffer+4, AQ_MSGLEN, packet_length-5);
-    else if (msgcnt == 3)
+      found++;
+    } else if (msgcnt == 3) {
       rsm_strncpy(_panelType, packet_buffer+4, AQ_MSGLEN, packet_length-5);
+      found++;
+    }
   }
 
   if (_panelType[1] == 'P' && _panelType[2] == 'D') { // PDA Panel
@@ -379,6 +390,34 @@ void getPanelInfo(int rs_fd, unsigned char *packet_buffer, int packet_length)
     _panelRevInt = REV[0];
   }
 
+}
+
+void getPanelInfoAllB(int rs_fd, unsigned char *packet_buffer, int packet_length)
+{
+  static unsigned char allbID = 0x00;
+  static bool found=false;
+
+  if (found)
+    return;
+
+  if (packet_buffer[PKT_CMD] == CMD_PROBE) {
+    if (allbID == 0x00) {
+      allbID = packet_buffer[PKT_DEST];
+      send_ack(rs_fd, 0x00);
+    }
+  } else if ( allbID == packet_buffer[PKT_DEST] ) {
+    if ( packet_buffer[PKT_CMD] == CMD_MSG ) {
+      if ( rsm_strnstr((char *)&packet_buffer[5], " REV", AQ_MSGLEN) != NULL ) {
+        char rev[16];
+        if ( rsm_get_revision(rev, (char *)&packet_buffer[5], packet_length-5) ) {
+          _panelRevInt = rev[0];
+          found=true;
+          strcpy(_panelRev, rev);
+        }
+      }
+    }
+    send_ack(rs_fd, 0x00);
+  }
 }
 
 bool filterMatch(unsigned char ID, unsigned char *packet_buffer, bool failNoFilters) {
@@ -687,6 +726,7 @@ int _serial_logger(int rs_fd, char *port_name, int logPackets, int logLevel, boo
   bool found_iAqualnk =false;
 
   bool probeCycle = false;
+
   int probeCycleCnt = 0;
 
   if (logPackets <= 0) {
@@ -745,21 +785,27 @@ int _serial_logger(int rs_fd, char *port_name, int logPackets, int logLevel, boo
         blankReads = 0;
 
         if (probeCycle) {          
-          if (packet_buffer[PKT_CMD] == CMD_PROBE && 
-            packet_buffer[PKT_DEST] != 0x60 && 
+          if (firstProbe == 0x00 && 
+              packet_buffer[PKT_CMD] == CMD_PROBE && 
+            /*packet_buffer[PKT_DEST] != 0x60 && */
             packet_buffer[PKT_DEST] != DEV_MASTER &&
-            firstProbe == 0x00)
+            (
+              (packet_buffer[PKT_DEST] >= 0x08 && packet_buffer[PKT_DEST] <= 0x0B) ||
+              (packet_buffer[PKT_DEST] >= 0x30 && packet_buffer[PKT_DEST] <= 0x33) ||
+              (packet_buffer[PKT_DEST] >= 0x40 && packet_buffer[PKT_DEST] <= 0x43)
+            ))
           {
             firstProbe = packet_buffer[PKT_DEST];
-            printf("\nFirst Probe = 0x%02hhx\n",firstProbe);
+            //printf("\nFirst Probe = 0x%02hhx\n",firstProbe);
           } else if ( firstProbe != 0x00 && packet_buffer[PKT_DEST] == firstProbe && packet_buffer[PKT_CMD] == CMD_PROBE ) {
-            printf("\nGot probe again after %d packets\n",received_packets);
-            if (++probeCycleCnt > 2) {
+            //printf("\nGot probe again after %d packets\n",received_packets);
+            if (++probeCycleCnt >= PROBE_CYCLES) {
               _keepRunning = false;
             }
           } else if ( firstProbe != 0x00 && packet_buffer[PKT_DEST] == firstProbe && packet_buffer[PKT_CMD] != CMD_PROBE ) {
           // Something connected to the first probe we saw, can't exit quickley
-            printf("\n Someone connected to probe 0x%02hhx\n",packet_buffer[PKT_DEST]);
+            //printf("\n Someone connected to probe 0x%02hhx\n",packet_buffer[PKT_DEST]);
+            firstProbe = 0x00;
           }
         }
         //LOG(SLOG_LOG, LOG_DEBUG_SERIAL, "Received Packet for ID 0x%02hhx of type %s\n", packet_buffer[PKT_DEST], get_packet_type(packet_buffer, packet_length));
@@ -813,6 +859,8 @@ int _serial_logger(int rs_fd, char *port_name, int logPackets, int logLevel, boo
 
          if (panleProbe && packet_buffer[PKT_DEST] == 0x58 ) {
            getPanelInfo(rs_fd, packet_buffer, packet_length);
+         } else if (panleProbe && _panelRevInt == 0 && (packet_buffer[PKT_DEST] >= 0x08 && packet_buffer[PKT_DEST] <= 0x0B) ){
+           getPanelInfoAllB(rs_fd, packet_buffer, packet_length);
          }
   
         lastID = packet_buffer[PKT_DEST];
@@ -833,10 +881,10 @@ int _serial_logger(int rs_fd, char *port_name, int logPackets, int logLevel, boo
 
 #ifndef SERIAL_LOGGER
     if(received_packets%100==0) {
-      LOG(SLOG_LOG, LOG_NOTICE, "Read %d of %d packets\n", received_packets, logPackets);
+      LOG(SLOG_LOG, LOG_NOTICE, "Read %d of %s%d packets\n", received_packets, probeCycle?"(max)":"" ,logPackets);
     }
 #endif
-
+ 
     if (logPackets != 0 && received_packets >= logPackets) {
       _keepRunning = false;
     }
@@ -940,10 +988,15 @@ int _serial_logger(int rs_fd, char *port_name, int logPackets, int logLevel, boo
         mainID = slog[i].ID;
       if (canUsePDA(slog[i].ID) && mainID == 0x00) 
         mainID = slog[i].ID;
-      else if (canUseRSSA(slog[i].ID) && rssaID == 0x00) 
-        rssaID = slog[i].ID;
-      else if (canUseONET(slog[i].ID) && extID == 0x00) 
-        extID = slog[i].ID;
+      else if (canUseRSSA(slog[i].ID) && rssaID == 0x00) {
+        // Check panel rev is higher than REV I (if it's been found). Panel rev I pings on OneTouch id but it's not supported.
+        if ( _panelRevInt == 0 || _panelRevInt >= 73 ) 
+          rssaID = slog[i].ID;
+      } else if (canUseONET(slog[i].ID) && extID == 0x00) {
+        // Check panel rev is higher than REV I (if it's been found). Panel rev I pings on OneTouch id but it's not supported.
+        if ( _panelRevInt == 0 || _panelRevInt >= 73 ) 
+          extID = slog[i].ID;
+      }
       else if (canUseIQAT(slog[i].ID) && (extID == 0x00 || canUseONET(extID)))
       {
         // Check panel rev is higher than REV Q (if it's been found). Panel rev I pings on IAQtouch id but it's not supported.
