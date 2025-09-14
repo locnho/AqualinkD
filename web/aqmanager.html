@@ -148,7 +148,12 @@
             color: #777 !important;
         }
 
-        .statusmsg {}
+        .statusmsg {
+          font-size: clamp(0.5rem, 1vw, 1rem);
+          white-space: nowrap; /* Keep text on a single line */
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
 
         .error {
             background-color: rgb(255, 0, 0) !important;
@@ -1795,6 +1800,12 @@
 
               if (minor1 > minor2) return true;
               if (minor1 < minor2) return false;
+
+              //Look for any strings that might be a pre-release
+              if ( version2.toLowerCase().includes("dev") ||
+                   version2.toLowerCase().includes("pre") ) {
+                patch2--;
+              }
 
               return patch1 > patch2;
             } catch (e) {
