@@ -136,6 +136,10 @@ NEED TO FIX FOR THIS RELEASE.
 * Use set_allbutton_light_dimmer for all lights (ie color lights)
 
 -->
+# Updates in 2.6.12 (dev)
+* Reading TruSense. (Jandy protocols working, need to finish off read_RS485_TruSense support)
+* ToDo assigning light mode & functionality to a vbutton (for JAndy Infinate water color support)
+
 # Updates in 2.6.11 (Sept 14 2025)
 * Cleaned up exit codes.
 * Fixed delay in shutting down when no data received on RS485

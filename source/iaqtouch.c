@@ -769,11 +769,12 @@ void passDeviceStatusPage(struct aqualinkdata *aq_data)
     } else {
       pump = NULL;
     }
-
     if (rsm_strcmp(_deviceStatus[i],"Chemlink") == 0) {
       /*   Info:  =    Chemlink 1   
            Info:  =  ORP 750/PH 7.0  */
+      // Use logic under TrueSense below to get ORP & PH
       i++;
+      /*
       if (rsm_strcmp(_deviceStatus[i],"ORP") == 0) {
         int orp = rsm_atoi(&_deviceStatus[i][4]);
         char *indx = strchr(_deviceStatus[i], '/');
@@ -784,6 +785,31 @@ void passDeviceStatusPage(struct aqualinkdata *aq_data)
         }
         aq_data->updated = true;
         LOG(IAQT_LOG,LOG_INFO, "Set Cemlink ORP = %d PH = %f from message '%s'\n",orp,ph,_deviceStatus[i]);
+      }*/
+    }
+
+    /* TruSense is different format to chemlink above
+                   | ORP:810 pH:7.3
+        Also make compatable with msg with intent of removing above Chemlink
+                     ORP 750/PH 7.0
+    */
+    if (rsm_strcmp(_deviceStatus[i],"ORP") == 0) {
+      char *oi = rsm_strncasestr(_deviceStatus[i], "ORP", AQ_MSGLEN);
+      char *pi = rsm_strncasestr(_deviceStatus[i], "PH", AQ_MSGLEN);
+      if (oi != NULL && pi != NULL) {
+        int orp = rsm_atoi(oi+4);
+        float ph = rsm_atof(pi+3);
+        if (orp > 0 && ph > 0) {
+          if (aq_data->ph != ph || aq_data->orp != orp) {
+            aq_data->ph = ph;
+            aq_data->orp = orp;
+          }
+          aq_data->updated = true;
+          LOG(IAQT_LOG,LOG_INFO, "Set Cem ORP = %d PH = %f from message '%s'\n",orp,ph,_deviceStatus[i]);
+        } else {
+          // Didn't understand message, not
+          LOG(IAQT_LOG,LOG_DEBUG, "Could not extract ORP & PH from message '%s'\n",_deviceStatus[i]);
+        }
       }
     }
     

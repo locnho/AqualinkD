@@ -1214,7 +1214,7 @@ int json_cfg_element_OLD(char* buffer, int size, const char *name, const void *v
 
 //#ifdef CONFIG_EDITOR
 
-int json_cfg_element(char* buffer, int size, const char *name, const void *value, cfg_value_type type, uint8_t mask, char *valid_val, uint8_t config_mask) {
+int json_cfg_element(char* buffer, int size, const char *name, const void *value, cfg_value_type type, uint16_t mask, char *valid_val, uint8_t config_mask) {
   int result = 0;
 
   char valid_values[256];
@@ -1280,7 +1280,7 @@ int json_cfg_element(char* buffer, int size, const char *name, const void *value
       result = snprintf(buffer, size, ",\"%s\" : {\"value\":\"%f\", \"type\":\"float\" %s %s}", name, *(float *)value, (valid_val==NULL?"":valid_values), adv );
     break;
     case CFG_BITMASK:
-      result = snprintf(buffer, size, ",\"%s\" : {\"value\":\"%s\", \"type\":\"bool\", \"valid values\": %s %s}", name, (*(uint8_t *)value & mask) == mask? bool2text(true):bool2text(false) ,CFG_V_BOOL, adv );
+      result = snprintf(buffer, size, ",\"%s\" : {\"value\":\"%s\", \"type\":\"bool\", \"valid values\": %s %s}", name, (*(uint16_t *)value & mask) == mask? bool2text(true):bool2text(false) ,CFG_V_BOOL, adv );
     break;
     case CFG_SPECIAL:
       if (strncasecmp(name, CFG_N_log_level, strlen(CFG_N_log_level)) == 0) {

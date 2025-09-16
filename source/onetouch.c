@@ -510,6 +510,7 @@ bool get_chemlinkinfo_from_menu(struct aqualinkdata *aq_data, int menuLineIdx)
     {
       aq_data->ph = ph;
       aq_data->orp = orp;
+      aq_data->updated = true;
       return true;
     }
     return false;
@@ -517,6 +518,34 @@ bool get_chemlinkinfo_from_menu(struct aqualinkdata *aq_data, int menuLineIdx)
   LOG(ONET_LOG, LOG_WARNING, "Did not understand Chemlink message '%s'\n",_menu[menuLineIdx + 1]);
   return false;
 }
+
+/* Get ORP and Ph from either chemlink or truesense
+   ORP 750/PH 7.0
+*/
+bool get_chemsensors_from_menu(struct aqualinkdata *aq_data, int menuLineIdx)
+{
+  char *oi = rsm_strncasestr(_menu[menuLineIdx], "ORP", AQ_MSGLEN);
+  char *pi = rsm_strncasestr(_menu[menuLineIdx], "PH", AQ_MSGLEN);
+  if (oi != NULL && pi != NULL) {
+    int orp = rsm_atoi(oi+4);
+    float ph = rsm_atof(pi+3);
+    if (orp > 0 && ph > 0) {
+      if (aq_data->ph != ph || aq_data->orp != orp) {
+        aq_data->ph = ph;
+        aq_data->orp = orp;
+      }
+      aq_data->updated = true;
+      LOG(ONET_LOG,LOG_INFO, "Set Cem ORP = %d PH = %f from message '%s'\n",orp,ph,_menu[menuLineIdx]);
+      return true;
+    } else {
+          // Didn't understand message, not
+      LOG(ONET_LOG,LOG_DEBUG, "Could not extract ORP & PH from message '%s'\n",_menu[menuLineIdx]);
+    }
+  }
+
+  return false;
+}
+
 
     /* 
        Info:   OneTouch Menu Line 2 =   AQUAPURE 60%  
@@ -610,7 +639,9 @@ bool log_qeuiptment_status_VP2(struct aqualinkdata *aq_data)
       rtn = get_aquapureinfo_from_menu(aq_data, i);
     } else if (rsm_strcmp(_menu[i],"Chemlink") == 0) {
       rtn = get_chemlinkinfo_from_menu(aq_data, i);
-
+    } else if (rsm_strcmp(_menu[i],"ORP") == 0) {
+      // On iaqtouch TruSence does not state "Chemlink", simply OR / PH values in different format.
+      rtn = get_chemsensors_from_menu(aq_data, i);
     } else if (PANEL_SIZE() >= 16 ) {
       // Loop over RS 16 buttons.
       get_RS16buttoninfo_from_menu(aq_data, i);

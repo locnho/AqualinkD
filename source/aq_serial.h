@@ -69,6 +69,15 @@ const char *getJandyDeviceName(emulation_type etype);
 
 #define JANDY_DEV_JLIGHT_MIN    0xF0
 #define JANDY_DEV_JLIGHT_MAX    0xF4 // 0xF4 is total guess.
+
+//#define JANDY_DEC_CHEM_SENSOR1  0x84 // Not sure if this is a range or not.
+//#define JANDY_DEC_CHEM_SENSOR2  0x86 // Not sure if this is a range or not.
+
+/* Below is a guess.  We *think* 0x84 and 0x86 are one TruSense, so assuming 0x85 and 0x87 would be a 2nd */
+// 0x83 is ChemLink and 0x88 is heater, so 84 to 86 are free
+#define JANDY_DEV_CHEM_ANLZ_MIN    0x84
+#define JANDY_DEV_CHEM_ANLZ_MAX    0x87
+
 /*
 //===== Device ID's =====//
 //=========================================================================//
@@ -527,9 +536,10 @@ typedef enum {
   DRS_EPUMP,
   DRS_JXI,
   DRS_LX,
-  DRS_CHEM,
+  DRS_CHEM_FEED,
   DRS_HEATPUMP,
-  DRS_JLIGHT
+  DRS_JLIGHT,
+  DRS_CHEM_ANLZ
 } rsDeviceType;
 
 /*

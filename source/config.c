@@ -111,9 +111,9 @@ void set_cfg_parm_to_default(cfgParam *parm) {
         break;
         case CFG_BITMASK:
           if ( *(bool *)parm->default_value == true) {
-            *(uint8_t *)parm->value_ptr |= parm->mask;
+            *(uint16_t *)parm->value_ptr |= parm->mask;
           } else {
-            *(uint8_t *)parm->value_ptr &= ~parm->mask;
+            *(uint16_t *)parm->value_ptr &= ~parm->mask;
           }
         break;
         case CFG_SPECIAL:
@@ -473,8 +473,15 @@ void init_parameters (struct aqconfig * parms)
   _numCfgParams++;
   _cfgParams[_numCfgParams].value_ptr = &_aqconfig_.read_RS485_devmask;
   _cfgParams[_numCfgParams].value_type = CFG_BITMASK;
-  _cfgParams[_numCfgParams].name = CFG_N_read_RS485_Chem;
-  _cfgParams[_numCfgParams].mask = READ_RS485_JAN_CHEM;
+  _cfgParams[_numCfgParams].name = CFG_N_read_RS485_ChemLink;
+  _cfgParams[_numCfgParams].mask = READ_RS485_JAN_CHEM_FEDR;
+  _cfgParams[_numCfgParams].default_value = (void *)&_dcfg_false;
+
+  _numCfgParams++;
+  _cfgParams[_numCfgParams].value_ptr = &_aqconfig_.read_RS485_devmask;
+  _cfgParams[_numCfgParams].value_type = CFG_BITMASK;
+  _cfgParams[_numCfgParams].name = CFG_N_read_RS485_ChemAnalyzer;
+  _cfgParams[_numCfgParams].mask = READ_RS485_JAN_CHEM_ANLZ;
   _cfgParams[_numCfgParams].default_value = (void *)&_dcfg_false;
 
   _numCfgParams++;
@@ -1040,9 +1047,9 @@ bool setConfigValue(struct aqualinkdata *aqdata, char *param, char *value) {
         break;
         case CFG_BITMASK:
           if (text2bool(value))
-            *(uint8_t *)_cfgParams[i].value_ptr |= _cfgParams[i].mask;
+            *(uint16_t *)_cfgParams[i].value_ptr |= _cfgParams[i].mask;
           else
-            *(uint8_t *)_cfgParams[i].value_ptr &= ~_cfgParams[i].mask;
+            *(uint16_t *)_cfgParams[i].value_ptr &= ~_cfgParams[i].mask;
         break;
         case CFG_SPECIAL:
           if (strncasecmp(param, CFG_N_log_level, strlen(CFG_N_log_level)) == 0) {
@@ -1114,7 +1121,13 @@ if (strlen(cleanwhitespace(value)) <= 0) {
 */
 
   // Old names that we will map.
-   } else if ((strncasecmp(param, CFG_N_mqtt_hass_discover_topic, strlen(CFG_N_mqtt_hass_discover_topic)) == 0) ||
+  } else if (strncasecmp(param, "read_RS485_Chem", 15) == 0) {
+    // Renamed to read_RS485_ChemLink now
+    if (text2bool(value))
+       _aqconfig_.read_RS485_devmask |= READ_RS485_JAN_CHEM_FEDR;
+    else
+      _aqconfig_.read_RS485_devmask &= ~ READ_RS485_JAN_CHEM_FEDR;
+  } else if ((strncasecmp(param, CFG_N_mqtt_hass_discover_topic, strlen(CFG_N_mqtt_hass_discover_topic)) == 0) ||
              (strncasecmp(param, "mqtt_hassio_discover_topic", 26) == 0) || 
              (strncasecmp(param, "mqtt_hass_discover_topic", 24) == 0)) {
     _aqconfig_.mqtt_hass_discover_topic = cleanalloc(value);
@@ -1946,7 +1959,7 @@ void check_print_config (struct aqualinkdata *aqdata)
         LOG(AQUA_LOG,LOG_NOTICE, "%-35s = %f\n", name, *(float *)_cfgParams[i].value_ptr);
       break;
       case CFG_BITMASK:
-        LOG(AQUA_LOG,LOG_NOTICE, "%-35s = %s\n", name, (*(uint8_t *)_cfgParams[i].value_ptr & _cfgParams[i].mask) == _cfgParams[i].mask?bool2text(true):bool2text(false));
+        LOG(AQUA_LOG,LOG_NOTICE, "%-35s = %s\n", name, (*(uint16_t *)_cfgParams[i].value_ptr & _cfgParams[i].mask) == _cfgParams[i].mask?bool2text(true):bool2text(false));
       break;
       case CFG_SPECIAL:
         if (strncasecmp(_cfgParams[i].name, CFG_N_log_level, strlen(CFG_N_log_level)) == 0) {
@@ -2316,7 +2329,7 @@ bool writeCfg (struct aqualinkdata *aqdata)
           fprintf(fp, "%s=%f\n", _cfgParams[i].name, *(float *)_cfgParams[i].value_ptr);
         break;
         case CFG_BITMASK:
-          fprintf(fp, "%s=%s\n", _cfgParams[i].name, (*(uint8_t *)_cfgParams[i].value_ptr & _cfgParams[i].mask) == _cfgParams[i].mask? bool2text(true):bool2text(false));
+          fprintf(fp, "%s=%s\n", _cfgParams[i].name, (*(uint16_t *)_cfgParams[i].value_ptr & _cfgParams[i].mask) == _cfgParams[i].mask? bool2text(true):bool2text(false));
         break;
         case CFG_SPECIAL:
           if (strncasecmp(_cfgParams[i].name, CFG_N_log_level, strlen(CFG_N_log_level)) == 0) {

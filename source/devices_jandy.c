@@ -97,10 +97,15 @@ bool processJandyPacket(unsigned char *packet_buffer, int packet_length, struct 
       printJandyDebugPacket("LX", packet_buffer, packet_length);
       rtn = processPacketFromJandyLXHeater(packet_buffer, packet_length, aqdata, previous_packet_to);
     }
-    else if (interestedInNextAck == DRS_CHEM)
+    else if (interestedInNextAck == DRS_CHEM_FEED)
     {
-      printJandyDebugPacket("CHEM", packet_buffer, packet_length);
+      printJandyDebugPacket("ChemL", packet_buffer, packet_length);
       rtn = processPacketFromJandyChemFeeder(packet_buffer, packet_length, aqdata, previous_packet_to);
+    }
+    else if (interestedInNextAck == DRS_CHEM_ANLZ)
+    {
+      printJandyDebugPacket("CemSnr", packet_buffer, packet_length);
+      rtn = processPacketFromJandyChemAnalyzer(packet_buffer, packet_length, aqdata, previous_packet_to);
     }
     else if (interestedInNextAck == DRS_HEATPUMP)
     {
@@ -158,11 +163,18 @@ bool processJandyPacket(unsigned char *packet_buffer, int packet_length, struct 
     rtn = processPacketToJandyLXHeater(packet_buffer, packet_length, aqdata);
     previous_packet_to = packet_buffer[PKT_DEST];
   }
-  else if (READ_RSDEV_CHEM && packet_buffer[PKT_DEST] >= JANDY_DEC_CHEM_MIN && packet_buffer[PKT_DEST] <= JANDY_DEC_CHEM_MAX)
+  else if (READ_RSDEV_CHEM_FEDR && packet_buffer[PKT_DEST] >= JANDY_DEC_CHEM_MIN && packet_buffer[PKT_DEST] <= JANDY_DEC_CHEM_MAX)
   {
-    interestedInNextAck = DRS_CHEM;
-    printJandyDebugPacket("CHEM", packet_buffer, packet_length);
+    interestedInNextAck = DRS_CHEM_FEED;
+    printJandyDebugPacket("ChemL", packet_buffer, packet_length);
     rtn = processPacketToJandyChemFeeder(packet_buffer, packet_length, aqdata);
+    previous_packet_to = packet_buffer[PKT_DEST];
+  }
+  else if (READ_RSDEV_CHEM_ANLZ && packet_buffer[PKT_DEST] == JANDY_DEV_CHEM_ANLZ_MIN && packet_buffer[PKT_DEST] == JANDY_DEV_CHEM_ANLZ_MAX)
+  {
+    interestedInNextAck = DRS_CHEM_ANLZ;
+    printJandyDebugPacket("CemSnr", packet_buffer, packet_length);
+    rtn = processPacketToJandyChemAnalyzer(packet_buffer, packet_length, aqdata);
     previous_packet_to = packet_buffer[PKT_DEST];
   }
   else if (READ_RSDEV_iAQLNK && packet_buffer[PKT_DEST] >= JANDY_DEV_AQLNK_MIN && packet_buffer[PKT_DEST] <= JANDY_DEV_AQLNK_MAX 
@@ -973,6 +985,30 @@ bool processPacketFromJandyChemFeeder(unsigned char *packet_buffer, int packet_l
 
   return false;
 }
+
+
+
+bool processPacketToJandyChemAnalyzer(unsigned char *packet_buffer, int packet_length, struct aqualinkdata *aqdata)
+{
+  
+  //LOG(DJAN_LOG, LOG_INFO, "Last panel info pH=%f, ORP=%d\n",aqdata->ph, aqdata->orp, );
+
+  return false;
+}
+
+bool processPacketFromJandyChemAnalyzer(unsigned char *packet_buffer, int packet_length, struct aqualinkdata *aqdata, const unsigned char previous_packet_to){
+  
+
+  if (isCOMBO_PANEL && aqdata->aqbuttons[SPA_INDEX].led->state == ON) {
+    LOG(DJAN_LOG, LOG_INFO, "Last panel info pH=%f, ORP=%d, Spa water temp=%d (Spamode)\n",aqdata->ph, aqdata->orp, aqdata->spa_temp  );
+  } else {
+    LOG(DJAN_LOG, LOG_INFO, "Last panel info pH=%f, ORP=%d, Pool water temp=%d\n",aqdata->ph, aqdata->orp, aqdata->pool_temp  );
+  }
+
+  return false;
+}
+
+
 
 bool processPacketToHeatPump(unsigned char *packet_buffer, int packet_length, struct aqualinkdata *aqdata)
 {

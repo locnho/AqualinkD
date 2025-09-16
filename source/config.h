@@ -27,15 +27,16 @@
 #define MQTT_ID_LEN 18 // 20 seems to kill mosquitto 1.6
 
 // For aqconfig.read_RS485_devmask
-#define READ_RS485_SWG      (1 << 0) // 1   SWG
-#define READ_RS485_JAN_PUMP (1 << 1) // 2   Jandy Pump
-#define READ_RS485_PEN_PUMP (1 << 2) // 4   Pentair Pump
-#define READ_RS485_JAN_JXI  (1 << 3) //    Jandy JX & LXi heater
-#define READ_RS485_JAN_LX   (1 << 4) //     Jandy LX heater
-#define READ_RS485_JAN_CHEM (1 << 5) //     Jandy Chemical Feeder
-#define READ_RS485_IAQUALNK (1 << 6) // Read iAqualink messages 
-#define READ_RS485_HEATPUMP (1 << 7) // Read HeatPump messages
-#define READ_RS485_JLIGHT   (1 << 8) // Read Jandy infinite watercolor light
+#define READ_RS485_SWG           (1 << 0) // 1   SWG
+#define READ_RS485_JAN_PUMP      (1 << 1) // 2   Jandy Pump
+#define READ_RS485_PEN_PUMP      (1 << 2) // 4   Pentair Pump
+#define READ_RS485_JAN_JXI       (1 << 3) //    Jandy JX & LXi heater
+#define READ_RS485_JAN_LX        (1 << 4) //     Jandy LX heater
+#define READ_RS485_JAN_CHEM_FEDR (1 << 5) //     Jandy Chemical Feeder - rename to READ_RS485_JAN_CHEM_FEDR
+#define READ_RS485_IAQUALNK      (1 << 6) // Read iAqualink messages 
+#define READ_RS485_HEATPUMP      (1 << 7) // Read HeatPump messages
+#define READ_RS485_JLIGHT        (1 << 8) // Read Jandy infinite watercolor light
+#define READ_RS485_JAN_CHEM_ANLZ (1 << 9) // Read TrueSens
 
 #define MAX_RSSD_LOG_FILTERS 4
 
@@ -48,7 +49,7 @@ struct aqconfig
   char *web_directory;
   unsigned char device_id;
   unsigned char rssa_device_id;
-  int16_t paneltype_mask;
+  uint16_t paneltype_mask;
   unsigned char extended_device_id;
   unsigned char extended_device_id2;
   bool extended_device_id_programming;
@@ -86,7 +87,7 @@ struct aqconfig
   bool report_zero_pool_temp;
   //bool read_all_devices;
   //bool read_pentair_packets;
-  uint8_t read_RS485_devmask;
+  uint16_t read_RS485_devmask;
   bool use_panel_aux_labels; // Took this option out of config
 
   uint8_t force_device_devmask;
@@ -129,7 +130,8 @@ struct aqconfig _aqconfig_;
 #define READ_RSDEV_vsfPUMP ((_aqconfig_.read_RS485_devmask & READ_RS485_PEN_PUMP) == READ_RS485_PEN_PUMP)
 #define READ_RSDEV_JXI ((_aqconfig_.read_RS485_devmask & READ_RS485_JAN_JXI) == READ_RS485_JAN_JXI)
 #define READ_RSDEV_LX ((_aqconfig_.read_RS485_devmask & READ_RS485_JAN_LX) == READ_RS485_JAN_LX)
-#define READ_RSDEV_CHEM ((_aqconfig_.read_RS485_devmask & READ_RS485_JAN_CHEM) == READ_RS485_JAN_CHEM)
+#define READ_RSDEV_CHEM_FEDR ((_aqconfig_.read_RS485_devmask & READ_RS485_JAN_CHEM_FEDR) == READ_RS485_JAN_CHEM_FEDR)
+#define READ_RSDEV_CHEM_ANLZ ((_aqconfig_.read_RS485_devmask & READ_RS485_JAN_CHEM_ANLZ) == READ_RS485_JAN_CHEM_ANLZ)
 #define READ_RSDEV_iAQLNK ((_aqconfig_.read_RS485_devmask & READ_RS485_IAQUALNK) == READ_RS485_IAQUALNK)
 #define READ_RSDEV_HPUMP ((_aqconfig_.read_RS485_devmask & READ_RS485_HEATPUMP) == READ_RS485_HEATPUMP)
 #define READ_RSDEV_JLIGHT ((_aqconfig_.read_RS485_devmask & READ_RS485_JLIGHT) == READ_RS485_JLIGHT)
@@ -141,7 +143,7 @@ struct aqconfig _aqconfig_;
 #define FORCE_SWG_SP           (1 << 0)
 #define FORCE_POOLSPA_SP       (1 << 1)
 #define FORCE_FREEZEPROTECT_SP (1 << 2)
-#define FORCE_CHEM_FEEDER      (1 << 3)
+#define FORCE_CHEM_FEEDER      (1 << 3) // rename to FORCE_CHEMICALS
 #define FORCE_CHILLER          (1 << 4)
 
 #define ENABLE_SWG           ((_aqconfig_.force_device_devmask & FORCE_SWG_SP) == FORCE_SWG_SP)
@@ -210,10 +212,10 @@ typedef struct cfgParam {
   void *value_ptr;
   void *default_value;
   cfg_value_type value_type;
-  uint8_t config_mask;
+  uint16_t config_mask;
   char *name;
   char *valid_values;
-  uint8_t mask;
+  uint16_t mask;
   //bool advanced;
 } cfgParam;
 
@@ -298,7 +300,8 @@ int _numCfgParams;
 #define CFG_N_read_RS485_vsfPump                "read_RS485_vsfPump"
 #define CFG_N_read_RS485_JXi                    "read_RS485_JXi"
 #define CFG_N_read_RS485_LX                     "read_RS485_LX"
-#define CFG_N_read_RS485_Chem                   "read_RS485_Chem"
+#define CFG_N_read_RS485_ChemLink               "read_RS485_ChemLink"
+#define CFG_N_read_RS485_ChemAnalyzer           "read_RS485_TruSense"
 #define CFG_N_read_RS485_iAqualink              "read_RS485_iAqualink"
 #define CFG_N_read_RS485_HeatPump               "read_RS485_HeatPump"
 
