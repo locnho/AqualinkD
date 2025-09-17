@@ -304,7 +304,7 @@ case $1 in
   development)
     if ! latest_development_version; then logerr "getting development version";exit "$FALSE"; fi
     if ! download_latest_development; then logerr "downloading latest development";exit "$FALSE"; fi
-    run_install_script "$REL_VERSION"
+    run_install_script "$DEV_VERSION"
     cleanup
   ;;
   # Add Delete / remove / clean.
