@@ -311,7 +311,7 @@ char *get_aux_information(aqkey *button, struct aqualinkdata *aqdata, char *buff
   }
   if (isVBUTTON_ALTLABEL(button->special_mask))
   {
-    length += sprintf(buffer, ",\"alt_label\":\"%s\", \"in_alt_mode\": \"%s\" ",((vbutton_detail *)button->special_mask_ptr)->altlabel, ((vbutton_detail *)button->special_mask_ptr)->in_alt_mode?JSON_ON:JSON_OFF );
+    length += sprintf(buffer, ",\"alt_label\":\"%s\", \"in_alt_mode\": \"%s\" ",((altlabel_detail *)button->special_mask_ptr)->altlabel, ((altlabel_detail *)button->special_mask_ptr)->in_alt_mode?JSON_ON:JSON_OFF );
     //return buffer;
   }
 
@@ -588,6 +588,12 @@ int build_device_JSON(struct aqualinkdata *aqdata, char* buffer, int size, bool 
 
   length += sprintf(buffer+length, "]}");
 
+  // Really crap test
+  if (length >= size) {
+    LOG(NET_LOG,LOG_ERR, "JSON: %s went over buffer size %d of %d\n", homekit?"homebridge":"web", length, size);
+    buffer[size - 1] = '\0';
+  }
+
   LOG(NET_LOG,LOG_DEBUG, "JSON: %s used %d of %d\n", homekit?"homebridge":"web", length, size);
 
   buffer[length] = '\0';
@@ -717,7 +723,7 @@ int build_aqualink_status_JSON(struct aqualinkdata *aqdata, char* buffer, int si
   if ( (ENABLE_CHILLER || aqdata->chiller_set_point != TEMP_UNKNOWN) && aqdata->chiller_button != NULL) {
     length += sprintf(buffer+length, ",\"chiller_set_pnt\":\"%d\"",aqdata->chiller_set_point );//"0",
     if (isVBUTTON_CHILLER(aqdata->chiller_button->special_mask))
-      length += sprintf(buffer+length, ",\"chiller_mode\":\"%s\"",((vbutton_detail *)aqdata->chiller_button->special_mask_ptr)->in_alt_mode?"cool":"heat");
+      length += sprintf(buffer+length, ",\"chiller_mode\":\"%s\"",((altlabel_detail *)aqdata->chiller_button->special_mask_ptr)->in_alt_mode?"cool":"heat");
   }
   
   if ( aqdata->air_temp == TEMP_UNKNOWN )
@@ -860,7 +866,7 @@ printf("Pump Type %d\n",aqdata->pumps[i].pumpType);
     for (i=aqdata->virtual_button_start; i < aqdata->total_buttons; i++) 
     {
       if (isVBUTTON_ALTLABEL(aqdata->aqbuttons[i].special_mask)) {
-        length += sprintf(buffer+length, "\"%s\": \"%s\",",aqdata->aqbuttons[i].name, ((vbutton_detail *)aqdata->aqbuttons[i].special_mask_ptr)->in_alt_mode?JSON_ON:JSON_OFF );
+        length += sprintf(buffer+length, "\"%s\": \"%s\",",aqdata->aqbuttons[i].name, ((altlabel_detail *)aqdata->aqbuttons[i].special_mask_ptr)->in_alt_mode?JSON_ON:JSON_OFF );
       }
     }
     if (buffer[length-1] == ',')
@@ -1561,7 +1567,7 @@ int build_aqualink_config_JSON(char* buffer, int size, struct aqualinkdata *aq_d
           length += result;
     } else if ( isVBUTTON_ALTLABEL(aq_data->aqbuttons[i].special_mask)) {
       sprintf(buf,"%s_altlabel", prefix);
-      if ((result = json_cfg_element(buffer+length, size-length, buf, &((vbutton_detail *)aq_data->aqbuttons[i].special_mask_ptr)->altlabel, CFG_STRING, 0, NULL, 0)) <= 0) {
+      if ((result = json_cfg_element(buffer+length, size-length, buf, &((altlabel_detail *)aq_data->aqbuttons[i].special_mask_ptr)->altlabel, CFG_STRING, 0, NULL, 0)) <= 0) {
         LOG(NET_LOG,LOG_ERR, "Config json buffer full in, result truncated! size=%d curently used=%d\n",size,length);
         return length;
       } else

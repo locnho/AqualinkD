@@ -87,10 +87,11 @@ uint16_t getPanelSupport( char *rev_string, int rev_len);
 
 aqkey *addVirtualButton(struct aqualinkdata *aqdata, char *label, int vindex);
 bool setVirtualButtonLabel(aqkey *button, const char *label);
-bool setVirtualButtonAltLabel(aqkey *button, const char *label);
+bool setVirtualButtonAltLabel(aqkey *button, char *label);
 
 clight_detail *getProgramableLight(struct aqualinkdata *aqdata, int button);
 pump_detail *getPumpDetail(struct aqualinkdata *aqdata, int button);
+void setButtonSpecialMask(aqkey *button, uint16_t masktoset);
 
 //void panneltest();
 

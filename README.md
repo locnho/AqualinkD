@@ -136,9 +136,18 @@ NEED TO FIX FOR THIS RELEASE.
 * Use set_allbutton_light_dimmer for all lights (ie color lights)
 
 -->
-# Updates in 2.6.12 (dev)
+# Updates in 3.0.0 (dev)
+* Serial optimization for HAT.
+* Added options to force upgrades in aqmanager. (add ?upgrade or ?devupgrade to url to enable upgrade button)
+
+* Need to finish off :-
+* ToDo HAT serial optimizations broke some USB serial adapters
+* Code cleanup of old stuff. (THREAD_NET_SERVICE / BLOCKING SERIAL PORT)
 * Reading TruSense. (Jandy protocols working, need to finish off read_RS485_TruSense support)
-* ToDo assigning light mode & functionality to a vbutton (for JAndy Infinate water color support)
+* ToDo Cleanup the upgrade of Mongoose code
+* ToDo Finish off assigning light mode & functionality to a vbutton (for Jandy Infinite water color support )
+* ToDo Remove Domoticz support ???????
+* ToDo cleanup rs_msg_utils.c
 
 # Updates in 2.6.11 (Sept 14 2025)
 * Cleaned up exit codes.

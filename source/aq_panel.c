@@ -689,8 +689,9 @@ aqkey *addVirtualButton(struct aqualinkdata *aqdata, char *label, int vindex) {
   snprintf(name, 9, "%s%d", BTN_VAUX, index);
   button->name = name;
 
-  button->special_mask_ptr = malloc(sizeof(vbutton_detail));
-  ((vbutton_detail *)button->special_mask_ptr)->altlabel = NUL;
+  // NSF THIS NEEDS TO BE REMOVED
+  //button->special_mask_ptr = malloc(sizeof(altlabel_detail));
+  //((altlabel_detail *)button->special_mask_ptr)->altlabel = NUL;
 
   if (label == NULL || strlen(label) <= 0) {
     //button->label = name; 
@@ -701,7 +702,8 @@ aqkey *addVirtualButton(struct aqualinkdata *aqdata, char *label, int vindex) {
 
   button->code = NUL;
   button->dz_idx = DZ_NULL_IDX;
-  button->special_mask |= VIRTUAL_BUTTON; // Could change to special mask vbutton
+  setButtonSpecialMask(button, VIRTUAL_BUTTON);
+  //button->special_mask |= VIRTUAL_BUTTON; // Could change to special mask vbutton
   button->led->state = OFF;
 
   return button;  
@@ -727,13 +729,22 @@ bool setVirtualButtonLabel(aqkey *button, const char *label) {
   return true;
 }
 
-bool setVirtualButtonAltLabel(aqkey *button, const char *label) {
+
+bool setVirtualButtonAltLabel(aqkey *button, char *label) {
   if (label == NULL )
     return false;
 
-  ((vbutton_detail *)button->special_mask_ptr)->altlabel = (char *)label;
-  ((vbutton_detail *)button->special_mask_ptr)->in_alt_mode = false;
-  button->special_mask |= VIRTUAL_BUTTON_ALT_LABEL;
+  if (! isMASK_SET(button->special_mask, VIRTUAL_BUTTON_ALT_LABEL) ) {
+    button->special_mask_ptr = malloc(sizeof(altlabel_detail));
+    ((altlabel_detail *)button->special_mask_ptr)->altlabel = cleanalloc(label);
+    setButtonSpecialMask(button, VIRTUAL_BUTTON_ALT_LABEL);
+  }
+
+  ((altlabel_detail *)button->special_mask_ptr)->altlabel = (char *)label;
+  ((altlabel_detail *)button->special_mask_ptr)->in_alt_mode = false;
+  
+  //setButtonSpecialMask(button, VIRTUAL_BUTTON_ALT_LABEL);
+  //button->special_mask |= VIRTUAL_BUTTON_ALT_LABEL;
 
   return true;
 }
@@ -1475,7 +1486,17 @@ void programDeviceLightMode(struct aqualinkdata *aqdata, int value, int deviceIn
 
   char buf[LIGHT_MODE_BUFER];
 
-  if (light->lightType == LC_PROGRAMABLE ) {
+  if (isMASK_SET(light->button->special_mask, VIRTUAL_BUTTON)) {
+    // We can only program a light on virtual button on iaqtouch or onetouch
+    if (isIAQT_ENABLED ) {
+      sprintf(buf, "%-5d%-5d%-5d",value, deviceIndex, light->lightType);
+      aq_programmer(AQ_SET_IAQTOUCH_LIGHTCOLOR_MODE, buf, aqdata);
+    } else if (isONET_ENABLED ) {
+      LOG(PANL_LOG,LOG_ERR, "Light mode on virtual button not implimented on OneTouch protocol (needs AqualinkTouch)\n");
+    } else {
+      LOG(PANL_LOG,LOG_ERR, "Light mode on virtual button needs AqualinkTouch protocol\n");
+    }
+  } else if (light->lightType == LC_PROGRAMABLE ) {
     //sprintf(buf, "%-5s%-5d%-5d%-5d%.2f",value, 
     sprintf(buf, "%-5d%-5d%-5d%-5d%.2f",value, 
                                       deviceIndex, 
@@ -1483,7 +1504,7 @@ void programDeviceLightMode(struct aqualinkdata *aqdata, int value, int deviceIn
                                       _aqconfig_.light_programming_initial_off,
                                       _aqconfig_.light_programming_mode );
     aq_programmer(AQ_SET_LIGHTPROGRAM_MODE, buf, aqdata);
-  } else if (isRSSA_ENABLED) {
+  } else if (isRSSA_ENABLED ) {
     // If we are using rs-serial then turn light on first.
     if (light->button->led->state != ON) {
       set_aqualink_rssadapter_aux_state(light->button, TRUE);
@@ -1678,3 +1699,58 @@ pump_detail *getPumpDetail(struct aqualinkdata *aqdata, int button)
   return NULL;
 }
 
+
+const char *getButtontSpecialMaskName(uint16_t mask) {
+  switch(mask) {
+    case VS_PUMP: 
+      return "VSpump";
+    break;
+    case PROGRAM_LIGHT: 
+      return "lightMode";
+    break;
+    case VIRTUAL_BUTTON_ALT_LABEL:
+      return "altLabel";
+    break;
+    case VIRTUAL_BUTTON: 
+      return "Virtual Button";
+    break;
+    case VIRTUAL_BUTTON_CHILLER:
+      return "Virtual Button Chiller";
+    default:
+      return "unknown";
+    break;
+  }
+}
+void checkButtonSpecialMask(aqkey *button, uint16_t mask2remove) {
+  if (isMASK_SET(button->special_mask,mask2remove)) {
+    LOG(AQUA_LOG,LOG_ERR, "Config error can only have one type for button `%s`, removing `%s`\n",
+                           button->name, 
+                          getButtontSpecialMaskName(mask2remove));
+    removeMASK(button->special_mask, mask2remove);
+  }
+}
+void setButtonSpecialMask(aqkey *button, uint16_t mask2set) 
+{
+  switch(mask2set) {
+    case VS_PUMP:                  // assign struct pump_detail
+      checkButtonSpecialMask(button, PROGRAM_LIGHT);
+      checkButtonSpecialMask(button, VIRTUAL_BUTTON_ALT_LABEL);
+    break;
+    case PROGRAM_LIGHT:            // assign struct clight_detail
+      checkButtonSpecialMask(button, VIRTUAL_BUTTON_ALT_LABEL);
+      checkButtonSpecialMask(button, VS_PUMP);
+    break;
+    case VIRTUAL_BUTTON_ALT_LABEL: // assign struct altlabel_detail (Maybe delete VIRTUAL_BUTTON)
+      checkButtonSpecialMask(button, PROGRAM_LIGHT);
+      checkButtonSpecialMask(button, VS_PUMP);
+    break;
+    case VIRTUAL_BUTTON:           // Type can be added to above
+    break;
+    case VIRTUAL_BUTTON_CHILLER:   // Type can be added to above
+    break;
+    default:
+    break;
+  }
+
+  button->special_mask |= mask2set;
+}

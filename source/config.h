@@ -45,6 +45,7 @@ struct aqconfig
   char *config_file;
   char *serial_port;
   unsigned int log_level;
+  unsigned int mg_log_level;
   char *socket_port;
   char *web_directory;
   unsigned char device_id;
@@ -112,10 +113,6 @@ struct aqconfig
   bool save_debug_log_masks;
   bool save_light_programming_value;
   int sensor_poll_time;
-#ifdef AQ_NO_THREAD_NETSERVICE
-  int rs_poll_speed; // Need to remove
-  bool thread_netservices; // Need to remove
-#endif
 };
 
 #ifndef CONFIG_C
@@ -174,6 +171,8 @@ bool setConfigValue(struct aqualinkdata *aqdata, char *param, char *value);
 bool mac(char *buf, int len, bool useDelimiter);
 char *cleanalloc(char *str);
 char *ncleanalloc(char *str, int length);
+
+
 
 const char *pumpType2String(pump_type ptype);
 
@@ -236,6 +235,7 @@ int _numCfgParams;
 
 #define CFG_N_serial_port                       "serial_port"
 #define CFG_N_log_level                         "log_level"
+#define CFG_N_MG_log_level                      "mg_log_level"
 #define CFG_V_log_level                         "[\"DEBUG_SERIAL\", \"DEBUG\", \"INFO\", \"NOTICE\", \"WARNING\", \"ERROR\"]"
 #define CFG_N_socket_port                       "socket_port" 
 #define CFG_N_web_directory                     "web_directory"

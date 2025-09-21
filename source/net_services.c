@@ -13,6 +13,7 @@
  *
  *  https://github.com/sfeakes/aqualinkd
  */
+#define _GNU_SOURCE 1 // for strcasestr
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -52,6 +53,12 @@
 #include "pda.h"
 #endif
 
+
+struct mg_connection *mg_next(struct mg_mgr *s, struct mg_connection *conn) {
+  return conn == NULL ? s->conns : conn->next;
+}
+
+
 /*
 #if defined AQ_DEBUG || defined AQ_TM_DEBUG
   #include "timespec_subtract.h"
@@ -79,31 +86,19 @@ void reset_last_mqtt_status();
 bool uri_strcmp(const char *uri, const char *string);
 
 //static const char *s_http_port = "8080";
-static struct mg_serve_http_opts _http_server_opts;
+//static struct mg_serve_http_opts _http_server_opts;
+static struct mg_http_serve_opts _http_server_opts;
 
-
-#ifdef AQ_NO_THREAD_NETSERVICE
-  static sig_atomic_t s_signal_received = 0;
-#endif
 
 static void net_signal_handler(int sig_num) {
-  //printf("** net_signal_handler **\n");
-#ifdef AQ_NO_THREAD_NETSERVICE
-  if (!_aqconfig_.thread_netservices) {
-    signal(sig_num, net_signal_handler);  // Reinstantiate signal handler to aqualinkd.c
-    s_signal_received = sig_num;
-  } else {  
-    intHandler(sig_num); // Force signal handler to aqualinkd.c
-  }
-#else
   intHandler(sig_num); // Force signal handler to aqualinkd.c
-#endif
 }
 
 
 static int is_websocket(const struct mg_connection *nc) {
   //return nc->flags & MG_F_IS_WEBSOCKET && !(nc->flags & MG_F_USER_2); // WS only, not WS simulator
-  return nc->flags & MG_F_IS_WEBSOCKET;
+  //return nc->flags & MG_F_IS_WEBSOCKET;
+  return nc->is_websocket;
 }
 static void set_websocket_simulator(struct mg_connection *nc) {
   nc->flags |= MG_F_USER_2; 
@@ -128,7 +123,7 @@ static void ws_send(struct mg_connection *nc, char *msg)
 {
   int size = strlen(msg);
   
-  mg_send_websocket_frame(nc, WEBSOCKET_OP_TEXT, msg, size);
+  mg_ws_send(nc, msg, size, WEBSOCKET_OP_TEXT);
   
   //LOG(NET_LOG,LOG_DEBUG, "WS: Sent %d characters '%s'\n",size, msg);
 }
@@ -291,13 +286,13 @@ bool _broadcast_systemd_logmessages(bool aqMgrActive, bool reOpenStaleConnection
       if ( (journal = open_journal()) == NULL) {
   //printf("Open faied\n");
         build_logmsg_JSON(msg, LOG_ERR, "Failed to open journal", WS_LOG_LENGTH,22);
-        ws_send_logmsg(_mgr.active_connections, msg);
+        ws_send_logmsg(_mgr.conns, msg);
         return false;
       }
   //printf("Open good %d\n",journal);
       if (sd_journal_seek_tail(journal) < 0) {
         build_logmsg_JSON(msg, LOG_ERR, "Failed to seek to journal end", WS_LOG_LENGTH,29);
-        ws_send_logmsg(_mgr.active_connections, msg);
+        ws_send_logmsg(_mgr.conns, msg);
         sd_journal_close(journal);
         return false;
       }
@@ -322,20 +317,20 @@ bool _broadcast_systemd_logmessages(bool aqMgrActive, bool reOpenStaleConnection
   {
     if (sd_journal_get_data(journal, "MESSAGE", &log, &len) < 0) {
         build_logmsg_JSON(msg, LOG_ERR, "Failed to get journal message", WS_LOG_LENGTH,29);
-        ws_send_logmsg(_mgr.active_connections, msg);
+        ws_send_logmsg(_mgr.conns, msg);
     } else if (sd_journal_get_data(journal, "PRIORITY", &pri, &plen) < 0) {
         build_logmsg_JSON(msg, LOG_ERR, "Failed to seek to journal message priority", WS_LOG_LENGTH,42);
-        ws_send_logmsg(_mgr.active_connections, msg);
+        ws_send_logmsg(_mgr.conns, msg);
     } else {
         build_logmsg_JSON(msg, atoi((const char *)pri+9), (const char *)log+8, WS_LOG_LENGTH,(int)len-8);
-        ws_send_logmsg(_mgr.active_connections, msg);
+        ws_send_logmsg(_mgr.conns, msg);
         cnt=0;
         sd_journal_get_cursor(journal, &cursor);
     }
   }
   if (rtn < 0) {
     build_logmsg_JSON(msg, LOG_ERR, "Failed to seek to next journal message", WS_LOG_LENGTH,42);
-    ws_send_logmsg(_mgr.active_connections, msg);
+    ws_send_logmsg(_mgr.conns, msg);
     sd_journal_close(journal);
     active = false;
   } else if (rtn == 0) {
@@ -477,15 +472,21 @@ void _broadcast_aqualinkstate(struct mg_connection *nc)
 
 void send_mqtt(struct mg_connection *nc, const char *toppic, const char *message)
 {
-  static uint16_t msg_id = 0;
+  //static uint16_t msg_id = 0;
 
   if (toppic == NULL)
     return;
 
-  if (msg_id >= 65535){msg_id=1;}else{msg_id++;}
+  //if (msg_id >= 65535){msg_id=1;}else{msg_id++;}
 
   //mg_mqtt_publish(nc, toppic, msg_id, MG_MQTT_QOS(0), message, strlen(message));
-  mg_mqtt_publish(nc, toppic, msg_id, MG_MQTT_RETAIN | MG_MQTT_QOS(1), message, strlen(message));
+  //mg_mqtt_publish(nc, toppic, msg_id, MG_MQTT_RETAIN | MG_MQTT_QOS(1), message, strlen(message));
+  
+  struct mg_mqtt_opts pub_opts = {.topic = mg_str(toppic),
+                                .message = mg_str(message),
+                                .qos = 1,
+                                .retain = true};
+  uint16_t msg_id = mg_mqtt_pub(nc, &pub_opts);
 
   LOG(NET_LOG,LOG_INFO, "MQTT: Published id=%d: %s %s\n", msg_id, toppic, message);
 }
@@ -649,7 +650,7 @@ void send_mqtt_temp_msg_new(struct mg_connection *nc, char *dev_name, long value
 void send_mqtt_setpoint_msg(struct mg_connection *nc, char *dev_name, long value)
 {
   static char mqtt_pub_topic[250];
-  static char degC[10];
+  static char degC[11];
   // Use "not CELS" over "equal FAHR" so we default to FAHR for unknown units
   //sprintf(degC, "%.2f", (_aqualink_data->temp_units==FAHRENHEIT && _aqconfig_.convert_mqtt_temp)?degFtoC(value):value );
   sprintf(degC, "%.2f", (_aqualink_data->temp_units!=CELSIUS && _aqconfig_.convert_mqtt_temp)?degFtoC(value):value );
@@ -659,7 +660,7 @@ void send_mqtt_setpoint_msg(struct mg_connection *nc, char *dev_name, long value
 void send_mqtt_numeric_msg(struct mg_connection *nc, char *dev_name, int value)
 {
   static char mqtt_pub_topic[250];
-  static char msg[10];
+  static char msg[11];
   
   sprintf(msg, "%d", value);
   sprintf(mqtt_pub_topic, "%s/%s", _aqconfig_.mqtt_aq_topic, dev_name);
@@ -667,7 +668,7 @@ void send_mqtt_numeric_msg(struct mg_connection *nc, char *dev_name, int value)
 }
 void send_mqtt_float_msg(struct mg_connection *nc, char *dev_name, float value) {
   static char mqtt_pub_topic[250];
-  static char msg[10];
+  static char msg[11];
 
   sprintf(msg, "%.2f", value);
   sprintf(mqtt_pub_topic, "%s/%s", _aqconfig_.mqtt_aq_topic, dev_name);
@@ -807,13 +808,13 @@ void mqtt_broadcast_aqualinkstate(struct mg_connection *nc)
     }
 
     // Chiller is only on when in_alt_mode = true and led != off 
-    if ( _aqualink_data->chiller_button != NULL && ((vbutton_detail *) _aqualink_data->chiller_button->special_mask_ptr)->in_alt_mode == false ) {
+    if ( _aqualink_data->chiller_button != NULL && ((altlabel_detail *) _aqualink_data->chiller_button->special_mask_ptr)->in_alt_mode == false ) {
       // Chiller is off (in heat pump mode)
       if (OFF != _last_mqtt_chiller_led.state) {
         _last_mqtt_chiller_led.state = OFF;
         send_mqtt_led_state_msg(nc, CHILLER, OFF, MQTT_COOL, MQTT_OFF);
       }
-    } else if (_aqualink_data->chiller_button != NULL && ((vbutton_detail *) _aqualink_data->chiller_button->special_mask_ptr)->in_alt_mode == true ) {
+    } else if (_aqualink_data->chiller_button != NULL && ((altlabel_detail *) _aqualink_data->chiller_button->special_mask_ptr)->in_alt_mode == true ) {
       // post actual LED state, in chiller mode
       if (_aqualink_data->chiller_button->led->state != _last_mqtt_chiller_led.state) {
         _last_mqtt_chiller_led.state = _aqualink_data->chiller_button->led->state;
@@ -1193,6 +1194,12 @@ uriAtype action_URI(request_source from, const char *URI, int uri_length, float 
     return uActioned; 
   } else if (strncmp(ri1, "upgrade", 7) == 0 && from == NET_WS) { // Only valid from websocket.
     LOG(NET_LOG,LOG_NOTICE, "Received upgrade request!\n");
+    setMASK(_aqualink_data->updatetype, UPDATERELEASE);
+    raise(SIGRUPGRADE);
+    return uActioned; 
+  } else if (strncmp(ri1, "installdevrelease", 17) == 0 && from == NET_WS) { // Only valid from websocket.
+    LOG(NET_LOG,LOG_NOTICE, "Received install dev release request!\n");
+    setMASK(_aqualink_data->updatetype, INSTALLDEVRELEASE);
     raise(SIGRUPGRADE);
     return uActioned; 
   } else if (strncmp(ri1, "seriallogger", 12) == 0 && from == NET_WS) { // Only valid from websocket.
@@ -1201,7 +1208,7 @@ uriAtype action_URI(request_source from, const char *URI, int uri_length, float 
     _aqualink_data->slogger_packets = round(value);
     if (ri2 != NULL) {
       //MIN( 19, (ri3 - ri2));
-      snprintf(_aqualink_data->slogger_ids, MIN( 19, (ri3 - ri2)+1 ), ri2); // 0x01 0x02 0x03 0x04
+      snprintf(_aqualink_data->slogger_ids, AQ_MIN( 19, (ri3 - ri2)+1 ), ri2); // 0x01 0x02 0x03 0x04
     } else {
       _aqualink_data->slogger_ids[0] = '\0';
     }
@@ -1410,7 +1417,7 @@ uriAtype action_URI(request_source from, const char *URI, int uri_length, float 
       for (i=0; i < _aqualink_data->total_buttons ; i++) {
         //if (strncmp(ri1, _aqualink_data->aqbuttons[i].name, strlen(_aqualink_data->aqbuttons[i].name)) == 0 ){
         if ( uri_strcmp(ri1, _aqualink_data->aqbuttons[i].name) || 
-             ( isVBUTTON_ALTLABEL(_aqualink_data->aqbuttons[i].special_mask) && uri_strcmp(ri1, ((vbutton_detail *)_aqualink_data->aqbuttons[i].special_mask_ptr)->altlabel)) ) {
+             ( isVBUTTON_ALTLABEL(_aqualink_data->aqbuttons[i].special_mask) && uri_strcmp(ri1, ((altlabel_detail *)_aqualink_data->aqbuttons[i].special_mask_ptr)->altlabel)) ) {
           int pi;
           for (pi=0; pi < _aqualink_data->num_pumps; pi++) {
             if (_aqualink_data->pumps[pi].button == &_aqualink_data->aqbuttons[i]) {
@@ -1497,7 +1504,7 @@ uriAtype action_URI(request_source from, const char *URI, int uri_length, float 
       //if ( uri_strcmp(ri1, _aqualink_data->aqbuttons[i].name) || uri_strcmp(ri1, _aqualink_data->aqbuttons[i].label) )
 
       if ( uri_strcmp(ri1, _aqualink_data->aqbuttons[i].name) || uri_strcmp(ri1, _aqualink_data->aqbuttons[i].label) || 
-         ( isVBUTTON_ALTLABEL(_aqualink_data->aqbuttons[i].special_mask) && uri_strcmp(ri1, ((vbutton_detail *)_aqualink_data->aqbuttons[i].special_mask_ptr)->altlabel)) )
+         ( isVBUTTON_ALTLABEL(_aqualink_data->aqbuttons[i].special_mask) && uri_strcmp(ri1, ((altlabel_detail *)_aqualink_data->aqbuttons[i].special_mask_ptr)->altlabel)) )
       {
         found = true;
         //create_panel_request(from, i, value, istimer);
@@ -1550,19 +1557,19 @@ void action_mqtt_message(struct mg_connection *nc, struct mg_mqtt_message *msg) 
   int tid;
 #endif
   //unsigned int i;
-  //LOG(NET_LOG,LOG_DEBUG, "MQTT: topic %.*s %.2f\n",msg->topic.len, msg->topic.p, atof(msg->payload.p));
+  //LOG(NET_LOG,LOG_DEBUG, "MQTT: topic %.*s %.2f\n",msg->topic.len, msg->topic.buf, atof(msg->data.buf));
   // If message doesn't end in set or increment we don't care about it.
-  if (strncmp(&msg->topic.p[msg->topic.len -4], "/set", 4) != 0 && strncmp(&msg->topic.p[msg->topic.len -10], "/increment", 10) != 0) {
-    LOG(NET_LOG,LOG_DEBUG, "MQTT: Ignore %.*s %.*s\n",msg->topic.len, msg->topic.p, msg->payload.len, msg->payload.p);
+  if (strncmp(&msg->topic.buf[msg->topic.len -4], "/set", 4) != 0 && strncmp(&msg->topic.buf[msg->topic.len -10], "/increment", 10) != 0) {
+    LOG(NET_LOG,LOG_DEBUG, "MQTT: Ignore %.*s %.*s\n",msg->topic.len, msg->topic.buf, msg->data.len, msg->data.buf);
     return;
   }
-  LOG(NET_LOG,LOG_DEBUG, "MQTT: topic %.*s %.*s\n",msg->topic.len, msg->topic.p, msg->payload.len, msg->payload.p);
+  LOG(NET_LOG,LOG_DEBUG, "MQTT: topic %.*s %.*s\n",msg->topic.len, msg->topic.buf, msg->data.len, msg->data.buf);
 
   DEBUG_TIMER_START(&tid);
   //Need to do this in a better manor, but for present it's ok.
   static char tmp[20];
-  strncpy(tmp, msg->payload.p, msg->payload.len);
-  tmp[msg->payload.len] = '\0';
+  strncpy(tmp, msg->data.buf, msg->data.len);
+  tmp[msg->data.len] = '\0';
 
   //float value = atof(tmp);
 
@@ -1575,16 +1582,16 @@ void action_mqtt_message(struct mg_connection *nc, struct mg_mqtt_message *msg) 
     if (rsm_strcmp(tmp, "on")==0 || rsm_strcmp(tmp, "heat")==0 || rsm_strcmp(tmp, "cool")==0)
       value = 1;
 
-    LOG(NET_LOG,LOG_NOTICE, "MQTT: converted value from '%s' to '%.0f', from message '%.*s'\n",tmp,value,msg->topic.len, msg->topic.p);
+    LOG(NET_LOG,LOG_NOTICE, "MQTT: converted value from '%s' to '%.0f', from message '%.*s'\n",tmp,value,msg->topic.len, msg->topic.buf);
   } 
 
 
   //int val = _aqualink_data->unactioned.value = (_aqualink_data->temp_units != CELSIUS && _aqconfig_.convert_mqtt_temp) ? round(degCtoF(value)) : round(value);
   bool convert = (_aqualink_data->temp_units != CELSIUS && _aqconfig_.convert_mqtt_temp)?true:false;
   int offset = strlen(_aqconfig_.mqtt_aq_topic)+1;
-  if ( action_URI(NET_MQTT, &msg->topic.p[offset], msg->topic.len - offset, value, convert, &rtnmsg) == uBad ) {
+  if ( action_URI(NET_MQTT, &msg->topic.buf[offset], msg->topic.len - offset, value, convert, &rtnmsg) == uBad ) {
     // Check if it was something that can't be changed, if so send back current state.  Homekit thermostat for SWG and Freezeprotect.
-    if (  strncmp(&msg->topic.p[offset], FREEZE_PROTECT, strlen(FREEZE_PROTECT)) == 0) {
+    if (  strncmp(&msg->topic.buf[offset], FREEZE_PROTECT, strlen(FREEZE_PROTECT)) == 0) {
       if (_aqualink_data->frz_protect_set_point != TEMP_UNKNOWN ) {
         send_mqtt_setpoint_msg(nc, FREEZE_PROTECT, _aqualink_data->frz_protect_set_point);
         send_mqtt_string_msg(nc, FREEZE_PROTECT_ENABELED, MQTT_ON);
@@ -1592,7 +1599,7 @@ void action_mqtt_message(struct mg_connection *nc, struct mg_mqtt_message *msg) 
         send_mqtt_string_msg(nc, FREEZE_PROTECT_ENABELED, MQTT_OFF);
       }
       send_mqtt_string_msg(nc, FREEZE_PROTECT, _aqualink_data->frz_protect_state==ON?MQTT_ON:MQTT_OFF);
-    } else if (  strncmp(&msg->topic.p[offset], SWG_TOPIC, strlen(SWG_TOPIC)) == 0) {
+    } else if (  strncmp(&msg->topic.buf[offset], SWG_TOPIC, strlen(SWG_TOPIC)) == 0) {
       if (_aqualink_data->swg_led_state != LED_S_UNKNOWN) {
         send_mqtt_swg_state_msg(nc, SWG_TOPIC, _aqualink_data->swg_led_state);
         send_mqtt_int_msg(nc, SWG_BOOST_TOPIC, _aqualink_data->boost);
@@ -1607,7 +1614,7 @@ void action_mqtt_message(struct mg_connection *nc, struct mg_mqtt_message *msg) 
 
 
 float pass_mg_body(struct mg_str *body) {
-  LOG(NET_LOG,LOG_INFO, "Message body:'%.*s'\n", body->len, body->p);
+  LOG(NET_LOG,LOG_INFO, "Message body:'%.*s'\n", body->len, body->buf);
   // Quick n dirty pass value from either of below.
   // value=1.5&arg2=val2
   // {"value":"1.5"}
@@ -1622,11 +1629,11 @@ float pass_mg_body(struct mg_str *body) {
   // NSF Really need to come back and clean this up
 
   for (i=0; i < len; i++) {
-    if ( body->p[i] == '=' || body->p[i] == ':' ) {
-      while (!isdigit((unsigned char) body->p[i]) && body->p[i] != '-' && i < len) {i++;}
+    if ( body->buf[i] == '=' || body->buf[i] == ':' ) {
+      while (!isdigit((unsigned char) body->buf[i]) && body->buf[i] != '-' && i < len) {i++;}
       if(i < len) {
         // Need to copy to buffer so we can terminate correctly.
-        strncpy(buf, &body->p[i], len - i);
+        strncpy(buf, &body->buf[i], len - i);
         buf[len - i] = '\0';
         return atof(buf);
       }
@@ -1636,18 +1643,18 @@ float pass_mg_body(struct mg_str *body) {
   return TEMP_UNKNOWN;
 }
 
-void log_http_request(int level, char *message, struct http_message *http_msg) {
-  char *uri = (char *)malloc(http_msg->uri.len + http_msg->query_string.len + 2);
+void log_http_request(int level, char *message, struct mg_http_message *http_msg) {
+  char *uri = (char *)malloc(http_msg->uri.len + http_msg->query.len + 2);
   
-  strncpy(uri, http_msg->uri.p, http_msg->uri.len + http_msg->query_string.len + 1);
-  uri[http_msg->uri.len + http_msg->query_string.len + 1] = '\0';
+  strncpy(uri, http_msg->uri.buf, http_msg->uri.len + http_msg->query.len + 1);
+  uri[http_msg->uri.len + http_msg->query.len + 1] = '\0';
 
   LOG(NET_LOG,level, "%s: '%s'\n", message, uri);
   
   free(uri);
 }
 
-void action_web_request(struct mg_connection *nc, struct http_message *http_msg) {
+void action_web_request(struct mg_connection *nc, struct mg_http_message *http_msg) {
   char *msg = NULL;
   // struct http_message *http_msg = (struct http_message *)ev_data;
 #ifdef AQ_TM_DEBUG
@@ -1671,12 +1678,17 @@ void action_web_request(struct mg_connection *nc, struct http_message *http_msg)
   //LOG(NET_LOG,LOG_INFO, "Message request:\n'%.*s'\n", http_msg->message.len, http_msg->message.p);
 
   // If we have a get request, pass it
-  if (strncmp(http_msg->uri.p, "/api", 4 ) != 0) {
+  if (strncmp(http_msg->uri.buf, "/api", 4 ) != 0) {
     //if (strstr(http_msg->method.p, "GET") && http_msg->query_string.len > 0) {
     //  log_http_request(LOG_ERR, "Old API stanza requested, ignoring request :", http_msg);
     //} else {
       DEBUG_TIMER_START(&tid);
-      mg_serve_http(nc, http_msg, _http_server_opts);
+
+      //mg_serve_http(nc, http_msg, _http_server_opts);
+      //mg_http_serve_file(nc, http_msg, _http_server_opts.root_dir, &_http_server_opts);
+      mg_http_serve_dir(nc, http_msg, &_http_server_opts);
+      // _aqconfig_.web_directory
+               
       DEBUG_TIMER_STOP(tid, NET_LOG, "action_web_request() serve file took");
     //}
   //} else if (strstr(http_msg->method.p, "PUT")) {
@@ -1686,96 +1698,106 @@ void action_web_request(struct mg_connection *nc, struct http_message *http_msg)
     DEBUG_TIMER_START(&tid);
 
     // If query string.
-    if (http_msg->query_string.len > 1) {
-      mg_get_http_var(&http_msg->query_string, "value", buf, sizeof(buf));
+    if (http_msg->query.len > 1) {
+      //mg_get_http_var(&http_msg->query, "value", buf, sizeof(buf)); // Old mosquitto
+      mg_http_get_var(&http_msg->query, "value", buf, sizeof(buf));
       value = atof(buf);
     } else if (http_msg->body.len > 1) {
       value = pass_mg_body(&http_msg->body);
     }
     
-    int len = mg_url_decode(http_msg->uri.p, http_msg->uri.len, buf, 50, 0);
+    int len = mg_url_decode(http_msg->uri.buf, http_msg->uri.len, buf, 50, 0);
     
-    if (strncmp(http_msg->uri.p, "/api/",4) == 0) {
+    if (strncmp(http_msg->uri.buf, "/api/",4) == 0) {
       switch (action_URI(NET_API, &buf[5], len-5, value, false, &msg)) {
         case uActioned:
-          mg_send_head(nc, 200, strlen(GET_RTN_OK), CONTENT_TEXT);
-          mg_send(nc, GET_RTN_OK, strlen(GET_RTN_OK));
+          //mg_send_head(nc, 200, strlen(GET_RTN_OK), CONTENT_TEXT);
+          //mg_send(nc, GET_RTN_OK, strlen(GET_RTN_OK));
+          mg_http_reply(nc, 200, CONTENT_TEXT, GET_RTN_OK);
         break;
         case uDevices:
         {
           char message[JSON_BUFFER_SIZE];
           DEBUG_TIMER_START(&tid2);
-          int size = build_device_JSON(_aqualink_data, message, JSON_BUFFER_SIZE, false);
+          build_device_JSON(_aqualink_data, message, JSON_BUFFER_SIZE, false);
           DEBUG_TIMER_STOP(tid2, NET_LOG, "action_web_request() build_device_JSON took");
-          mg_send_head(nc, 200, size, CONTENT_JSON);
-          mg_send(nc, message, size);
+          //mg_send_head(nc, 200, size, CONTENT_JSON);
+          //mg_send(nc, message, size);
+          mg_http_reply(nc, 200, CONTENT_JSON, message);
         }
         break;
         case uHomebridge:
         {
           char message[JSON_BUFFER_SIZE];
-          int size = build_device_JSON(_aqualink_data, message, JSON_BUFFER_SIZE, true);
-          mg_send_head(nc, 200, size, CONTENT_JSON);
-          mg_send(nc, message, size);
+          build_device_JSON(_aqualink_data, message, JSON_BUFFER_SIZE, true);
+          //mg_send_head(nc, 200, size, CONTENT_JSON);
+          //mg_send(nc, message, size);
+          mg_http_reply(nc, 200, CONTENT_JSON, message);
         }
         break;
         case uStatus:
         {
           char message[JSON_BUFFER_SIZE];
           DEBUG_TIMER_START(&tid2);
-          int size = build_aqualink_status_JSON(_aqualink_data, message, JSON_BUFFER_SIZE);
+          build_aqualink_status_JSON(_aqualink_data, message, JSON_BUFFER_SIZE);
           DEBUG_TIMER_STOP(tid2, NET_LOG, "action_web_request() build_aqualink_status_JSON took");
-          mg_send_head(nc, 200, size, CONTENT_JSON);
-          mg_send(nc, message, size);
+          //mg_send_head(nc, 200, size, CONTENT_JSON);
+          //mg_send(nc, message, size);
+          mg_http_reply(nc, 200, CONTENT_JSON, message);
         }
         break;
         case uDynamicconf:
         {
           char message[JSON_BUFFER_SIZE];
           DEBUG_TIMER_START(&tid2);
-          int size = build_webconfig_js(_aqualink_data, message, JSON_BUFFER_SIZE);
+          build_webconfig_js(_aqualink_data, message, JSON_BUFFER_SIZE);
           DEBUG_TIMER_STOP(tid2, NET_LOG, "action_web_request() build_webconfig_js took");
-          mg_send_head(nc, 200, size, CONTENT_JS);
-          mg_send(nc, message, size); 
+          //mg_send_head(nc, 200, size, CONTENT_JS);
+          //mg_send(nc, message, size);
+          mg_http_reply(nc, 200, CONTENT_JSON, message);
         }
         break;
         case uSchedules:
         {
           char message[JSON_BUFFER_SIZE];
           DEBUG_TIMER_START(&tid2);
-          int size = build_schedules_js(message, JSON_BUFFER_SIZE);
+          build_schedules_js(message, JSON_BUFFER_SIZE);
           DEBUG_TIMER_STOP(tid2, NET_LOG, "action_web_request() build_schedules_js took");
-          mg_send_head(nc, 200, size, CONTENT_JSON);
-          mg_send(nc, message, size); 
+          //mg_send_head(nc, 200, size, CONTENT_JSON);
+          //mg_send(nc, message, size); 
+          mg_http_reply(nc, 200, CONTENT_JSON, message);
         }
         break;
         case uSetSchedules:
         {
           char message[JSON_BUFFER_SIZE];
           DEBUG_TIMER_START(&tid2);
-          int size = save_schedules_js(http_msg->body.p, http_msg->body.len, message, JSON_BUFFER_SIZE);
+          save_schedules_js(http_msg->body.buf, http_msg->body.len, message, JSON_BUFFER_SIZE);
           DEBUG_TIMER_STOP(tid2, NET_LOG, "action_web_request() save_schedules_js took");
-          mg_send_head(nc, 200, size, CONTENT_JSON);
-          mg_send(nc, message, size); 
+          //mg_send_head(nc, 200, size, CONTENT_JSON);
+          //mg_send(nc, message, size);
+          mg_http_reply(nc, 200, CONTENT_JSON, message);
         }
         break;
         case uConfig:
         {
           char message[JSON_BUFFER_SIZE];
           DEBUG_TIMER_START(&tid2);
-          int size = build_aqualink_config_JSON(message, JSON_BUFFER_SIZE, _aqualink_data);
+          build_aqualink_config_JSON(message, JSON_BUFFER_SIZE, _aqualink_data);
           DEBUG_TIMER_STOP(tid2, NET_LOG, "action_web_request() build_aqualink_config_JSON took");
-          mg_send_head(nc, 200, size, CONTENT_JSON);
-          mg_send(nc, message, size); 
+          //mg_send_head(nc, 200, size, CONTENT_JSON);
+          //mg_send(nc, message, size);
+          mg_http_reply(nc, 200, CONTENT_JSON, message);
         }
         break;
 #ifndef AQ_MANAGER
         case uDebugStatus:
         {
           char message[JSON_BUFFER_SIZE];
-          int size = snprintf(message,80,"{\"sLevel\":\"%s\", \"iLevel\":%d, \"logReady\":\"%s\"}\n",elevel2text(getLogLevel(NET_LOG)),getLogLevel(NET_LOG),islogFileReady()?"true":"false" );
-          mg_send_head(nc, 200, size, CONTENT_JS);
-          mg_send(nc, message, size);
+          snprintf(message,80,"{\"sLevel\":\"%s\", \"iLevel\":%d, \"logReady\":\"%s\"}\n",elevel2text(getLogLevel(NET_LOG)),getLogLevel(NET_LOG),islogFileReady()?"true":"false" );
+          //mg_send_head(nc, 200, size, CONTENT_JS);
+          //mg_send(nc, message, size);
+          mg_http_reply(nc, 200, CONTENT_JS, message);
         }
         break;
 #else
@@ -1790,40 +1812,45 @@ void action_web_request(struct mg_connection *nc, struct http_message *http_msg)
           }
           LOG(NET_LOG, LOG_DEBUG, "Downloading log of max %d lines\n",value>0?(int)value:DEFAULT_LOG_DOWNLOAD_LINES);
           if (write_systemd_logmessages_2file("/dev/shm/aqualinkd.log", value>0?(int)value:DEFAULT_LOG_DOWNLOAD_LINES) ) {
-            mg_http_serve_file(nc, http_msg, "/dev/shm/aqualinkd.log", mg_mk_str("text/plain"), mg_mk_str("Content-Disposition: attachment; filename=\"aqualinkd.log\""));
+            //mg_http_serve_file(nc, http_msg, "/dev/shm/aqualinkd.log", mg_mk_str("text/plain"), mg_mk_str("Content-Disposition: attachment; filename=\"aqualinkd.log\""));
+            mg_http_serve_file(nc, http_msg, "/dev/shm/aqualinkd.log", &_http_server_opts);
             remove("/dev/shm/aqualinkd.log");
           }
         break;
 
         case uConfigDownload:
           LOG(NET_LOG, LOG_DEBUG, "Downloading config\n");
-          mg_http_serve_file(nc, http_msg, _aqconfig_.config_file, mg_mk_str("text/plain"), mg_mk_str("Content-Disposition: attachment; filename=\"aqualinkd.conf\""));
+          //mg_http_serve_file(nc, http_msg, _aqconfig_.config_file, mg_mk_str("text/plain"), mg_mk_str("Content-Disposition: attachment; filename=\"aqualinkd.conf\""));
+          mg_http_serve_file(nc, http_msg, _aqconfig_.config_file, &_http_server_opts);
         break;
 #endif
         case uBad:
         default:
           if (msg == NULL) {
-            mg_send_head(nc, 400, strlen(GET_RTN_UNKNOWN), CONTENT_TEXT);
-            mg_send(nc, GET_RTN_UNKNOWN, strlen(GET_RTN_UNKNOWN));
+            //mg_send_head(nc, 400, strlen(GET_RTN_UNKNOWN), CONTENT_TEXT);
+            //mg_send(nc, GET_RTN_UNKNOWN, strlen(GET_RTN_UNKNOWN));
+            mg_http_reply(nc, 400, CONTENT_TEXT, GET_RTN_UNKNOWN);
           } else {
-            mg_send_head(nc, 400, strlen(msg), CONTENT_TEXT);
-            mg_send(nc, msg, strlen(msg));
+            //mg_send_head(nc, 400, strlen(msg), CONTENT_TEXT);
+            //mg_send(nc, msg, strlen(msg));
+            mg_http_reply(nc, 400, CONTENT_TEXT, msg);
           }
         break;
       }
     } else {
-      mg_send_head(nc, 200, strlen(GET_RTN_UNKNOWN), CONTENT_TEXT);
-      mg_send(nc, GET_RTN_UNKNOWN, strlen(GET_RTN_UNKNOWN));
+      //mg_send_head(nc, 200, strlen(GET_RTN_UNKNOWN), CONTENT_TEXT);
+      //mg_send(nc, GET_RTN_UNKNOWN, strlen(GET_RTN_UNKNOWN));
+      mg_http_reply(nc, 400, CONTENT_TEXT, GET_RTN_UNKNOWN);
     }
 
-    sprintf(buf, "action_web_request() request '%.*s' took",(int)http_msg->uri.len, http_msg->uri.p);
+    sprintf(buf, "action_web_request() request '%.*s' took",(int)http_msg->uri.len, http_msg->uri.buf);
 
     DEBUG_TIMER_STOP(tid, NET_LOG, buf);
   }
 }
 
 
-void action_websocket_request(struct mg_connection *nc, struct websocket_message *wm) {
+void action_websocket_request(struct mg_connection *nc, struct mg_ws_message *wm) {
   char buffer[100];
   struct JSONkvptr jsonkv;
   int i;
@@ -1839,8 +1866,8 @@ void action_websocket_request(struct mg_connection *nc, struct websocket_message
     pda_reset_sleep();
 #endif
    
-  strncpy(buffer, (char *)wm->data, MIN(wm->size, 99));
-  buffer[wm->size] = '\0';
+  strncpy(buffer, (char *)wm->data.buf, AQ_MIN(wm->data.len, 99));
+  buffer[wm->data.len] = '\0';
 
   parseJSONrequest(buffer, &jsonkv);
 
@@ -1927,7 +1954,7 @@ void action_websocket_request(struct mg_connection *nc, struct websocket_message
     {
       DEBUG_TIMER_START(&tid);
       char message[JSON_BUFFER_SIZE];
-      save_schedules_js((char *)wm->data, wm->size, message, JSON_BUFFER_SIZE);
+      save_schedules_js((char *)wm->data.buf, wm->data.len, message, JSON_BUFFER_SIZE);
       DEBUG_TIMER_STOP(tid, NET_LOG, "action_websocket_request() save_schedules_js took");
       ws_send(nc, message); 
     }
@@ -1945,7 +1972,7 @@ void action_websocket_request(struct mg_connection *nc, struct websocket_message
     {
       DEBUG_TIMER_START(&tid);
       char message[JSON_BUFFER_SIZE];
-      save_config_js((char *)wm->data, wm->size, message, JSON_BUFFER_SIZE, _aqualink_data);
+      save_config_js((char *)wm->data.buf, wm->data.len, message, JSON_BUFFER_SIZE, _aqualink_data);
       DEBUG_TIMER_STOP(tid, NET_LOG, "action_websocket_request() save_config_js took");
       ws_send(nc, message);
     }
@@ -1967,7 +1994,7 @@ void action_domoticz_mqtt_message(struct mg_connection *nc, struct mg_mqtt_messa
   int i;
   char svalue[DZ_SVALUE_LEN+1];
 
-  if (parseJSONmqttrequest(msg->payload.p, msg->payload.len, &idx, &nvalue, svalue) && idx > 0) {
+  if (parseJSONmqttrequest(msg->data.buf, msg->data.len, &idx, &nvalue, svalue) && idx > 0) {
     for (i=0; i < _aqualink_data->total_buttons; i++) {
       if (_aqualink_data->aqbuttons[i].dz_idx == idx){
         LOG(NET_LOG,LOG_DEBUG, "MQTT: DZ: Received message IDX=%d nValue=%d sValue=%s\n", idx, nvalue, svalue);
@@ -2001,8 +2028,8 @@ void action_domoticz_mqtt_message(struct mg_connection *nc, struct mg_mqtt_messa
 
 static void ev_handler(struct mg_connection *nc, int ev, void *ev_data) {
   struct mg_mqtt_message *mqtt_msg;
-  struct http_message *http_msg;
-  struct websocket_message *ws_msg;
+  struct mg_http_message *http_msg;
+  struct mg_ws_message *ws_msg;
   char aq_topic[30];
   #ifdef AQ_TM_DEBUG 
     int tid; 
@@ -2011,23 +2038,35 @@ static void ev_handler(struct mg_connection *nc, int ev, void *ev_data) {
 
   // LOG(NET_LOG,LOG_DEBUG, "Event\n");
   switch (ev) {
-  case MG_EV_HTTP_REQUEST:
+  //case MG_EV_HTTP_REQUEST:
+  case MG_EV_HTTP_MSG:
     //nc->user_data = WEB;
-    http_msg = (struct http_message *)ev_data;
+    http_msg = (struct mg_http_message *)ev_data;
+
+    //if ( strstr(http_msg->head.buf, "Upgrade: websocket")  ) {
+    //if ( strstr(http_msg->head.buf, "Sec-WebSocket-Key")  ) {
+    if ( mg_http_get_header(http_msg, "Sec-WebSocket-Key") != NULL) {
+      LOG(NET_LOG,LOG_DEBUG, "Enable websockets\n");
+      mg_ws_upgrade(nc, http_msg, NULL);
+      break;
+    }
+
     DEBUG_TIMER_START(&tid); 
     action_web_request(nc, http_msg);
     DEBUG_TIMER_STOP(tid, NET_LOG, "WEB Request action_web_request() took"); 
     LOG(NET_LOG,LOG_DEBUG, "Served WEB request\n");
     break;
   
-  case MG_EV_WEBSOCKET_HANDSHAKE_DONE:
+  //case MG_EV_WEBSOCKET_HANDSHAKE_DONE:
+  case MG_EV_WS_OPEN:
     //nc->user_data = WS;
     _aqualink_data->open_websockets++;
     LOG(NET_LOG,LOG_DEBUG, "++ Websocket joined\n");
     break;
   
-  case MG_EV_WEBSOCKET_FRAME: 
-    ws_msg = (struct websocket_message *)ev_data;
+  //case MG_EV_WEBSOCKET_FRAME:
+  case MG_EV_WS_MSG:
+    ws_msg = (struct mg_ws_message *)ev_data;
     DEBUG_TIMER_START(&tid); 
     action_websocket_request(nc, ws_msg);
     DEBUG_TIMER_STOP(tid, NET_LOG, "Websocket Request action_websocket_request() took"); 
@@ -2051,90 +2090,59 @@ static void ev_handler(struct mg_connection *nc, int ev, void *ev_data) {
     break;
   
   case MG_EV_CONNECT: {
-    //nc->user_data = MQTT;
-    //nc->flags |= MG_F_USER_1; // NFS Need to readup on this
     set_mqtt(nc);
     _mqtt_exit_flag = false;
-    //char *MQTT_id = "AQUALINK_MQTT_TEST_ID";
-    struct mg_send_mqtt_handshake_opts opts;
-    memset(&opts, 0, sizeof(opts));
-    opts.user_name = _aqconfig_.mqtt_user;
-    opts.password = _aqconfig_.mqtt_passwd;
-    opts.keep_alive = 5;
-    opts.flags |= MG_MQTT_CLEAN_SESSION; // NFS Need to readup on this
-
-    snprintf(aq_topic, 24, "%s/%s", _aqconfig_.mqtt_aq_topic,MQTT_LWM_TOPIC);
-    opts.will_topic = aq_topic;
-    opts.will_message = MQTT_OFF;
-
-    mg_set_protocol_mqtt(nc);
-    mg_send_mqtt_handshake_opt(nc, _aqconfig_.mqtt_ID, opts);
-    LOG(NET_LOG,LOG_INFO, "MQTT: Subscribing mqtt with id of: %s\n", _aqconfig_.mqtt_ID);
-    //last_control_time = mg_time();
+    LOG(NET_LOG,LOG_DEBUG, "MQTT: Connected to : %s, id : %s\n", _aqconfig_.mqtt_server, _aqconfig_.mqtt_ID);
   } break;
 
-  case MG_EV_MQTT_CONNACK:
+  //case MG_EV_MQTT_CONNACK:
+  case MG_EV_MQTT_OPEN:
     {
-      struct mg_mqtt_topic_expression topics[2];
-      
-      int qos=0;// can't be bothered with ack, so set to 0
+      //struct mg_mqtt_opts sub_opts
+      static uint8_t qos=1;// PUT IN FUNCTION HEADDER can't be bothered with ack, so set to 0
 
-      LOG(NET_LOG,LOG_DEBUG, "MQTT: Connection acknowledged\n");
-      mqtt_msg = (struct mg_mqtt_message *)ev_data;
-      if (mqtt_msg->connack_ret_code != MG_EV_MQTT_CONNACK_ACCEPTED) {
-        LOG(NET_LOG,LOG_WARNING, "Got mqtt connection error: %d\n", mqtt_msg->connack_ret_code);
-        _mqtt_exit_flag = true;
-      }
-      
+      LOG(NET_LOG,LOG_DEBUG, "MQTT: Connection open %lu\n", nc->id);
+
       snprintf(aq_topic, 29, "%s/#", _aqconfig_.mqtt_aq_topic);
-      if (_aqconfig_.mqtt_aq_topic != NULL && _aqconfig_.mqtt_dz_sub_topic != NULL) {
-        topics[0].topic = aq_topic;
-        topics[0].qos = qos; 
-        topics[1].topic = _aqconfig_.mqtt_dz_sub_topic;
-        topics[1].qos = qos;
-        mg_mqtt_subscribe(nc, topics, 2, 42);
-        LOG(NET_LOG,LOG_INFO, "MQTT: Subscribing to '%s'\n", aq_topic);
-        LOG(NET_LOG,LOG_INFO, "MQTT: Subscribing to '%s'\n", _aqconfig_.mqtt_dz_sub_topic);
-      } 
-      else if (_aqconfig_.mqtt_aq_topic != NULL) {
-        topics[0].topic = aq_topic;
-        topics[0].qos = qos;
-        mg_mqtt_subscribe(nc, topics, 1, 42);
-        LOG(NET_LOG,LOG_INFO, "MQTT: Subscribing to '%s'\n", aq_topic);
-      } 
-      else if (_aqconfig_.mqtt_dz_sub_topic != NULL) {
-        topics[0].topic = _aqconfig_.mqtt_dz_sub_topic;;
-        topics[0].qos = qos;
-        mg_mqtt_subscribe(nc, topics, 1, 42);
-        LOG(NET_LOG,LOG_INFO, "MQTT: Subscribing to '%s'\n", _aqconfig_.mqtt_dz_sub_topic);
+  
+      struct mg_mqtt_opts sub_opts;
+      memset(&sub_opts, 0, sizeof(sub_opts));
+      sub_opts.topic = mg_str(aq_topic);
+      sub_opts.qos = qos;
+      mg_mqtt_sub(nc, &sub_opts);
+
+      LOG(NET_LOG,LOG_INFO, "MQTT: Subscribing to '%s'\n", aq_topic);
+
+      if (_aqconfig_.mqtt_dz_sub_topic != NULL) {
+        LOG(NET_LOG,LOG_ERR,"MQTT: Domoticz not supported\n");
       }
+
+      LOG(NET_LOG,LOG_INFO, "MQTT: send last will message\n");
+      snprintf(aq_topic, 24, "%s/%s", _aqconfig_.mqtt_aq_topic,MQTT_LWM_TOPIC);
+      send_mqtt(nc, aq_topic ,MQTT_ON);
 
       publish_mqtt_hassio_discover( _aqualink_data, nc);
     }
     break;
-  case MG_EV_MQTT_PUBACK:
-    mqtt_msg = (struct mg_mqtt_message *)ev_data;
-    LOG(NET_LOG,LOG_DEBUG, "MQTT: Message publishing acknowledged (msg_id: %d)\n", mqtt_msg->message_id);
+
+  case MG_EV_MQTT_CMD:
+    //LOG(NET_LOG,LOG_NOTICE, "MQTT: MG_EV_MQTT_CMD command, add code / need to replocate MG_EV_MQTT_PUBACK MG_EV_MQTT_SUBACK\n");
     break;
-  case MG_EV_MQTT_SUBACK:
-    LOG(NET_LOG,LOG_INFO, "MQTT: Subscription(s) acknowledged\n");
-    snprintf(aq_topic, 24, "%s/%s", _aqconfig_.mqtt_aq_topic,MQTT_LWM_TOPIC);
-    send_mqtt(nc, aq_topic ,MQTT_ON);
-    break;
-  case MG_EV_MQTT_PUBLISH: 
+  //case MG_EV_MQTT_PUBLISH:
+  case MG_EV_MQTT_MSG:
     mqtt_msg = (struct mg_mqtt_message *)ev_data;
     
-    if (mqtt_msg->message_id != 0) {
-      LOG(NET_LOG,LOG_DEBUG, "MQTT: received (msg_id: %d), looks like my own message, ignoring\n", mqtt_msg->message_id);
+    if (mqtt_msg->id != 0) { // NSF Not good check mongoose.h # 2842
+      LOG(NET_LOG,LOG_DEBUG, "MQTT: received (msg_id: %d), looks like my own message, ignoring\n", mqtt_msg->id);
     }
 // NSF Need to change strlen to a global so it's not executed every time we check a topic
-    if (_aqconfig_.mqtt_aq_topic != NULL && strncmp(mqtt_msg->topic.p, _aqconfig_.mqtt_aq_topic, strlen(_aqconfig_.mqtt_aq_topic)) == 0) 
+    if (_aqconfig_.mqtt_aq_topic != NULL && strncmp(mqtt_msg->topic.buf, _aqconfig_.mqtt_aq_topic, strlen(_aqconfig_.mqtt_aq_topic)) == 0) 
     {
       DEBUG_TIMER_START(&tid); 
       action_mqtt_message(nc, mqtt_msg);
       DEBUG_TIMER_STOP(tid, NET_LOG, "MQTT Request action_mqtt_message() took"); 
     }
-    if (_aqconfig_.mqtt_dz_sub_topic != NULL && strncmp(mqtt_msg->topic.p, _aqconfig_.mqtt_dz_sub_topic, strlen(_aqconfig_.mqtt_dz_sub_topic)) == 0) {
+    if (_aqconfig_.mqtt_dz_sub_topic != NULL && strncmp(mqtt_msg->topic.buf, _aqconfig_.mqtt_dz_sub_topic, strlen(_aqconfig_.mqtt_dz_sub_topic)) == 0) {
       action_domoticz_mqtt_message(nc, mqtt_msg);
     }
     break;
@@ -2196,14 +2204,32 @@ void reset_last_mqtt_status()
 
 void start_mqtt(struct mg_mgr *mgr) {
   
+  //LOG(NET_LOG,LOG_WARNING, "NOT Starting MQTT client, need to check code\n");
+  
   if ( _aqconfig_.mqtt_server == NULL || 
       ( _aqconfig_.mqtt_aq_topic == NULL && _aqconfig_.mqtt_dz_pub_topic == NULL && _aqconfig_.mqtt_dz_sub_topic == NULL) )
     return;
 
+  char aq_topic[30];
   LOG(NET_LOG,LOG_NOTICE, "Starting MQTT client to %s\n", _aqconfig_.mqtt_server);
 
-  if (mg_connect(mgr, _aqconfig_.mqtt_server, ev_handler) == NULL) {
-      LOG(NET_LOG,LOG_ERR, "Failed to create MQTT listener to %s\n", _aqconfig_.mqtt_server);
+  snprintf(aq_topic, 24, "%s/%s", _aqconfig_.mqtt_aq_topic,MQTT_LWM_TOPIC);
+
+  struct mg_mqtt_opts opts;
+    memset(&opts, 0, sizeof(opts));
+    opts.user = mg_str(_aqconfig_.mqtt_user);
+    opts.pass = mg_str(_aqconfig_.mqtt_passwd);
+    opts.client_id = mg_str(_aqconfig_.mqtt_ID);
+
+    //opts.keepalive = 5; // This seems to kill connection for some reason, and not sent heartbeat
+    opts.clean = true;
+    //opts.version = 4; // Maybe 5
+    opts.message = mg_str(MQTT_OFF); // will_message
+    opts.topic = mg_str(aq_topic); // will_topic
+    
+
+  if ( mg_mqtt_connect(mgr, _aqconfig_.mqtt_server, &opts, ev_handler, NULL) == NULL ) {
+    LOG(NET_LOG,LOG_ERR, "Failed to create MQTT listener to %s\n", _aqconfig_.mqtt_server);
   } else {
     //int i;
 #ifdef AQ_MEMCMP
@@ -2212,6 +2238,7 @@ void start_mqtt(struct mg_mgr *mgr) {
     reset_last_mqtt_status();
     _mqtt_exit_flag = false; // set here to stop multiple connects, if it fails truley fails it will get set to false.
   }
+    
 }
 
 //bool start_web_server(struct mg_mgr *mgr, struct aqualinkdata *aqdata, char *port, char* web_root) {
@@ -2227,28 +2254,30 @@ bool _start_net_services(struct mg_mgr *mgr, struct aqualinkdata *aqdata) {
   setvbuf(stdout, NULL, _IOLBF, 0);
   setvbuf(stderr, NULL, _IOLBF, 0);
   
-  mg_mgr_init(mgr, NULL);
-  LOG(NET_LOG,LOG_NOTICE, "Starting web server on port %s\n", _aqconfig_.socket_port);
-  nc = mg_bind(mgr, _aqconfig_.socket_port, ev_handler);
+  mg_log_set(_aqconfig_.mg_log_level);
+
+  mg_mgr_init(mgr);
+
+  char url[256];
+  if ( strcasestr(_aqconfig_.socket_port, "http") != NULL ) {
+    sprintf(url, "%s",_aqconfig_.socket_port);
+  } else {
+    sprintf(url, "http://0.0.0.0:%s",_aqconfig_.socket_port);
+  }
+  LOG(NET_LOG,LOG_NOTICE, "Starting web server on %s\n", url);
+  //nc = mg_bind(mgr, _aqconfig_.socket_port, ev_handler);
+  nc = mg_http_listen(mgr, url, ev_handler, mgr);
   if (nc == NULL) {
-    LOG(NET_LOG,LOG_ERR, "Failed to create listener on port %s\n",_aqconfig_.socket_port);
+    LOG(NET_LOG,LOG_ERR, "Failed to create listener on port %s\n",url);
     return false;
   }
 
-  // Set up HTTP server parameters
-  mg_set_protocol_http_websocket(nc);
-  
   // Set default web options
-  //struct mg_serve_http_opts opts;
-      //memset(&opts, 0, sizeof(opts)); // Reset all options to defaults
-      //opts.document_root = _web_root; // Serve files from the current directory
-      //opts.extra_headers = "Cache-Control: public, max-age=604800, immutable";
-
-  memset(&_http_server_opts, 0, sizeof(_http_server_opts)); // Reset all options to defaults
-  _http_server_opts.document_root = _aqconfig_.web_directory;  // Serve current directory
-  _http_server_opts.enable_directory_listing = "yes";
-  //_http_server_opts.extra_headers = "Cache-Control: public, max-age=604800, immutable";
-  _http_server_opts.extra_headers = "Cache-Control: public,max-age=31536000,immutable"; // Let's be as agressive on browser caching.
+  LOG(NET_LOG,LOG_WARNING, "TODO web server TODO disable directory_listing somehow\n");
+  _http_server_opts.root_dir = _aqconfig_.web_directory;  // Serve current directory
+  _http_server_opts.extra_headers = "Cache-Control: public, max-age=604800, immutable"; // 7 days
+  //_http_server_opts.extra_headers = "Cache-Control: public,max-age=31536000,immutable"; // 1 year.  Let's be as agressive on browser caching.
+  // Need to disable directory_listing somehow
   
 #ifndef MG_DISABLE_MQTT
   // Start MQTT
@@ -2274,6 +2303,7 @@ void *net_services_thread( void *ptr )
   struct aqualinkdata *aqdata = (struct aqualinkdata *) ptr;
   int journald_fail = 0;
   //struct mg_mgr mgr;
+
   if (!_start_net_services(&_mgr, aqdata)) {
     //LOG(NET_LOG,LOG_ERR, "Failed to start network services\n");
     // Not the best way to do this (have thread exit process), but forks for the moment.
@@ -2292,7 +2322,7 @@ void *net_services_thread( void *ptr )
 
     if (aqdata->updated == true /*|| _broadcast == true*/) {
       //LOG(NET_LOG,LOG_DEBUG, "********** Broadcast ************\n");
-      _broadcast_aqualinkstate(_mgr.active_connections);
+      _broadcast_aqualinkstate(_mgr.conns);
       aqdata->updated = false;
     }
 #ifdef AQ_MANAGER
@@ -2308,7 +2338,7 @@ void *net_services_thread( void *ptr )
     } else if (journald_fail == JOURNAL_FAIL_RETRY) {
       char msg[WS_LOG_LENGTH];
       build_logmsg_JSON(msg, LOG_ERR, "Giving up on journal, don't expect to see logs", WS_LOG_LENGTH,46);
-      ws_send_logmsg(_mgr.active_connections, msg);
+      ws_send_logmsg(_mgr.conns, msg);
       journald_fail = JOURNAL_FAIL_RETRY+1;
     }
     // Reset failures when manager is not active.
@@ -2320,7 +2350,7 @@ void *net_services_thread( void *ptr )
 */    
 #endif
     if (aqdata->simulator_active != SIM_NONE && aqdata->simulator_packet_updated == true ) {
-      _broadcast_simulator_message(_mgr.active_connections);
+      _broadcast_simulator_message(_mgr.conns);
     } 
   }
 
@@ -2331,17 +2361,11 @@ f_end:
   pthread_exit(0);
 }
 
-
-
-
-#ifndef AQ_NO_THREAD_NETSERVICE
-
-
 void broadcast_aqualinkstate() {
   _aqualink_data->updated = true;
 }
 void broadcast_aqualinkstate_error(const char *msg) {
-  _broadcast_aqualinkstate_error(_mgr.active_connections, msg);
+  _broadcast_aqualinkstate_error(_mgr.conns, msg);
 }
 void broadcast_simulator_message() {
   _aqualink_data->simulator_packet_updated = true;
@@ -2375,72 +2399,3 @@ bool start_net_services(struct aqualinkdata *aqdata)
   return true;
 }
 
-#else // DON'T THREAD NET SERVICES
-
-void stop_net_services() {
-  if ( ! _aqconfig_.thread_netservices) {
-    mg_mgr_free(&_mgr);
-    return;
-  }
-}
-void broadcast_aqualinkstate(/*struct mg_connection *nc*/)
-{
-  if ( ! _aqconfig_.thread_netservices) {
-    _broadcast_aqualinkstate(_mgr.active_connections);
-    _aqualink_data->updated = false;
-    return;
-  }
-}
-void broadcast_aqualinkstate_error(/*struct mg_connection *nc,*/ char *msg)
-{
-  if ( ! _aqconfig_.thread_netservices) {
-    return _broadcast_aqualinkstate_error(_mgr.active_connections, msg);
-  }
-  LOG(NET_LOG,LOG_NOTICE, "Broadcast error to network\n");
-}
-void broadcast_simulator_message() {
-  if ( ! _aqconfig_.thread_netservices) {
-    return _broadcast_simulator_message();
-  }
-}
-time_t poll_net_services(/*struct mg_mgr *mgr,*/ int timeout_ms) 
-{
-  if (timeout_ms < 0)
-    timeout_ms = 0;
-
-  if ( ! _aqconfig_.thread_netservices) {
-    //return mg_mgr_poll(mgr, timeout_ms);
-    return mg_mgr_poll(&_mgr, timeout_ms);
-  }
-  
-  if (timeout_ms > 5)
-    delay(5);
-  else if (timeout_ms > 0)
-    delay(timeout_ms);
-
-  //LOG(NET_LOG,LOG_NOTICE, "Poll network services\n");
-
-  return 0;
-}
-bool start_net_services(/*struct mg_mgr *mgr, */struct aqualinkdata *aqdata) 
-{
-  _keepNetServicesRunning = true;
-
-  if ( ! _aqconfig_.thread_netservices) {
-    //return _start_net_services(mgr, aqdata);
-    return _start_net_services(&_mgr, aqdata);
-  }
-  
-  LOG(NET_LOG,LOG_NOTICE, "Starting network services thread\n");
-
-  if( pthread_create( &_net_thread_id , NULL ,  net_services_thread, (void*)aqdata) < 0) {
-    LOG(NET_LOG, LOG_ERR, "could not create network thread\n");
-    return false;
-  }
-
-  pthread_detach(_net_thread_id);
-
-  return true;
-}
-
-#endif

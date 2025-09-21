@@ -14,8 +14,8 @@ const char *getJandyDeviceName(emulation_type etype);
 #define CONNECTION_RUNNING_SLOG "Running serial_logger, this will take some time"
 #endif
 
-//#define SERIAL_BLOCKING_TIME 50 // (1 to 255) in 1/10th second so 1 = 0.1 sec, 255 = 25.5 sec
-#define SERIAL_BLOCKING_TIME 10
+#define SERIAL_BLOCKING_TIME 50 // (1 to 255) in 1/10th second so 1 = 0.1 sec, 255 = 25.5 sec
+//#define SERIAL_BLOCKING_TIME 10
 
 // Protocol types
 #define PCOL_JANDY     0xFF
@@ -575,8 +575,8 @@ int init_blocking_serial_port(const char* tty);
 //int init_readahead_serial_port(const char* tty);
 
 void close_serial_port(int file_descriptor);
-void close_blocking_serial_port();
-bool serial_blockingmode();
+//void close_blocking_serial_port();
+//bool serial_blockingmode();
 
 //#ifdef AQ_PDA
 //void set_pda_mode(bool mode);
