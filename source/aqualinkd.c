@@ -1026,7 +1026,7 @@ void main_loop()
 
   if (!start_net_services(&_aqualink_data))
   {
-    LOG(AQUA_LOG,LOG_ERR, "Can not start webserver on port %s.\n", _aqconfig_.socket_port);
+    LOG(AQUA_LOG,LOG_ERR, "Can not start webserver at address %s.\n", _aqconfig_.listen_address);
     exit(EXIT_FAILURE);
   }
 
@@ -1036,28 +1036,12 @@ void main_loop()
 
   rs_fd = init_serial_port(_aqconfig_.serial_port);
 
-  /*
-  if (rs_fd == -1) {
-    LOG(AQUA_LOG,LOG_ERR, "Error Aqualink setting serial port: %s\n", _aqconfig_.serial_port);
-    //_aqualink_data.panelstatus = SERIAL_ERROR;
-    AddAQDstatusMask(ERROR_SERIAL);
-    _aqualink_data.updated = true;
-#ifndef AQ_CONTAINER    
-    exit(EXIT_FAILURE);
-#endif 
-  } else {
-    //AddAQDstatusMask(CHECKING_CONFIG);
-  }
-*/
   if (is_valid_port(rs_fd)) {
     LOG(AQUA_LOG,LOG_NOTICE, "Listening to Aqualink %s on serial port: %s\n", getPanelString(), _aqconfig_.serial_port);
   } else {
-    LOG(AQUA_LOG,LOG_ERR, "Error Aqualink bad serial port: %s\n", _aqconfig_.serial_port);
+    LOG(AQUA_LOG,LOG_ERR, "Bad serial port: %s\n", _aqconfig_.serial_port);
     AddAQDstatusMask(ERROR_SERIAL);
   }
-
-  //if (!serial_blockingmode())
-  //  blank_read_reconnect = MAX_ZERO_READ_BEFORE_RECONNECT_NONBLOCKING;
 
 #ifdef AQ_PDA
   if (isPDA_PANEL) {
@@ -1344,7 +1328,7 @@ void main_loop()
 
     packet_length = get_packet(rs_fd, packet_buffer);
 
-    if (packet_length <= 0)
+    if (packet_length <= 0 && _keepRunning)
     {
       // AQSERR_2SMALL // no reset (-5)
       // AQSERR_2LARGE // no reset (-4)
@@ -1359,7 +1343,6 @@ void main_loop()
         blank_read = blank_read_reconnect;
       } else {
         // In non blocking, so sleep for 2 milliseconds
-        //delay(NONBLOCKING_SERIAL_DELAY);
         LOG(AQUA_LOG,LOG_WARNING, "Nothing read on serial port\n");
       }
       //if (blank_read > max_blank_read) {

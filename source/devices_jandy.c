@@ -537,85 +537,52 @@ aqledstate get_swg_led_state(struct aqualinkdata *aqdata)
   }
 }
 
-void get_swg_status_msg(struct aqualinkdata *aqdata, char *message)
-{
-  int tmp1;
-  int tmp2;
-
-  return get_swg_status_mqtt(aqdata, message, &tmp1, &tmp2);
-}
-
-void get_swg_status_mqtt(struct aqualinkdata *aqdata, char *message, int *status, int *dzalert) 
+const char *get_swg_status_msg(struct aqualinkdata *aqdata)
 {
   switch (aqdata->ar_swg_device_status) {
-  // Level = (0=gray, 1=green, 2=yellow, 3=orange, 4=red)
+
   case SWG_STATUS_ON:
-    *status = (aqdata->swg_percent > 0?SWG_ON:SWG_OFF);
-    sprintf(message, "AQUAPURE GENERATING CHLORINE");
-    *dzalert = 1;
+    return "AQUAPURE GENERATING CHLORINE";
     break;
   case SWG_STATUS_NO_FLOW:
-    *status = SWG_OFF;
-    sprintf(message, "AQUAPURE NO FLOW");
-    *dzalert = 2;
+    return "AQUAPURE NO FLOW";
     break;
   case SWG_STATUS_LOW_SALT:
-    *status = (aqdata->swg_percent > 0?SWG_ON:SWG_OFF);
-    sprintf(message, "AQUAPURE LOW SALT");
-    *dzalert = 2;
+    return "AQUAPURE LOW SALT";
     break;
   case SWG_STATUS_HI_SALT:
-    *status = (aqdata->swg_percent > 0?SWG_ON:SWG_OFF);
-    sprintf(message, "AQUAPURE HIGH SALT");
-    *dzalert = 3;
+    return "AQUAPURE HIGH SALT";
     break;
   case SWG_STATUS_HIGH_CURRENT:
-    *status = (aqdata->swg_percent > 0?SWG_ON:SWG_OFF);
-    sprintf(message, "AQUAPURE HIGH CURRENT");
-    *dzalert = 4;
+    return "AQUAPURE HIGH CURRENT";
     break;
   case SWG_STATUS_TURNING_OFF:
-    *status = SWG_OFF;
-    sprintf(message, "AQUAPURE TURNING OFF");
-    *dzalert = 0;
+    return "AQUAPURE TURNING OFF";
     break;
   case SWG_STATUS_CLEAN_CELL:
-    *status = (aqdata->swg_percent > 0?SWG_ON:SWG_OFF);
-    sprintf(message, "AQUAPURE CLEAN CELL");
-    *dzalert = 2;
+    return "AQUAPURE CLEAN CELL";
     break;
   case SWG_STATUS_LOW_VOLTS:
-    *status = (aqdata->swg_percent > 0?SWG_ON:SWG_OFF);
-    sprintf(message, "AQUAPURE LOW VOLTAGE");
-    *dzalert = 3;
+    return "AQUAPURE LOW VOLTAGE";
     break;
   case SWG_STATUS_LOW_TEMP:
-    *status = SWG_OFF;
-    sprintf(message, "AQUAPURE WATER TEMP LOW");
-    *dzalert = 2;
+    return "AQUAPURE WATER TEMP LOW";
     break;
   case SWG_STATUS_CHECK_PCB:
-    *status = SWG_OFF;
-    sprintf(message, "AQUAPURE CHECK PCB");
-    *dzalert = 4;
+    return "AQUAPURE CHECK PCB";
     break;
   case SWG_STATUS_OFF: // THIS IS OUR OFF STATUS, NOT AQUAPURE
-    *status = SWG_OFF;
-    sprintf(message, "AQUAPURE OFF");
-    *dzalert = 0;
+    return "AQUAPURE OFF";
     break;
   case SWG_STATUS_GENFAULT:
-    *status = (aqdata->swg_percent > 0?SWG_ON:SWG_OFF);
-    sprintf(message, "AQUAPURE GENERAL FAULT");
-    *dzalert = 2;
+    return "AQUAPURE GENERAL FAULT";
     break;
   default:
-    *status = (aqdata->swg_percent > 0?SWG_ON:SWG_OFF);
-    sprintf(message, "AQUAPURE UNKNOWN STATUS");
-    *dzalert = 4;
+    return "AQUAPURE UNKNOWN STATUS";
     break;
   }
 }
+
 
 
 #define EP_HI_B_WAT 8
@@ -982,6 +949,29 @@ bool processPacketFromJandyChemFeeder(unsigned char *packet_buffer, int packet_l
   acl_setpoint = raw_data[9] * 10
   ph_current   = float(raw_data[10]) / 10
   acl_current  = raw_data[11] * 10
+  */
+  
+  /*
+  from https://community.home-assistant.io/t/reading-orp-ph-from-old-watermatic-jandy-chemlink1500/933085
+  10 02                                  <-- uartex header
+  00 21                                  <-- chemistry frame marker
+  02 41                                  <-- tag02: ORP=0x41=65 → 650 mV
+  03 4B                                  <-- tag03: pH=0x4B=75 → 7.5
+  08 00                                  <-- tag08: pH feeder active (0x00)
+  18 01                                  <-- tag18: ORP feed ON
+  60                                     <-- checksum (sum&0x7F)
+  10 03                                  <-- uartex footer
+
+  ORP is tag 0x02 (0x41=65)          (value × 10, 200–1200 mV accepted).
+  pH is found at tag 0x03 (0x4B=75). (value ÷ 10, only 5.0–10.0 accepted).
+
+  0x41 (65) ×10 = 650 mV (ORP)
+  0x4B (75) ÷10 = 7.5 pH
+  tag08=0x00 → pH feeder running
+  tag18=0x01 → ORP feed ON
+  
+  0x10|0x02|0x00|0x21|0x02|0x41|0x03|0x4B|0x08|0x00|0x18|0x01|0x60|0x10|0x03
+
   */
 
   return false;

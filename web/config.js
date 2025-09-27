@@ -99,16 +99,31 @@
       //var background_reload = 10;
       //var background_reload = 0;
 
-      // By default all Variable Speed Pumps will show RPM.
-      // this will show GPM on VSP's that you can only set GPM (ie Jandy VF pumps)
+      // By default all Variable Speed Pumps will show RPM or GPM depending on how they are controlled.
+      // this will show RPM for all pumps (ie Jandy VF pumps)
       //var show_vsp_gpm=false;
 
-      // By default all Temperatures & Value tiles are off.
-      // this will turn them on
-      var turn_on_sensortiles = true;
+      // By default all Temperatures & Value tiles are on when they have a value other than 0.
+      // this will turn them off permanently
+      //var turn_off_sensortiles = true;
 
       // This will turn on/off the Spa Heater when you turn on/off Spa Mode.
       //var link_spa_and_spa_heater = true;
+
+      var ppm_max_attention = 3400; 
+      var ppm_min_attention = 2700;
+      var ppm_max_outofrange = 3500;
+      var ppm_min_outofrange = 2600;
+
+      var ph_max_attention = 7.8;
+      var ph_min_attention = 7.2;
+      var ph_max_outofrange = 8;
+      var ph_min_outofrange = 7;
+
+      var orp_max_attention = 850;
+      var orp_min_attention = 650;
+      var orp_max_outofrange = 900;
+      var orp_min_outofrange = 560;
 
       // Change the min max for heater slider
       var heater_slider_min = 36;

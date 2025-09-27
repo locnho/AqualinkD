@@ -14,9 +14,9 @@
 #define DEFAULT_WEBROOT      "/var/www/aqualinkd/"
 #define DEFAULT_SERIALPORT   "/dev/ttyUSB0"
 #define DEFAULT_DEVICE_ID    "0x0a"
-#define DEFAULT_MQTT_DZ_IN   NULL // "domoticz/in"
-#define DEFAULT_MQTT_DZ_OUT  NULL // "domoticz/out"
-#define DEFAULT_HASS_DISCOVER "homeassistant"
+//#define DEFAULT_MQTT_DZ_IN   NULL // "domoticz/in"
+//#define DEFAULT_MQTT_DZ_OUT  NULL // "domoticz/out"
+#define DEFAULT_DISCOVERY    "homeassistant"
 #define DEFAULT_MQTT_AQ_TP   "aqualinkd"
 #define DEFAULT_MQTT_SERVER  NULL
 #define DEFAULT_MQTT_USER    NULL
@@ -43,10 +43,10 @@
 struct aqconfig
 {
   char *config_file;
+  char *listen_address;
   char *serial_port;
   unsigned int log_level;
   unsigned int mg_log_level;
-  char *socket_port;
   char *web_directory;
   unsigned char device_id;
   unsigned char rssa_device_id;
@@ -60,30 +60,24 @@ struct aqconfig
 #ifndef AQ_MANAGER // Need to uncomment and clean up referances in future.
   char *log_file;
 #endif
-  char *mqtt_dz_sub_topic;
-  char *mqtt_dz_pub_topic;
   char *mqtt_aq_topic;
-  char *mqtt_hass_discover_topic;
+  //char *mqtt_hass_discover_topic;
+  char *mqtt_discovery_topic;
   char *mqtt_server;
   char *mqtt_user;
   char *mqtt_passwd;
-  bool mqtt_hass_discover_use_mac;
-  char mqtt_ID[MQTT_ID_LEN+1];
-  int dzidx_air_temp;
-  int dzidx_pool_water_temp;
-  int dzidx_spa_water_temp;
-  int dzidx_swg_percent;
-  int dzidx_swg_ppm;
-  int dzidx_swg_status;
+  //bool mqtt_hass_discover_use_mac;
+  bool mqtt_discovery_use_mac;
+  //char mqtt_ID[MQTT_ID_LEN+1];
   float light_programming_mode;
   int light_programming_initial_on;
   int light_programming_initial_off;
   bool override_freeze_protect;
-  #ifdef AQ_PDA
+#ifdef AQ_PDA
   bool pda_sleep_mode;
-  #endif
+#endif
   bool convert_mqtt_temp;
-  bool convert_dz_temp;
+ 
   bool report_zero_spa_temp;
   bool report_zero_pool_temp;
   //bool read_all_devices;
@@ -168,7 +162,7 @@ void init_config();
 
 bool writeCfg (struct aqualinkdata *aqdata);
 bool setConfigValue(struct aqualinkdata *aqdata, char *param, char *value);
-bool mac(char *buf, int len, bool useDelimiter);
+//bool mac(char *buf, int len, bool useDelimiter);
 char *cleanalloc(char *str);
 char *ncleanalloc(char *str, int length);
 
@@ -237,7 +231,7 @@ int _numCfgParams;
 #define CFG_N_log_level                         "log_level"
 #define CFG_N_MG_log_level                      "mg_log_level"
 #define CFG_V_log_level                         "[\"DEBUG_SERIAL\", \"DEBUG\", \"INFO\", \"NOTICE\", \"WARNING\", \"ERROR\"]"
-#define CFG_N_socket_port                       "socket_port" 
+#define CFG_N_listen_address                    "listen_address" 
 #define CFG_N_web_directory                     "web_directory"
 #define CFG_N_device_id                         "device_id"
 
@@ -264,24 +258,17 @@ int _numCfgParams;
 #define CFG_N_mqtt_server                       "mqtt_address"
 #define CFG_N_mqtt_user                         "mqtt_user"
 #define CFG_N_mqtt_passwd                       "mqtt_passwd"
-#define CFG_N_mqtt_hass_discover_topic          "mqtt_ha_discover_topic"
-#define CFG_N_mqtt_hass_discover_use_mac        "mqtt_ha_discover_use_mac"
+#define CFG_N_mqtt_discovery_topic              "mqtt_discovery_topic"
+#define CFG_N_mqtt_discovery_use_mac            "mqtt_discovery_use_mac"
 #define CFG_N_mqtt_timed_update                 "mqtt_timed_update"
-#define CFG_N_mqtt_dz_sub_topic                 "mqtt_dz_sub_topic"
-#define CFG_N_mqtt_dz_pub_topic                 "mqtt_dz_pub_topic"
-#define CFG_N_dzidx_air_temp                    "dzidx_air_temp"
-#define CFG_N_dzidx_pool_water_temp             "dzidx_pool_water_temp"
-#define CFG_N_dzidx_spa_water_temp              "dzidx_spa_water_temp"
-#define CFG_N_dzidx_swg_percent                 "dzidx_SWG_percent"
-#define CFG_N_dzidx_swg_ppm                     "dzidx_SWG_PPM"
-#define CFG_N_dzidx_swg_status                  "dzidx_SWG_Status"
+
 #define CFG_N_light_programming_mode            "light_programming_mode"
 #define CFG_N_light_programming_initial_on      "light_programming_initial_on"
 #define CFG_N_light_programming_initial_off     "light_programming_initial_off"
 #define CFG_N_override_freeze_protect           "override_freeze_protect"
 #define CFG_N_pda_sleep_mode                    "pda_sleep_mode"
 #define CFG_N_convert_mqtt_temp                 "mqtt_convert_temp_to_c"
-#define CFG_N_convert_dz_temp                   "dz_convert_temp_to_c"
+
 #define CFG_N_report_zero_spa_temp              "report_zero_spa_temp"
 #define CFG_N_report_zero_pool_temp             "report_zero_pool_temp"
 #define CFG_N_read_RS485_devmask                "read_RS485_devmask"

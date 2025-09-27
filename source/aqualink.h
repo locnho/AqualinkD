@@ -105,7 +105,6 @@ typedef struct aqualinkkey
 //#endif
   unsigned char code;
   unsigned char rssd_code;
-  int dz_idx;
   uint8_t special_mask;
   void *special_mask_ptr;
 } aqkey;
@@ -309,8 +308,7 @@ typedef struct altlabeld
 typedef enum {
   NET_MQTT=0, 
   NET_API, 
-  NET_WS, 
-  NET_DZMQTT,
+  NET_WS,
   NET_TIMER,       // Timer or Scheduler (eg poweron/freezeprotect check)
   UNACTION_TIMER
 } request_source;

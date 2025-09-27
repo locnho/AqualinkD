@@ -346,6 +346,20 @@
       color: rgb(220, 220, 220);
     }
 
+    .outofrange {
+      background-color: rgb(255, 123, 0);
+      color: rgb(255, 255, 255);
+    }
+
+    .attention {
+      background-color: rgb(255, 187, 0);
+      color: rgb(255, 255, 255);
+    }
+
+    .uom_text {
+      font-size: 75%;
+    }
+
     /* All for options panel */
 
     .option_switch {
@@ -587,6 +601,7 @@
 
   <script type='text/javascript'>
     //'use strict';
+    
     var _lightProgramDropdown = false;
     var _pressEvent;
     var _ignoreMouseEvent = false;
@@ -613,22 +628,27 @@
         255: "Off"
     }
 
-    if (typeof show_vsp_gpm !== 'undefined' && show_vsp_gpm == false)
-      var _show_vsp_gpm=false;
-    else
-      var _show_vsp_gpm=true;
-
-    if (typeof link_spa_and_spa_heater !== 'undefined' && link_spa_and_spa_heater == true)
-      var _link_spa_and_heater=true;
-    else
-      var _link_spa_and_heater=false;
+    const _turn_off_sensortiles = (typeof turn_off_sensortiles !== 'undefined') ? turn_off_sensortiles : false;
+    const _show_vsp_gpm = (typeof show_vsp_gpm !== 'undefined') ? show_vsp_gpm : true;
+    const _link_spa_and_heater = (typeof link_spa_and_spa_heater !== 'undefined') ? link_spa_and_spa_heater : false;
 
     // If swgStatus was defined in config.js, use it, else create our own
-    if (typeof swgStatus !== 'undefined') {
-      var _swgStatus = swgStatus;
-    } else {
-      var _swgStatus = _swgALLStatus
-    }
+    const _swgStatus = (typeof swgStatus !== 'undefined')? swgStatus : _swgALLStatus;
+
+    const _ppm_max_attention = (typeof ppm_max_attention !== 'undefined') ? ppm_max_attention : 3400;
+    const _ppm_min_attention = (typeof ppm_min_attention !== 'undefined') ? ppm_min_attention : 2700;
+    const _ppm_max_outofrange = (typeof ppm_max_outofrange !== 'undefined') ? ppm_max_outofrange : 3500;
+    const _ppm_min_outofrange = (typeof ppm_min_outofrange !== 'undefined') ? ppm_min_outofrange : 2600;
+
+    const _ph_max_attention = (typeof ph_max_attention !== 'undefined') ? ph_max_attention : 7.8;
+    const _ph_min_attention = (typeof ph_min_attention !== 'undefined') ? ph_min_attention : 7.2;
+    const _ph_max_outofrange = (typeof ph_max_outofrange !== 'undefined') ? ph_max_outofrange : 8;
+    const _ph_min_outofrange = (typeof ph_min_outofrange !== 'undefined') ? ph_min_outofrange : 7;
+
+    const _orp_max_attention = (typeof orp_max_attention !== 'undefined') ? orp_max_attention : 850;
+    const _orp_min_attention = (typeof orp_min_attention !== 'undefined') ? orp_min_attention : 650;
+    const _orp_max_outofrange = (typeof orp_max_outofrange !== 'undefined') ? orp_max_outofrange : 900;
+    const _orp_min_outofrange = (typeof orp_min_outofrange !== 'undefined') ? orp_min_outofrange : 560;
 
     function init() {
       setSizeSpecifics();
@@ -701,6 +721,7 @@
         var html2 = '';
         var fLen = light_program.length;
         var i;
+        var selected = "";
         for (i = 0; i < fLen; i++) {
           selected = "";
           if (current_mode != "" && light_program[i].startsWith(current_mode)) {
@@ -922,13 +943,14 @@
              valdiv.textContent = '--';
              subdiv.appendChild(valdiv);
            } */
-      title_subdiv = document.createElement('div');
+      var title_subdiv = document.createElement('div');
       title_subdiv.setAttribute('class', 'tile_name');
       title_subdiv.setAttribute('id', id + '_name');
       title_subdiv.textContent = name;
       div.appendChild(title_subdiv);
       // Value and Thermostat are the same, but value is read only and no state
-      if (type != "value") {
+      //if (type != "value") {
+      {
         // Add extra status line to VSP if we can
         if (subtype == "switch_vsp") {
           var title1linechatlimit = getComputedStyle(document.documentElement).getPropertyValue('--tile_name-charlimit');
@@ -944,7 +966,9 @@
         subdiv = document.createElement('div');
         subdiv.setAttribute('class', 'tile_status');
         subdiv.setAttribute('id', id + '_status');
-        subdiv.textContent = formatSatus(status);
+        if (type != 'value') {
+          subdiv.textContent = formatSatus(status);
+        }
         div.appendChild(subdiv);
         if (type == "switch" && (subtype != "switch_program" && subtype != "switch_vsp" && 
                                 subtype != "switch_timer" && subtype != "light_dimmer") ) {
@@ -1024,6 +1048,7 @@
     function setTileValue(id, value) {
       var ext = '';
       var type = null;
+//console.log("setTileValue "+id+" "+value);
       try {
         type = document.getElementById(id).getAttribute('type');
 
@@ -1037,10 +1062,14 @@
               ext = '&deg;';
             else if (type == 'setpoint_swg')
               ext = '%';
+            else if (type == 'value' && id == 'CHEM/ORP')
+              ext = '<span class="uom_text">mV</span>';
+            //else if (type == 'value' && id == 'CHEM/pH')
+            //  ext = '<span class="uom_text">pH</span>';
           }
         }
 
-        if ((type == 'temperature' || type == 'value') && turn_on_sensortiles == true) {
+        if ((type == 'temperature' || type == 'value') && _turn_off_sensortiles == false) {
           // Anything specific (SWG PPM should be off if SWG is off)
           // This needs a try catch, or is above try block good enough?
           if (id == 'SWG/PPM' && document.getElementById('SWG').getAttribute('status') != 'on' )
@@ -1048,8 +1077,31 @@
           // Generic for all.
           else if (value == 0 || value == '--')
             setTileOn(id, 'off');
-          else
-            setTileOn(id, 'on');
+          else {
+            if ( id == 'SWG/PPM' && ( value <= _ppm_min_outofrange || value >= _ppm_max_outofrange )) {
+              setTileOn(id, 'outofrange');
+              setTileOnText(id, 'out of range');
+            } else if ( id == 'SWG/PPM' && ( value < _ppm_min_attention || value > _ppm_max_attention )) {
+              setTileOn(id, 'attention');
+              setTileOnText(id, 'needs attention');
+            } else if ( id == 'CHEM/pH' && ( value <= _ph_min_outofrange || value >= _ph_max_outofrange )) {
+              setTileOn(id, 'outofrange');
+              setTileOnText(id, 'out of range');
+            } else if ( id == 'CHEM/pH' && ( value < _ph_min_attention || value > _ph_max_attention )) {
+              setTileOn(id, 'attention');
+              setTileOnText(id, 'needs attention');
+            } else if ( id == 'CHEM/ORP' && ( value <= _orp_min_outofrange || value >= _orp_max_outofrange )) {
+              setTileOn(id, 'outofrange');
+              setTileOnText(id, 'out of range');
+            } else if ( id == 'CHEM/ORP' && ( value < _orp_min_attention || value > _orp_max_attention )) {
+              setTileOn(id, 'attention');
+              setTileOnText(id, 'needs attention');
+            } else { 
+              setTileOn(id, 'on');
+              setTileOnText(id, '');
+            }
+            
+          }
         }
       } catch (e) {
           // Devices that are hidden are not found
@@ -1064,16 +1116,20 @@
     function setTileUOM(id, uom) {
       try {
         type = document.getElementById(id).setAttribute('UOM', uom);
-        console.log("Set UOM to "+uom+" for "+id);
+        //console.log("Set UOM to "+uom+" for "+id);
       } catch (e) {}
     }
 
     function setTileOnText(id, text) {
+      //console.log("setTileOnText() "+id+" "+text);
       try {
         var tile = document.getElementById(id);
         if (tile.getAttribute('status') == 'on' || tile.getAttribute('status') == 'enabled') {
           document.getElementById(id + '_status').innerHTML = text;
+        } else if (tile.getAttribute('status') == 'attention' || tile.getAttribute('status') == 'outofrange') {
+          document.getElementById(id + '_status').innerHTML = text;
         } else {
+          //document.getElementById(id + '_status').innerHTML = text;
           //console.log("Tile "+id+" status is '"+document.getElementById(id).getAttribute('status')+"' not setting text to '"+text+"'");
         }
       } catch(exception) {}
@@ -1158,7 +1214,7 @@
 
 
     function setTileOn(id, status) {
-      //console.log("setTileOn "+id+ " "+status);
+  //console.log("setTileOn "+id+ " "+status);
       var tile;
       var text;
       if ((tile = document.getElementById(id)) == null) {
@@ -1166,7 +1222,7 @@
         return;
       }
       // Display is a special status to "brighten up" sensor values. 
-      if (status != "on" && status != "off" && status != "enabled" && status != "flash") {
+      if (status != "on" && status != "off" && status != "enabled" && status != "flash" && status != "outofrange" && status != "attention") {
         if (status == "unknown") {
           status = "off"; // Just set it off for the moment
         } else {
@@ -1180,6 +1236,8 @@
           tile.classList.add("flash");
           tile.classList.remove("on");
           text = "Delay";
+        //} else if (status == 'outofrange') {
+        //  tile.classList.add("heat");
         } else {
           tile.classList.add("on");
           tile.classList.remove("flash");
@@ -1240,13 +1298,17 @@
         text = "Off";
       }
 
+      type = tile.getAttribute('type');
       try {
-        document.getElementById(id + '_status').innerHTML = text;
-        // Clear line 2 status if we have it.
-        document.getElementById(id + '_status_line2').innerHTML = "";
+        if (type != "value" && type != "temperature") {
+          //console.log("Set Text "+id+" "+" - "+type+" "+text);
+          document.getElementById(id + '_status').innerHTML = text;
+          // Clear line 2 status if we have it.
+          document.getElementById(id + '_status_line2').innerHTML = "";
+        }
       } catch (e) {} 
       var tile_icon = document.getElementById(id + '_tile_icon_value');
-      type = tile.getAttribute('type');
+      
       if (status != null && tile_icon != null) {
         if (status == 'enabled' || status == 'flash') {
           tile_icon.classList.add("enabled");
@@ -1258,6 +1320,7 @@
           tile_icon.classList.add("disabled");
           tile_icon.classList.remove("cool");
           tile_icon.classList.remove("heat");
+          tile_icon.classList.remove("outofrange");
         //} else if (status == 'on' && type != 'setpoint_swg' && type != 'setpoint_freeze' && type != 'temperature' && type != 'value') {
         } else if (status == 'on' && type == 'setpoint_thermo') {
           tile_icon.classList.remove("enabled");
@@ -1278,8 +1341,22 @@
         } else if (status == 'on') {
           tile_icon.classList.remove("enabled");
           tile_icon.classList.remove("disabled");
+          tile_icon.classList.remove("attention");
           tile_icon.classList.add("cool");
           tile_icon.classList.remove("heat");
+          tile_icon.classList.remove("outofrange");
+        } else if (status == 'outofrange') {
+          tile_icon.classList.remove("enabled");
+          tile_icon.classList.remove("disabled");
+          tile_icon.classList.remove("attention");
+          tile_icon.classList.add("outofrange");
+          tile_icon.classList.remove("cool");
+        } else if (status == 'attention') {
+          tile_icon.classList.remove("enabled");
+          tile_icon.classList.remove("disabled");
+          tile_icon.classList.remove("outofrange");
+          tile_icon.classList.add("attention");
+          tile_icon.classList.remove("cool");
         }
       }
     }
@@ -1326,7 +1403,7 @@
             document.getElementById(object.id).setAttribute('lighttype', object.Light_Type);
           
             if (typeof object.Light_Program !== 'undefined') {
-              light_mode = parseInt(object.Light_Program);
+              var light_mode = parseInt(object.Light_Program);
               if ( object.Light_Type != "10" && object.type_ext != 'light_dimmer' ) {
                 document.getElementById(object.id).setAttribute('spvalue', light_mode-1);
                 //console.log("Light_Program spvalue = "+document.getElementById(object.id).getAttribute('spvalue'));
@@ -1879,8 +1956,8 @@
 
 
 
-    _displayMsgTimer=0;
-    _displayMsgTimeout=0;
+    var _displayMsgTimer=0;
+    var _displayMsgTimeout=0;
 
     function displayMessage(message, timeoutSeconds) {
       // Check to see if we can display message

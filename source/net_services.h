@@ -15,6 +15,7 @@
 #define CONTENT_JS   "Content-Type: text/javascript\r\n"
 #define CONTENT_TEXT "Content-Type: text/plain\r\n"
 
+
 //void main_server();
 //void main_server_TEST(struct aqualinkdata *aqdata, char *s_http_port);
 //bool start_web_server(struct mg_mgr *mgr, struct aqualinkdata *aqdata, char *port, char* web_root);

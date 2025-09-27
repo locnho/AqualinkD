@@ -22,21 +22,24 @@ struct mg_connection {
 */
 
 
+#define MG_F_USER_1 (1 << 0)
+#define MG_F_USER_2 (1 << 1)
+#define MG_F_USER_3 (1 << 2)
+#define MG_F_USER_4 (1 << 3)
+#define MG_F_USER_5 (1 << 4)
+#define MG_F_USER_6 (1 << 5)
 
-#define AQ_M_USER_1 (1 << 0)
-#define AQ_M_USER_2 (1 << 1)
-#define AQ_M_USER_3 (1 << 2)
-#define AQ_M_USER_4 (1 << 3)
-#define AQ_M_USER_5 (1 << 4)
-#define AQ_M_USER_6 (1 << 5)
 
-#define MG_F_USER_1 AQ_M_USER_1
-#define MG_F_USER_2 AQ_M_USER_2
-#define MG_F_USER_3 AQ_M_USER_3
-#define MG_F_USER_4 AQ_M_USER_4
-#define MG_F_USER_5 AQ_M_USER_5
+#define AQ_MG_CON_MQTT     MG_F_USER_1
+
+//#define AQ_MG_CON_WS // Plane web interface websocket.
+#define AQ_MG_CON_WS_SIM   MG_F_USER_2
+#define AQ_MG_CON_WS_AQM   MG_F_USER_3
+#define AQ_MG_CON_MQTT_CONNECTING  MG_F_USER_4
 
 /*
+In mongose.h about line 1673 make sure to add aq_flags to the mg_connection strut
+
 struct mg_connection {
   unsigned short aq_flags;
 }

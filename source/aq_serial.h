@@ -14,7 +14,7 @@ const char *getJandyDeviceName(emulation_type etype);
 #define CONNECTION_RUNNING_SLOG "Running serial_logger, this will take some time"
 #endif
 
-#define SERIAL_BLOCKING_TIME 50 // (1 to 255) in 1/10th second so 1 = 0.1 sec, 255 = 25.5 sec
+//#define SERIAL_BLOCKING_TIME 50 // (1 to 255) in 1/10th second so 1 = 0.1 sec, 255 = 25.5 sec
 //#define SERIAL_BLOCKING_TIME 10
 
 // Protocol types

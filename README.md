@@ -138,16 +138,28 @@ NEED TO FIX FOR THIS RELEASE.
 -->
 # Updates in 3.0.0 (dev)
 * Serial optimization for HAT.
+* upgraded network library ( HTTP(S), MQTT(S), WS )
 * Added options to force upgrades in aqmanager. (add ?upgrade or ?devupgrade to url to enable upgrade button)
+* MQTT Discovery for supporting hubs (HomeAssistant Domoticz Hubitat OpenHAB)
+* Change tile color for ph / orp & ppm tiles when values are out of optimal range.
+* Add mV as the UOM for ORP tile.
+* Moved Domoticz support over to MQTT autodiscovery.
+* Fixed bug with sensor UOM.
 
 * Need to finish off :-
-  * ToDo HAT serial optimizations broke some USB serial adapters
-  * Code cleanup of old stuff. (THREAD_NET_SERVICE / BLOCKING SERIAL PORT)
-  * Reading TruSense. (Jandy protocols working, need to finish off read_RS485_TruSense support)
-  * ToDo Cleanup the upgrade of Mongoose code
-  * ToDo Finish off assigning light mode & functionality to a vbutton (for Jandy Infinite water color support )
-  * ToDo Remove Domoticz support ???????
-  * ToDo cleanup rs_msg_utils.c
+  * HAT serial optimizations broke some USB serial adapters
+  * Reading TruSense. (Jandy protocols working, need to finish off read_RS485_TruSense support) 
+  * Finish off assigning light mode & functionality to a vbutton (for Jandy Infinite water color support )
+  * cleanup rs_msg_utils.c
+  *  -D AQ_MANAGER.  reset default to on, not off
+  * With aqmanager is packet_logger still valid? (maybe for raw, but it's not been used in years)
+  * Get panel size and clean up the ap_panel code around config size/type and reported size/type
+  * WebUI Config in aqmanager.
+  * button pre-state was for domotics, delete
+  * AqualinkD programmable light (Look at 0 for initial on / off, and advancing light)
+
+  
+  
 
 # Updates in 2.6.11 (Sept 14 2025)
 * Cleaned up exit codes.

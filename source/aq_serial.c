@@ -524,10 +524,10 @@ int init_serial_port(const char* port)
   struct termios tty;
 
   // Have to open with O_NONBLOCK so we don't wait for the Data Carrier Detect (DCD) signal to go high
-  int _RS485_fds = open(port, O_RDWR | O_NOCTTY | O_NONBLOCK | O_CLOEXEC); 
+  _RS485_fds = open(port, O_RDWR | O_NOCTTY | O_NONBLOCK | O_CLOEXEC); 
 
   if (_RS485_fds < 0)  {
-    LOG(RSSD_LOG,LOG_ERR, "Unable to open port: %s, error %d\n", port, errno);
+    LOG(RSSD_LOG,LOG_ERR, "Unable to open port: %s: %s\n", port, strerror(errno));
     return -1;
   }
 
@@ -535,7 +535,7 @@ int init_serial_port(const char* port)
   //print_file_flags(fd);
 
   if ( lock_port(_RS485_fds, port) < 0) {
-    LOG(RSSD_LOG,LOG_ERR, "Unable to lock port: %s, error %d\n", tty, errno);
+    LOG(RSSD_LOG,LOG_ERR, "Unable to lock port: %s: %s\n", port, strerror(errno));
     //return -1;
   }
 
@@ -543,7 +543,7 @@ int init_serial_port(const char* port)
     set_port_low_latency(_RS485_fds, port);
   
   if (tcgetattr(_RS485_fds, &tty) != 0) {
-    LOG(RSSD_LOG,LOG_ERR, "Unable to get port attributes: %s, error %d\n", port,errno);
+    LOG(RSSD_LOG,LOG_ERR, "Unable to get port attributes: %s: %s\n", port,strerror(errno));
     return -1;
   }
 
@@ -616,10 +616,10 @@ void close_serial_port(int port)
     _close_serial_port(port);
   } else {
     if (_RS485_fds < 0) {
-      LOG(RSSD_LOG,LOG_ERR, "Didn't find valid blocking serial port file descriptor\n");
+      LOG(RSSD_LOG,LOG_ERR, "Didn't find valid serial port file descriptor to close\n");
       return;
     }
-    LOG(RSSD_LOG,LOG_INFO, "Forcing close of serial port, ignore following read errors\n");
+    LOG(RSSD_LOG,LOG_NOTICE, "Closing serial port\n");
     _close_serial_port(_RS485_fds);
   }
 }

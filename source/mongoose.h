@@ -1670,7 +1670,7 @@ struct mg_connection {
   unsigned is_readable : 1;       // Connection is ready to read
   unsigned is_writable : 1;       // Connection is ready to write
 
-  unsigned short flags;        // Added for AqualinkD. NEED TO RENAME TO aq_flags
+  unsigned short aq_flags;        // Added for AqualinkD. NEED TO RENAME TO aq_flags
 };
 
 void mg_mgr_poll(struct mg_mgr *, int ms);
