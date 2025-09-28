@@ -140,12 +140,13 @@ NEED TO FIX FOR THIS RELEASE.
 * Serial optimization for HAT.
 * upgraded network library ( HTTP(S), MQTT(S), WS )
 * Added options to force upgrades in aqmanager. (add ?upgrade or ?devupgrade to url to enable upgrade button)
-* MQTT Discovery for supporting hubs (HomeAssistant Domoticz Hubitat OpenHAB)
-* Change tile color for ph / orp & ppm tiles when values are out of optimal range.
-* Add mV as the UOM for ORP tile.
+* MQTT Discovery for all supporting hubs (HomeAssistant Domoticz Hubitat OpenHAB etc)
 * Moved Domoticz support over to MQTT autodiscovery.
+* Change tile color & label for ph / orp & ppm tiles when values are out of optimal range.
+* Add mV as the UOM for ORP tile.
 * Fixed bug with sensor UOM.
 * UI code cleanup.
+* Included program advance to AqualinkD programmable light mode. (lot quicker for lights that remember state)
 
 * Need to finish off :-
   * HAT serial optimizations broke some USB serial adapters
@@ -157,11 +158,8 @@ NEED TO FIX FOR THIS RELEASE.
   * Get panel size and clean up the ap_panel code around config size/type and reported size/type
   * WebUI Config in aqmanager.
   * button pre-state was for domotics, delete
-  * AqualinkD programmable light (Look at 0 for initial on / off, and advancing light)
 
   
-  
-
 # Updates in 2.6.11 (Sept 14 2025)
 * Cleaned up exit codes.
 * Fixed delay in shutting down when no data received on RS485
