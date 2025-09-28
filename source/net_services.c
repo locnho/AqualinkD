@@ -1982,7 +1982,7 @@ static void ev_handler(struct mg_connection *nc, int ev, void *ev_data) {
     set_mqttconnected(nc);
     //set_mqtt(nc);
     _mqtt_exit_flag = false;
-    LOG(NET_LOG,LOG_DEBUG, "MQTT: Connected to : %s, id : %s\n", _aqconfig_.mqtt_server, 99);
+    LOG(NET_LOG,LOG_DEBUG, "MQTT: Connected to : %s\n", _aqconfig_.mqtt_server);
   } break;
 
   case MG_EV_MQTT_OPEN:
@@ -2131,7 +2131,7 @@ void start_mqtt(struct mg_mgr *mgr) {
     reset_last_mqtt_status();
     _mqtt_exit_flag = false; // set here to stop multiple connects, if it fails truley fails it will get set to false.
   }
-    
+
 }
 static void mg_logger(char ch, void *param) {
   

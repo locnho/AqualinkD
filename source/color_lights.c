@@ -187,6 +187,19 @@ void clear_aqualinkd_light_modes()
   }
 }
 
+int get_num_light_modes(int index)
+{
+  int length;
+
+  for (length=0; length < LIGHT_COLOR_OPTIONS; length++) {
+    if (_color_light_options[index][length] == NULL) {
+      break;
+    }
+  }
+
+  return length--; // index 0 is off, so don;t count that 
+}
+
 bool set_aqualinkd_light_mode_name(char *name, int index, bool isShow)
 {
   static bool reset = false;

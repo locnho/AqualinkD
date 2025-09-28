@@ -1264,9 +1264,11 @@ bool setDeviceState(struct aqualinkdata *aqdata, int deviceIndex, bool isON, req
              button->code == KEY_EXT_AUX) &&
             isON > 0) {
           button->led->state = ENABLE; // if heater and set to on, set pre-status to enable.
+          LOG(PANL_LOG, LOG_INFO, "Pre-set state of %s to enable\n",button->label);
         //_aqualink_data->updated = true;
         } else if (isRSSA_ENABLED || ((button->special_mask & PROGRAM_LIGHT) != PROGRAM_LIGHT)) {
           button->led->state = (isON == false ? OFF : ON); // as long as it's not programmable light , pre-set to on/off
+          LOG(PANL_LOG, LOG_INFO, "Pre-set state of %s to %s\n",button->label,(isON == false ? "Off" : "On"));
         //_aqualink_data->updated = true;
         }
       }
@@ -1524,7 +1526,10 @@ void programDeviceLightMode(struct aqualinkdata *aqdata, int value, int deviceIn
   }
 
   // Use function so can be called from programming thread if we decide to in future.
-  updateButtonLightProgram(aqdata, value, deviceIndex);
+  if (light->lightType != LC_PROGRAMABLE ) {
+    // Only update if a panel programed light.  If AqualinkD programs, the programmer needs to know the last mode.
+    updateButtonLightProgram(aqdata, value, deviceIndex);
+  }
 }
 
 /*

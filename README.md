@@ -145,6 +145,7 @@ NEED TO FIX FOR THIS RELEASE.
 * Add mV as the UOM for ORP tile.
 * Moved Domoticz support over to MQTT autodiscovery.
 * Fixed bug with sensor UOM.
+* UI code cleanup.
 
 * Need to finish off :-
   * HAT serial optimizations broke some USB serial adapters

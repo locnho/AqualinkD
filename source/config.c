@@ -341,7 +341,6 @@ void init_parameters (struct aqconfig * parms)
   _cfgParams[_numCfgParams].value_ptr = &_aqconfig_.light_programming_mode;
   _cfgParams[_numCfgParams].value_type = CFG_FLOAT;
   _cfgParams[_numCfgParams].name = CFG_N_light_programming_mode;
-  //_cfgParams[_numCfgParams].advanced = true;
   _cfgParams[_numCfgParams].config_mask |= CFG_GRP_ADVANCED;
   _cfgParams[_numCfgParams].default_value = (void *)&_dcfg_light_programming_mode;
 
@@ -349,7 +348,6 @@ void init_parameters (struct aqconfig * parms)
   _cfgParams[_numCfgParams].value_ptr = &_aqconfig_.light_programming_initial_on;
   _cfgParams[_numCfgParams].value_type = CFG_INT;
   _cfgParams[_numCfgParams].name = CFG_N_light_programming_initial_on;
-  //_cfgParams[_numCfgParams].advanced = true;
   _cfgParams[_numCfgParams].config_mask |= CFG_GRP_ADVANCED;
   _cfgParams[_numCfgParams].default_value = (void *)&_dcfg_light_programming_initial_on;
 
@@ -357,9 +355,15 @@ void init_parameters (struct aqconfig * parms)
   _cfgParams[_numCfgParams].value_ptr = &_aqconfig_.light_programming_initial_off;
   _cfgParams[_numCfgParams].value_type = CFG_INT;
   _cfgParams[_numCfgParams].name = CFG_N_light_programming_initial_off;
-  //_cfgParams[_numCfgParams].advanced = true;
   _cfgParams[_numCfgParams].config_mask |= CFG_GRP_ADVANCED;
   _cfgParams[_numCfgParams].default_value = (void *)&_dcfg_light_programming_initial_off;
+
+  _numCfgParams++;
+  _cfgParams[_numCfgParams].value_ptr = &_aqconfig_.light_programming_advance_mode;
+  _cfgParams[_numCfgParams].value_type = CFG_BOOL;
+  _cfgParams[_numCfgParams].name = CFG_N_light_programming_advance_mode;
+  _cfgParams[_numCfgParams].config_mask |= CFG_GRP_ADVANCED;
+  _cfgParams[_numCfgParams].default_value = (void *)&_dcfg_false;
 
   _numCfgParams++;
   _cfgParams[_numCfgParams].value_ptr = &_aqconfig_.read_RS485_devmask;
@@ -617,7 +621,9 @@ void init_parameters (struct aqconfig * parms)
   parms->log_protocol_packets = false; // Read & Write as packets write to file
   parms->log_raw_bytes = false; // bytes read and write to file
 
+  // CHANGED DEFAULT IN V3.  (WAnt to DELETE this)
   parms->device_pre_state = true;
+
 
   clearDebugLogMask();
   
@@ -1679,6 +1685,13 @@ void check_print_config (struct aqualinkdata *aqdata)
     }
   }
   
+  // We need to store light values if using light advance mode
+  if (_aqconfig_.light_programming_advance_mode) {
+    if (_aqconfig_.save_light_programming_value == false) {
+      LOG(AQUA_LOG,LOG_WARNING, "Config error, `%s` must be enabled for `%s`, enabeling!",CFG_N_save_light_programming_value,CFG_N_light_programming_advance_mode);
+      _aqconfig_.save_light_programming_value = true;
+    }
+  }
 
   /* 
      PDA Mode

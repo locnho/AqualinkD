@@ -72,6 +72,7 @@ struct aqconfig
   float light_programming_mode;
   int light_programming_initial_on;
   int light_programming_initial_off;
+  bool light_programming_advance_mode;
   bool override_freeze_protect;
 #ifdef AQ_PDA
   bool pda_sleep_mode;
@@ -265,6 +266,7 @@ int _numCfgParams;
 #define CFG_N_light_programming_mode            "light_programming_mode"
 #define CFG_N_light_programming_initial_on      "light_programming_initial_on"
 #define CFG_N_light_programming_initial_off     "light_programming_initial_off"
+#define CFG_N_light_programming_advance_mode    "light_programming_advance_mode"
 #define CFG_N_override_freeze_protect           "override_freeze_protect"
 #define CFG_N_pda_sleep_mode                    "pda_sleep_mode"
 #define CFG_N_convert_mqtt_temp                 "mqtt_convert_temp_to_c"

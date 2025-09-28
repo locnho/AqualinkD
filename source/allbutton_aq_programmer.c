@@ -566,6 +566,10 @@ void *set_allbutton_light_programmode( void *ptr )
   int iOff = atoi(&buf[15]);
   float pmode = atof(&buf[20]);
 
+  int final_mode=val;
+
+  bool useProgAdvance = _aqconfig_.light_programming_advance_mode;
+
   if (btn < 0 || btn >= aq_data->total_buttons ) {
     LOG(ALLB_LOG, LOG_ERR, "Can't program light mode on button %d\n", btn);
     cleanAndTerminateThread(threadCtrl);
@@ -575,43 +579,71 @@ void *set_allbutton_light_programmode( void *ptr )
   aqkey *button = &aq_data->aqbuttons[btn];
   unsigned char code = button->code;
 
-  LOG(ALLB_LOG, LOG_INFO, "Light Programming #: %d, on button: %s, with pause mode: %f (initial on=%d, initial off=%d)\n", val, button->label, pmode, iOn, iOff);
-
-  // Simply turn the light off if value is 0
+    // Simply turn the light off if value is 0
   if (val <= 0) {
     if ( button->led->state == ON ) {
+      LOG(ALLB_LOG, LOG_INFO, "Light mode request set to 0, turning off\n");
       send_cmd(code);
+    } else {
+      LOG(ALLB_LOG, LOG_INFO, "Light mode request set to 0 and light is off. Not sure what to do!\n");
     }
     cleanAndTerminateThread(threadCtrl);
     return ptr;
   }
 
+  LOG(ALLB_LOG, LOG_INFO, "Light Programming #: %d, on button: %s, with pause mode: %f (initial on=%d, initial off=%d)\n", val, button->label, pmode, iOn, iOff);
+
+  if ( button->led->state == ON && useProgAdvance ) {
+    // Light is on, we know the mode, we can advance to next mode without re-setting program to 1
+    int cmode = ((clight_detail *)button->special_mask_ptr)->currentValue;
+    if (cmode > 0) {
+      int numPrograms = get_num_light_modes(0);
+      int adv_steps = (val - cmode + numPrograms) % numPrograms;
+      LOG(ALLB_LOG, LOG_INFO, "Advancing Light program by %d (current=%d, new=%d, total=%d)\n",adv_steps, cmode, val, numPrograms);
+      if (adv_steps > 0) {
+        send_cmd(code);
+        waitfor_queue2empty();
+      }
+      final_mode = val;
+      val = adv_steps;
+      iOn = -1;
+      iOff = -1;
+      //goto programming;
+    } else {
+      LOG(ALLB_LOG, LOG_INFO, "Can't advance Light program, current state unknown\n");
+    }
+  } else {
+    //LOG(ALLB_LOG, LOG_INFO, "Not using advance mode (state=%d, usemode=%d)\n",button->led->state,useProgAdvance);
+  }
+
   const int seconds = 1000;
   // Needs to start programming sequence with light on, if off we need to turn on for 15 seconds
   // before we can send the next off.
-  if ( button->led->state != ON ) {
+  if ( button->led->state != ON && iOn > 0) {
     LOG(ALLB_LOG, LOG_INFO, "Light Programming Initial state off, turning on for %d seconds\n",iOn);
     send_cmd(code);
     delay(iOn * seconds);
   }
 
-  LOG(ALLB_LOG, LOG_INFO, "Light Programming turn off for %d seconds\n",iOff);
   // Now need to turn off for between 11 and 14 seconds to reset light.
-  send_cmd(code);
-  delay(iOff * seconds);
+  if (iOff > 0) {
+    LOG(ALLB_LOG, LOG_INFO, "Light Programming turn off for %d seconds\n",iOff);
+    send_cmd(code);
+    delay(iOff * seconds);
+  }
 
   // Now light is reset, pulse the appropiate number of times to advance program.
   LOG(ALLB_LOG, LOG_INFO, "Light Programming button pulsing on/off %d times\n", val);
  
   // Program light in safe mode (slowley), or quick mode
-  if (pmode > 0) {
+  if (pmode > 0 && val > 0) {
     for (i = 1; i < (val * 2); i++) {
       LOG(ALLB_LOG, LOG_INFO, "Light Programming button press number %d - %s of %d\n", i, i % 2 == 0 ? "Off" : "On", val);
       send_cmd(code);
       waitfor_queue2empty();
       delay(pmode * seconds); // 0.3 works, but using 0.4 to be safe
     }
-  } else {
+  } else if (val > 0) {
     for (i = 1; i < val; i++) {
       const int dt = 0.5;  // Time to wait after receiving conformation of light on/off
       waitfor_queue2empty();
@@ -634,6 +666,9 @@ void *set_allbutton_light_programmode( void *ptr )
 
   // set before we are called
   //updateButtonLightProgram(aq_data, val, btn);
+
+  // Save value if needed
+  updateLightProgram(aq_data, final_mode, (clight_detail *)button->special_mask_ptr );
 
   cleanAndTerminateThread(threadCtrl);
   
