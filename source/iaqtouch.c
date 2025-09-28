@@ -294,13 +294,13 @@ int matchLabel2Button(const char* pageButtonName, aqkey *aqbutton, int ignorecha
   int rtn = rsm_strmatch_ignore(pageButtonName, aqbutton->label, ignorechars);
 
   if (rtn == 0 && isVBUTTON_ALTLABEL(aqbutton->special_mask) ) {
-    ((vbutton_detail *)aqbutton->special_mask_ptr)->in_alt_mode = false;
-    LOG(IAQT_LOG,LOG_DEBUG, "Virtual Button `%s` is NOT in alternate state of `%s`\n", aqbutton->label, ((vbutton_detail *)aqbutton->special_mask_ptr)->altlabel);
+    ((altlabel_detail *)aqbutton->special_mask_ptr)->in_alt_mode = false;
+    LOG(IAQT_LOG,LOG_DEBUG, "Virtual Button `%s` is NOT in alternate state of `%s`\n", aqbutton->label, ((altlabel_detail *)aqbutton->special_mask_ptr)->altlabel);
   } else if (rtn != 0 && isVBUTTON_ALTLABEL(aqbutton->special_mask) ) {
-    rtn = rsm_strmatch_ignore(pageButtonName, ((vbutton_detail *)aqbutton->special_mask_ptr)->altlabel,ignorechars );
+    rtn = rsm_strmatch_ignore(pageButtonName, ((altlabel_detail *)aqbutton->special_mask_ptr)->altlabel,ignorechars );
     if (rtn == 0 ) {
-      ((vbutton_detail *)aqbutton->special_mask_ptr)->in_alt_mode = true;
-      LOG(IAQT_LOG,LOG_DEBUG, "Virtual Button `%s` is in alternate state of `%s`\n", aqbutton->label, ((vbutton_detail *)aqbutton->special_mask_ptr)->altlabel);
+      ((altlabel_detail *)aqbutton->special_mask_ptr)->in_alt_mode = true;
+      LOG(IAQT_LOG,LOG_DEBUG, "Virtual Button `%s` is in alternate state of `%s`\n", aqbutton->label, ((altlabel_detail *)aqbutton->special_mask_ptr)->altlabel);
     }
   }
 

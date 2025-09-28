@@ -31,8 +31,8 @@ bool processPacketFromHeatPump(unsigned char *packet_buffer, int packet_length, 
 bool processPacketToJandyLight(unsigned char *packet_buffer, int packet_length, struct aqualinkdata *aqdata);
 bool processPacketFromJandyLight(unsigned char *packet_buffer, int packet_length, struct aqualinkdata *aqdata, const unsigned char previous_packet_to);
 
+const char *get_swg_status_msg(struct aqualinkdata *aqdata);
 
-void get_swg_status_mqtt(struct aqualinkdata *aqdata, char *message, int *status, int *dzalert);
 aqledstate get_swg_led_state(struct aqualinkdata *aqdata);
 
 bool changeSWGpercent(struct aqualinkdata *aqdata, int percent);

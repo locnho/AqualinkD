@@ -20,7 +20,6 @@
 #include <ctype.h>
 
 #include "config.h"
-#include "domoticz.h"
 #include "aq_panel.h"
 #include "serialadapter.h"
 #include "aq_timer.h"
@@ -689,8 +688,9 @@ aqkey *addVirtualButton(struct aqualinkdata *aqdata, char *label, int vindex) {
   snprintf(name, 9, "%s%d", BTN_VAUX, index);
   button->name = name;
 
-  button->special_mask_ptr = malloc(sizeof(vbutton_detail));
-  ((vbutton_detail *)button->special_mask_ptr)->altlabel = NUL;
+  // NSF THIS NEEDS TO BE REMOVED
+  //button->special_mask_ptr = malloc(sizeof(altlabel_detail));
+  //((altlabel_detail *)button->special_mask_ptr)->altlabel = NUL;
 
   if (label == NULL || strlen(label) <= 0) {
     //button->label = name; 
@@ -700,8 +700,8 @@ aqkey *addVirtualButton(struct aqualinkdata *aqdata, char *label, int vindex) {
   }
 
   button->code = NUL;
-  button->dz_idx = DZ_NULL_IDX;
-  button->special_mask |= VIRTUAL_BUTTON; // Could change to special mask vbutton
+  setButtonSpecialMask(button, VIRTUAL_BUTTON);
+  //button->special_mask |= VIRTUAL_BUTTON; // Could change to special mask vbutton
   button->led->state = OFF;
 
   return button;  
@@ -727,13 +727,22 @@ bool setVirtualButtonLabel(aqkey *button, const char *label) {
   return true;
 }
 
-bool setVirtualButtonAltLabel(aqkey *button, const char *label) {
+
+bool setVirtualButtonAltLabel(aqkey *button, char *label) {
   if (label == NULL )
     return false;
 
-  ((vbutton_detail *)button->special_mask_ptr)->altlabel = (char *)label;
-  ((vbutton_detail *)button->special_mask_ptr)->in_alt_mode = false;
-  button->special_mask |= VIRTUAL_BUTTON_ALT_LABEL;
+  if (! isMASK_SET(button->special_mask, VIRTUAL_BUTTON_ALT_LABEL) ) {
+    button->special_mask_ptr = malloc(sizeof(altlabel_detail));
+    ((altlabel_detail *)button->special_mask_ptr)->altlabel = cleanalloc(label);
+    setButtonSpecialMask(button, VIRTUAL_BUTTON_ALT_LABEL);
+  }
+
+  ((altlabel_detail *)button->special_mask_ptr)->altlabel = (char *)label;
+  ((altlabel_detail *)button->special_mask_ptr)->in_alt_mode = false;
+  
+  //setButtonSpecialMask(button, VIRTUAL_BUTTON_ALT_LABEL);
+  //button->special_mask |= VIRTUAL_BUTTON_ALT_LABEL;
 
   return true;
 }
@@ -790,7 +799,6 @@ void initPanelButtons(struct aqualinkdata *aqdata, bool rs, int size, bool combo
   aqdata->aqbuttons[index].label = rs?name2label(BTN_PUMP):cleanalloc(BTN_PDA_PUMP);
   aqdata->aqbuttons[index].name = BTN_PUMP;
   aqdata->aqbuttons[index].code = KEY_PUMP;
-  aqdata->aqbuttons[index].dz_idx = DZ_NULL_IDX;
   aqdata->aqbuttons[index].special_mask = 0;
   aqdata->aqbuttons[index].rssd_code = RS_SA_PUMP;
   index++;
@@ -801,7 +809,6 @@ void initPanelButtons(struct aqualinkdata *aqdata, bool rs, int size, bool combo
     aqdata->aqbuttons[index].label = rs?name2label(BTN_SPA):cleanalloc(BTN_PDA_SPA);
     aqdata->aqbuttons[index].name = BTN_SPA;
     aqdata->aqbuttons[index].code = KEY_SPA;
-    aqdata->aqbuttons[index].dz_idx = DZ_NULL_IDX;
     aqdata->aqbuttons[index].special_mask = 0;
     aqdata->aqbuttons[index].rssd_code = RS_SA_SPA;
     index++;
@@ -812,7 +819,6 @@ void initPanelButtons(struct aqualinkdata *aqdata, bool rs, int size, bool combo
   aqdata->aqbuttons[index].label = rs?name2label(BTN_AUX1):cleanalloc(BTN_PDA_AUX1);
   aqdata->aqbuttons[index].name = BTN_AUX1;
   aqdata->aqbuttons[index].code = KEY_AUX1;
-  aqdata->aqbuttons[index].dz_idx = DZ_NULL_IDX;
   aqdata->aqbuttons[index].special_mask = 0;
   aqdata->aqbuttons[index].rssd_code = RS_SA_AUX1;
   index++;
@@ -822,7 +828,6 @@ void initPanelButtons(struct aqualinkdata *aqdata, bool rs, int size, bool combo
   aqdata->aqbuttons[index].label = rs?name2label(BTN_AUX2):cleanalloc(BTN_PDA_AUX2);
   aqdata->aqbuttons[index].name = BTN_AUX2;
   aqdata->aqbuttons[index].code = KEY_AUX2;
-  aqdata->aqbuttons[index].dz_idx = DZ_NULL_IDX;
   aqdata->aqbuttons[index].special_mask = 0;
   aqdata->aqbuttons[index].rssd_code = RS_SA_AUX2;
   index++;
@@ -832,7 +837,6 @@ void initPanelButtons(struct aqualinkdata *aqdata, bool rs, int size, bool combo
   aqdata->aqbuttons[index].label = rs?name2label(BTN_AUX3):cleanalloc(BTN_PDA_AUX3);
   aqdata->aqbuttons[index].name = BTN_AUX3;
   aqdata->aqbuttons[index].code = KEY_AUX3;
-  aqdata->aqbuttons[index].dz_idx = DZ_NULL_IDX;
   aqdata->aqbuttons[index].special_mask = 0;
   aqdata->aqbuttons[index].rssd_code = RS_SA_AUX3;
   index++;
@@ -844,7 +848,6 @@ void initPanelButtons(struct aqualinkdata *aqdata, bool rs, int size, bool combo
     aqdata->aqbuttons[index].label = rs?name2label(BTN_AUX4):cleanalloc(BTN_PDA_AUX4);
     aqdata->aqbuttons[index].name = BTN_AUX4;
     aqdata->aqbuttons[index].code = KEY_AUX4;
-    aqdata->aqbuttons[index].dz_idx = DZ_NULL_IDX;
     aqdata->aqbuttons[index].special_mask = 0;
     aqdata->aqbuttons[index].rssd_code = RS_SA_AUX4;
     index++;
@@ -854,7 +857,6 @@ void initPanelButtons(struct aqualinkdata *aqdata, bool rs, int size, bool combo
     aqdata->aqbuttons[index].label = rs?name2label(BTN_AUX5):cleanalloc(BTN_PDA_AUX5);
     aqdata->aqbuttons[index].name = BTN_AUX5;
     aqdata->aqbuttons[index].code = KEY_AUX5;
-    aqdata->aqbuttons[index].dz_idx = DZ_NULL_IDX;
     aqdata->aqbuttons[index].special_mask = 0;
     aqdata->aqbuttons[index].rssd_code = RS_SA_AUX5;
     index++; 
@@ -866,7 +868,6 @@ void initPanelButtons(struct aqualinkdata *aqdata, bool rs, int size, bool combo
     aqdata->aqbuttons[index].label = rs?name2label(BTN_AUX6):cleanalloc(BTN_PDA_AUX6);
     aqdata->aqbuttons[index].name = BTN_AUX6;
     aqdata->aqbuttons[index].code = KEY_AUX6;
-    aqdata->aqbuttons[index].dz_idx = DZ_NULL_IDX;
     aqdata->aqbuttons[index].special_mask = 0;
     aqdata->aqbuttons[index].rssd_code = RS_SA_AUX6;
     index++;
@@ -876,7 +877,6 @@ void initPanelButtons(struct aqualinkdata *aqdata, bool rs, int size, bool combo
     aqdata->aqbuttons[index].label = rs?name2label(BTN_AUX7):cleanalloc(BTN_PDA_AUX7);
     aqdata->aqbuttons[index].name = BTN_AUX7;
     aqdata->aqbuttons[index].code = KEY_AUX7;
-    aqdata->aqbuttons[index].dz_idx = DZ_NULL_IDX;
     aqdata->aqbuttons[index].special_mask = 0;
     aqdata->aqbuttons[index].rssd_code = RS_SA_AUX7;
     index++;
@@ -898,7 +898,6 @@ void initPanelButtons(struct aqualinkdata *aqdata, bool rs, int size, bool combo
     aqdata->aqbuttons[index].label = name2label(BTN_AUXB1); // AUX8
     aqdata->aqbuttons[index].name = BTN_AUXB1;
     aqdata->aqbuttons[index].code = KEY_AUXB1;
-    aqdata->aqbuttons[index].dz_idx = DZ_NULL_IDX;
     aqdata->aqbuttons[index].special_mask = 0;
     aqdata->aqbuttons[index].rssd_code = RS_SA_AUX8;
     index++;
@@ -908,7 +907,6 @@ void initPanelButtons(struct aqualinkdata *aqdata, bool rs, int size, bool combo
     aqdata->aqbuttons[index].label = name2label(BTN_AUXB2); // AUX9
     aqdata->aqbuttons[index].name = BTN_AUXB2;
     aqdata->aqbuttons[index].code = KEY_AUXB2;
-    aqdata->aqbuttons[index].dz_idx = DZ_NULL_IDX;
     aqdata->aqbuttons[index].special_mask = 0;
     aqdata->aqbuttons[index].rssd_code = RS_SA_AUX9;
     index++;
@@ -918,7 +916,6 @@ void initPanelButtons(struct aqualinkdata *aqdata, bool rs, int size, bool combo
     aqdata->aqbuttons[index].label = name2label(BTN_AUXB3);  // AUX10
     aqdata->aqbuttons[index].name = BTN_AUXB3;
     aqdata->aqbuttons[index].code = KEY_AUXB3;
-    aqdata->aqbuttons[index].dz_idx = DZ_NULL_IDX;
     aqdata->aqbuttons[index].special_mask = 0;
     aqdata->aqbuttons[index].rssd_code = RS_SA_AUX10;
     index++;
@@ -928,7 +925,6 @@ void initPanelButtons(struct aqualinkdata *aqdata, bool rs, int size, bool combo
     aqdata->aqbuttons[index].label = name2label(BTN_AUXB4);  // AUX11
     aqdata->aqbuttons[index].name = BTN_AUXB4;
     aqdata->aqbuttons[index].code = KEY_AUXB4;
-    aqdata->aqbuttons[index].dz_idx = DZ_NULL_IDX;
     aqdata->aqbuttons[index].special_mask = 0;
     aqdata->aqbuttons[index].rssd_code = RS_SA_AUX11;
     index++;
@@ -940,7 +936,6 @@ void initPanelButtons(struct aqualinkdata *aqdata, bool rs, int size, bool combo
     aqdata->aqbuttons[index].label = name2label(BTN_AUXB5);
     aqdata->aqbuttons[index].name = BTN_AUXB5;
     aqdata->aqbuttons[index].code = KEY_AUXB5;
-    aqdata->aqbuttons[index].dz_idx = DZ_NULL_IDX;
     aqdata->aqbuttons[index].special_mask = 0;
     aqdata->aqbuttons[index].rssd_code = RS_SA_AUX12;
     index++;
@@ -950,7 +945,6 @@ void initPanelButtons(struct aqualinkdata *aqdata, bool rs, int size, bool combo
     aqdata->aqbuttons[index].label = name2label(BTN_AUXB6);
     aqdata->aqbuttons[index].name = BTN_AUXB6;
     aqdata->aqbuttons[index].code = KEY_AUXB6;
-    aqdata->aqbuttons[index].dz_idx = DZ_NULL_IDX;
     aqdata->aqbuttons[index].special_mask = 0;
     aqdata->aqbuttons[index].rssd_code = RS_SA_AUX13;
     index++;
@@ -960,7 +954,6 @@ void initPanelButtons(struct aqualinkdata *aqdata, bool rs, int size, bool combo
     aqdata->aqbuttons[index].label = name2label(BTN_AUXB7);
     aqdata->aqbuttons[index].name = BTN_AUXB7;
     aqdata->aqbuttons[index].code = KEY_AUXB7;
-    aqdata->aqbuttons[index].dz_idx = DZ_NULL_IDX;
     aqdata->aqbuttons[index].rssd_code = RS_SA_AUX14;
    index++;
 
@@ -969,7 +962,6 @@ void initPanelButtons(struct aqualinkdata *aqdata, bool rs, int size, bool combo
     aqdata->aqbuttons[index].label = name2label(BTN_AUXB8);
     aqdata->aqbuttons[index].name = BTN_AUXB8;
     aqdata->aqbuttons[index].code = KEY_AUXB8;
-    aqdata->aqbuttons[index].dz_idx = DZ_NULL_IDX;
     aqdata->aqbuttons[index].special_mask = 0;
     aqdata->aqbuttons[index].rssd_code = RS_SA_AUX15;
     index++;
@@ -984,7 +976,6 @@ void initPanelButtons(struct aqualinkdata *aqdata, bool rs, int size, bool combo
       aqdata->aqbuttons[index].label = name2label(BTN_AUX6);
       aqdata->aqbuttons[index].name = BTN_AUX6;
       aqdata->aqbuttons[index].code = KEY_AUX6;
-      aqdata->aqbuttons[index].dz_idx = DZ_NULL_IDX;
       aqdata->aqbuttons[index].special_mask = 0;
       aqdata->aqbuttons[index].rssd_code = RS_SA_AUX6;
       index++;
@@ -1006,7 +997,6 @@ void initPanelButtons(struct aqualinkdata *aqdata, bool rs, int size, bool combo
   aqdata->aqbuttons[index].label = rs?name2label(combo?BTN_POOL_HTR:BTN_TEMP1_HTR):cleanalloc(BTN_PDA_POOL_HTR);
   aqdata->aqbuttons[index].name = BTN_POOL_HTR;
   aqdata->aqbuttons[index].code = KEY_POOL_HTR;
-  aqdata->aqbuttons[index].dz_idx = DZ_NULL_IDX;
   aqdata->aqbuttons[index].special_mask = 0;
   aqdata->aqbuttons[index].rssd_code = RS_SA_POOLHT;
   index++;
@@ -1016,7 +1006,6 @@ void initPanelButtons(struct aqualinkdata *aqdata, bool rs, int size, bool combo
   aqdata->aqbuttons[index].label = rs?name2label(combo?BTN_SPA_HTR:BTN_TEMP2_HTR):cleanalloc(BTN_PDA_SPA_HTR);
   aqdata->aqbuttons[index].name = BTN_SPA_HTR;
   aqdata->aqbuttons[index].code = KEY_SPA_HTR;
-  aqdata->aqbuttons[index].dz_idx = DZ_NULL_IDX;
   aqdata->aqbuttons[index].special_mask = 0;
   aqdata->aqbuttons[index].rssd_code = RS_SA_SPAHT;
   index++;
@@ -1026,7 +1015,6 @@ void initPanelButtons(struct aqualinkdata *aqdata, bool rs, int size, bool combo
   aqdata->aqbuttons[index].label = rs?name2label(BTN_EXT_AUX):cleanalloc(BTN_PDA_EXT_AUX);
   aqdata->aqbuttons[index].name = BTN_EXT_AUX;
   aqdata->aqbuttons[index].code = KEY_EXT_AUX;
-  aqdata->aqbuttons[index].dz_idx = DZ_NULL_IDX;
   aqdata->aqbuttons[index].special_mask = 0;
   index++;
 
@@ -1047,7 +1035,6 @@ void initPanelButtons(struct aqualinkdata *aqdata, bool rs, int size, bool combo
     for(int i=0; i < aqdata->total_buttons; i++) {
         aqdata->aqbuttons[i].led->state = OFF;
     }
-
   #endif
 }
 
@@ -1062,9 +1049,6 @@ const char* getRequestName(request_source source)
     break;
     case NET_WS:
       return "WebSocket";
-    break;
-    case NET_DZMQTT:
-      return "Domoticz";
     break;
     case NET_TIMER:
       return "Timer";
@@ -1252,13 +1236,6 @@ bool setDeviceState(struct aqualinkdata *aqdata, int deviceIndex, bool isON, req
         } else {
           LOG(PANL_LOG, LOG_ERR, "Can only use Aqualink Touch protocol for Virtual Buttons");
         }
-      } else if ( source == NET_DZMQTT && isRSSA_ENABLED ) {
-        // Domoticz has a bad habbit of resending the same state back to us, when we use the PRESTATE_ONOFF option
-        // since allbutton (default) is stateless, and rssaadapter is statefull, use rssaadapter for any domoricz requests
-        set_aqualink_rssadapter_aux_state(button, isON);
-      //} else if ( source == NET_TIMER && isRSSA_ENABLED ) {
-        // Timer will sometimes send duplicate, so use RSSA since that protocol has on/off rather than toggle
-      //  set_aqualink_rssadapter_aux_state(button, isON);
       } else if (isPLIGHT(button->special_mask) && isRSSA_ENABLED) {
         // If off and program light, use the RS serial adapter since that is overiding the state now.
         set_aqualink_rssadapter_aux_state(button, isON);
@@ -1287,9 +1264,11 @@ bool setDeviceState(struct aqualinkdata *aqdata, int deviceIndex, bool isON, req
              button->code == KEY_EXT_AUX) &&
             isON > 0) {
           button->led->state = ENABLE; // if heater and set to on, set pre-status to enable.
+          LOG(PANL_LOG, LOG_INFO, "Pre-set state of %s to enable\n",button->label);
         //_aqualink_data->updated = true;
         } else if (isRSSA_ENABLED || ((button->special_mask & PROGRAM_LIGHT) != PROGRAM_LIGHT)) {
           button->led->state = (isON == false ? OFF : ON); // as long as it's not programmable light , pre-set to on/off
+          LOG(PANL_LOG, LOG_INFO, "Pre-set state of %s to %s\n",button->label,(isON == false ? "Off" : "On"));
         //_aqualink_data->updated = true;
         }
       }
@@ -1475,7 +1454,17 @@ void programDeviceLightMode(struct aqualinkdata *aqdata, int value, int deviceIn
 
   char buf[LIGHT_MODE_BUFER];
 
-  if (light->lightType == LC_PROGRAMABLE ) {
+  if (isMASK_SET(light->button->special_mask, VIRTUAL_BUTTON)) {
+    // We can only program a light on virtual button on iaqtouch or onetouch
+    if (isIAQT_ENABLED ) {
+      sprintf(buf, "%-5d%-5d%-5d",value, deviceIndex, light->lightType);
+      aq_programmer(AQ_SET_IAQTOUCH_LIGHTCOLOR_MODE, buf, aqdata);
+    } else if (isONET_ENABLED ) {
+      LOG(PANL_LOG,LOG_ERR, "Light mode on virtual button not implimented on OneTouch protocol (needs AqualinkTouch)\n");
+    } else {
+      LOG(PANL_LOG,LOG_ERR, "Light mode on virtual button needs AqualinkTouch protocol\n");
+    }
+  } else if (light->lightType == LC_PROGRAMABLE ) {
     //sprintf(buf, "%-5s%-5d%-5d%-5d%.2f",value, 
     sprintf(buf, "%-5d%-5d%-5d%-5d%.2f",value, 
                                       deviceIndex, 
@@ -1483,7 +1472,7 @@ void programDeviceLightMode(struct aqualinkdata *aqdata, int value, int deviceIn
                                       _aqconfig_.light_programming_initial_off,
                                       _aqconfig_.light_programming_mode );
     aq_programmer(AQ_SET_LIGHTPROGRAM_MODE, buf, aqdata);
-  } else if (isRSSA_ENABLED) {
+  } else if (isRSSA_ENABLED ) {
     // If we are using rs-serial then turn light on first.
     if (light->button->led->state != ON) {
       set_aqualink_rssadapter_aux_state(light->button, TRUE);
@@ -1537,7 +1526,10 @@ void programDeviceLightMode(struct aqualinkdata *aqdata, int value, int deviceIn
   }
 
   // Use function so can be called from programming thread if we decide to in future.
-  updateButtonLightProgram(aqdata, value, deviceIndex);
+  if (light->lightType != LC_PROGRAMABLE ) {
+    // Only update if a panel programed light.  If AqualinkD programs, the programmer needs to know the last mode.
+    updateButtonLightProgram(aqdata, value, deviceIndex);
+  }
 }
 
 /*
@@ -1678,3 +1670,58 @@ pump_detail *getPumpDetail(struct aqualinkdata *aqdata, int button)
   return NULL;
 }
 
+
+const char *getButtontSpecialMaskName(uint16_t mask) {
+  switch(mask) {
+    case VS_PUMP: 
+      return "VSpump";
+    break;
+    case PROGRAM_LIGHT: 
+      return "lightMode";
+    break;
+    case VIRTUAL_BUTTON_ALT_LABEL:
+      return "altLabel";
+    break;
+    case VIRTUAL_BUTTON: 
+      return "Virtual Button";
+    break;
+    case VIRTUAL_BUTTON_CHILLER:
+      return "Virtual Button Chiller";
+    default:
+      return "unknown";
+    break;
+  }
+}
+void checkButtonSpecialMask(aqkey *button, uint16_t mask2remove) {
+  if (isMASK_SET(button->special_mask,mask2remove)) {
+    LOG(AQUA_LOG,LOG_ERR, "Config error can only have one type for button `%s`, removing `%s`\n",
+                           button->name, 
+                          getButtontSpecialMaskName(mask2remove));
+    removeMASK(button->special_mask, mask2remove);
+  }
+}
+void setButtonSpecialMask(aqkey *button, uint16_t mask2set) 
+{
+  switch(mask2set) {
+    case VS_PUMP:                  // assign struct pump_detail
+      checkButtonSpecialMask(button, PROGRAM_LIGHT);
+      checkButtonSpecialMask(button, VIRTUAL_BUTTON_ALT_LABEL);
+    break;
+    case PROGRAM_LIGHT:            // assign struct clight_detail
+      checkButtonSpecialMask(button, VIRTUAL_BUTTON_ALT_LABEL);
+      checkButtonSpecialMask(button, VS_PUMP);
+    break;
+    case VIRTUAL_BUTTON_ALT_LABEL: // assign struct altlabel_detail (Maybe delete VIRTUAL_BUTTON)
+      checkButtonSpecialMask(button, PROGRAM_LIGHT);
+      checkButtonSpecialMask(button, VS_PUMP);
+    break;
+    case VIRTUAL_BUTTON:           // Type can be added to above
+    break;
+    case VIRTUAL_BUTTON_CHILLER:   // Type can be added to above
+    break;
+    default:
+    break;
+  }
+
+  button->special_mask |= mask2set;
+}

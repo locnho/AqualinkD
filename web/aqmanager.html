@@ -149,10 +149,13 @@
         }
 
         .statusmsg {
-          font-size: clamp(0.5rem, 1vw, 1rem);
+          font-size: clamp(0.2rem, 1vw, 1rem);
           white-space: nowrap; /* Keep text on a single line */
           overflow: hidden;
           text-overflow: ellipsis;
+          /*text-overflow: clip;*/
+          width: var(--aqualinkd-container);
+          display:inline-block;
         }
 
         .error {
@@ -368,6 +371,7 @@
         var _panel_size = 6;
         var _panel_set = 0;
         var _latestVersionAvailable = 0;
+        var _latestDevVersionAvailable = 0;
         var _rssd_logmask = 0;
         const RSSD_MASK_ID = 512;  // Must match RSSD_LOG in utils.c
 
@@ -1567,6 +1571,12 @@
             } else {
               disablebutton("upgrade");
             }
+
+            if (_urlParams.get('devupgrade') != null) {
+              enablebutton("upgrade");
+              var button = document.getElementById("upgrade");
+              button.setAttribute("upgrade_type", "dev")
+            }
           }
         }
 
@@ -1596,10 +1606,11 @@
                 }
 
                 delayedVersionCheck(data['aqualinkd_version']);
-
+                /*
                 if (_urlParams.get('upgrade') != null) {
                    enablebutton("upgrade");
                 }
+                */
               }
             }
 
@@ -1857,6 +1868,7 @@
 
             startWebsockets();
             getLatestVersion();
+            getLatestDevVersion();
         }
 
         function set_unavailable(message) {
@@ -1893,13 +1905,23 @@
             //cmd.uri = "rawcommand"
             switch (source.id) {
                 case "upgrade":
-                   if (confirm("Are you sure you want to proceed upgrading AqualinkD?")) {
-                      console.log("Upgrading");
-                      update_log_message("***** AqualinkD upgrade in progress *****");
-                    } else {
-                      return;
+                   if (source.getAttribute("upgrade_type") == "dev") {
+                     if (confirm("Are you sure you want to proceed installing AqualinkD to Dev version '"+_latestDevVersionAvailable+"'' ?")) {
+                       //console.log("Upgrading to dev release");
+                       update_log_message("***** AqualinkD upgrade in progress *****");
+                      } else {
+                        return;
+                      }
+                      cmd.uri = "installdevrelease"
+                   } else {
+                     if (confirm("Are you sure you want to proceed upgrading AqualinkD to '"+_latestVersionAvailable+"'' ?")) {
+                       console.log("Upgrading");
+                       update_log_message("***** AqualinkD upgrade in progress *****");
+                      } else {
+                        return;
+                      }
+                      cmd.uri = "upgrade"
                     }
-                    cmd.uri = "upgrade"
                     // NEED TO REGET aqmanager after restart.
                     break;
                 case "restart":
@@ -1959,6 +1981,24 @@
                 }
             };
             xmlhttp.open("GET", url);
+            xmlhttp.send();
+        }
+
+        function getLatestDevVersion(url="https://api.github.com/repos/AqualinkD/AqualinkD/contents/source/version.h", tryagain=true) {
+            var xmlhttp = new XMLHttpRequest();
+            xmlhttp.onreadystatechange = function () {
+                if (this.readyState == 4 && this.status == 200) {
+                  //console.log(this.responseText);
+                  _latestDevVersionAvailable = this.responseText.match(/AQUALINKD_VERSION "(.*)"/i)[1];
+                } else if (this.readyState == 4 && this.status == 404) {
+                    if (tryagain) {
+                        // Try sfeakes repo
+                      getLatestDevVersion("https://api.github.com/repos/AqualinkD/AqualinkD/contents/source/version.h", false);
+                    }
+                }
+            };
+            xmlhttp.open("GET", url);
+            xmlhttp.setRequestHeader("Accept","application/vnd.github.raw");
             xmlhttp.send();
         }
     </script>

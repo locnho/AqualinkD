@@ -5,6 +5,7 @@
     // use the below URL and look at the ID value for each device.
     // http://aqualink.ip.address/api/devices
 
+    var config_js=true;
     
     var devices = [
         "Filter_Pump",
@@ -99,16 +100,36 @@
       //var background_reload = 10;
       //var background_reload = 0;
 
-      // By default all Variable Speed Pumps will show RPM.
-      // this will show GPM on VSP's that you can only set GPM (ie Jandy VF pumps)
+      // By default all Variable Speed Pumps will show RPM or GPM depending on how they are controlled.
+      // this will show RPM for all pumps (ie Jandy VF pumps)
       //var show_vsp_gpm=false;
 
-      // By default all Temperatures & Value tiles are off.
-      // this will turn them on
-      var turn_on_sensortiles = true;
+      // By default all Temperatures & Value tiles are on when they have a value other than 0.
+      // this will turn them off permanently
+      //var turn_off_sensortiles = true;
 
       // This will turn on/off the Spa Heater when you turn on/off Spa Mode.
       //var link_spa_and_spa_heater = true;
+
+      var tile_thresholds = {
+        "SWG/PPM": {
+          outofrange: {min: 2600, max: 3500, mintext:"Add Salt"},
+          attention: {min: 2700, max: 3400, mintext:"Add Salt"}
+        },
+        "CHEM/pH": {
+          outofrange: {min: 7, max: 8},
+          attention: {min: 7.2, max: 7.8, mintext:"Low", maxtext:"High"}
+        },
+        "CHEM/ORP": {
+          outofrange: {min: 560, max: 900},
+          attention: {min: 650, max: 850, mintext:"Low", maxtext:"High"}
+        },
+        // Example of how to set color to Aux_S1 (if Aux_S1 was a CPU temperature)
+        //"Aux_S1": {
+        //  outofrange: {min: 0, max: 170, maxtext:"ALERT High"},
+        //  attention: {min: 0, max: 140,  maxtext:"High"}
+        //},
+      }
 
       // Change the min max for heater slider
       var heater_slider_min = 36;
@@ -121,6 +142,7 @@
       var timer_slider_step = 1;
 
       // Colors 
+      
       var body_background = "#EBEBEA";
       var body_text = "#000000";
       
@@ -139,6 +161,11 @@
       var tile_on_text = "#000000";
       var tile_status_text = "#575757";
 
+      // Change the default color for vales in and out of range.
+      //var value_tile_normal_color = "#4ec400ff";
+      //var value_tile_attention_color =  "#ffbf00ff";
+      //var value_tile_outofrange_color = "#ff0000";
+   
      // Dark colors
      // var body_background = "#000000";
      // var tile_background = "#646464";

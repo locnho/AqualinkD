@@ -135,17 +135,21 @@ bool copy_file(const char *source_path, const char *destination_path)
     return true;
 }
 
-bool run_aqualinkd_upgrade(bool onlycheck)
+bool run_aqualinkd_upgrade(uint8_t type)
 {
     int pipe_curl_to_bash[2];
     pid_t pid_curl, pid_bash;
     //char *curl_args[] = {"curl", "-fsSl", "http://tiger/scratch/remote_install.sh", NULL};
     char *curl_args[] = {"curl", "-fsSl", "-H",  "Accept: application/vnd.github.raw", "https://api.github.com/repos/AqualinkD/AqualinkD/contents/release/remote_install.sh", NULL};
-    char *bash_args[] = {"bash", "-s", "--", "check", NULL};
+    char *bash_args[] = {"bash", "-s", "--", "", NULL};
     int status_curl, status_bash;
 
-    if (!onlycheck) {
-        bash_args[3] = NULL;
+    if (isMASK_SET(type, CHECKONLY)) {
+      bash_args[3] = "check";
+    } else {
+      if (isMASK_SET(type, INSTALLDEVRELEASE)) {
+        bash_args[3] = "development";
+      }
     }
 
     if (pipe(pipe_curl_to_bash) == -1)

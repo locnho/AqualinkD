@@ -14,6 +14,7 @@ AQ_PDA  = true
 #AQ_ONETOUCH = true
 #AQ_IAQTOUCH = true
 AQ_MANAGER = true
+#AQ_DOMOTICZ = true
 
 #AQ_RS_EXTRA_OPTS = false
 #AQ_CONTAINER = false // this is for compiling for containers
@@ -36,6 +37,7 @@ LIBS := -lpthread -lm -lrt
 
 # Standard compile flags
 GCCFLAGS = -Wall -O3
+#GCCFLAGS = -Wall -O3 -Wunused-macros
 #GCCFLAGS = -O3
 #GCCFLAGS = -Wall -O3 -Wextra
 #GCCFLAGS = -Wl,--gc-sections,--print-gc-sections
@@ -51,8 +53,11 @@ DBGFLAGS = -g -O0 -Wall -D AQ_DEBUG -D AQ_TM_DEBUG
 # Mongoose flags
 #MGFLAGS = -D MG_DISABLE_MD5 -D MG_DISABLE_HTTP_DIGEST_AUTH -D MG_DISABLE_MD5 -D MG_DISABLE_JSON_RPC
 # Mongoose 6.18 flags
-MGFLAGS = -D MG_ENABLE_HTTP_SSI=0 -D MG_ENABLE_DIRECTORY_LISTING=0 -D MG_ENABLE_HTTP_CGI=0
-#MGFLAGS =
+#MGFLAGS = -D MG_ENABLE_HTTP_SSI=0 -D MG_ENABLE_DIRECTORY_LISTING=0 -D MG_ENABLE_HTTP_CGI=0
+
+# Mongoose 7.19 flags
+#MGFLAGS = -D MG_TLS = 2 #(2=MG_TLS_OPENSSL. 3=MG_TLS_BUILTIN)
+MGFLAGS = 
 
 # Detect OS and set some specifics
 ifeq ($(OS),Windows_NT)
@@ -81,10 +86,10 @@ endif
 
 
 # Main source files
-SRCS = aqualinkd.c utils.c config.c aq_serial.c aq_panel.c aq_programmer.c allbutton.c allbutton_aq_programmer.c net_services.c json_messages.c rs_msg_utils.c\
+SRCS = aqualinkd.c utils.c config.c aq_serial.c aq_panel.c aq_programmer.c allbutton.c allbutton_aq_programmer.c net_services.c net_interface.c json_messages.c rs_msg_utils.c\
        onetouch.c onetouch_aq_programmer.c iaqtouch.c iaqtouch_aq_programmer.c iaqualink.c\
        devices_jandy.c packetLogger.c devices_pentair.c color_lights.c serialadapter.c aq_timer.c aq_scheduler.c web_config.c\
-       serial_logger.c mongoose.c hassio.c simulator.c sensors.c aq_systemutils.c timespec_subtract.c 
+       serial_logger.c mongoose.c mqtt_discovery.c simulator.c sensors.c aq_systemutils.c timespec_subtract.c 
 
 
 AQ_FLAGS =
@@ -94,24 +99,13 @@ ifeq ($(AQ_PDA), true)
   AQ_FLAGS := $(AQ_FLAGS) -D AQ_PDA
 endif
 
-#ifeq ($(AQ_ONETOUCH), true)
-#  SRCS := $(SRCS) onetouch.c onetouch_aq_programmer.c
-#  AQ_FLAGS := $(AQ_FLAGS) -D AQ_ONETOUCH
-#endif
-
-#ifeq ($(AQ_IAQTOUCH), true)
-#  SRCS := $(SRCS) iaqtouch.c iaqtouch_aq_programmer.c iaqualink.c
-#  AQ_FLAGS := $(AQ_FLAGS) -D AQ_IAQTOUCH
-#endif
-
-#ifeq ($(AQ_RS16), true)
-#  AQ_FLAGS := $(AQ_FLAGS) -D AQ_RS16
-#endif
-
 ifeq ($(AQ_MEMCMP), true)
   AQ_FLAGS := $(AQ_FLAGS) -D AQ_MEMCMP
 endif
 
+#ifeq ($(AQ_DOMOTICZ), true)
+#  AQ_FLAGS := $(AQ_FLAGS) -D AQ_DOMOTICZ
+#endif
 
 ifeq ($(AQ_MANAGER), true)
   AQ_FLAGS := $(AQ_FLAGS) -D AQ_MANAGER

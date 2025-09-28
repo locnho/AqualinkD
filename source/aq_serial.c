@@ -26,36 +26,22 @@
 // Below is needed to set low latency.
 #include <linux/serial.h>
 
+
+
+
+
 #include "aq_serial.h"
 #include "utils.h"
 #include "config.h"
 #include "packetLogger.h"
 #include "timespec_subtract.h"
 #include "aqualink.h"
+#include <sys/select.h>
 
-/*
-Notes for serial usb speed 
 
-File should exist if using ftdi chip, ie ftdi_sio driver.
-/sys/bus/usb-serial/devices/ttyUSB0/latency_timer
-Set to 1 for fastest latency.
+#define SERIAL_READ_TIMEOUT_SEC 1;
 
-Can also be set in code
-ioctl(fd, TIOCGSERIAL, &serial);
-serial.flags |= ASYNC_LOW_LATENCY;
-ioctl(fd, TIOCSSERIAL, &serial);
-
-*/
-
-// Default to send command with leading NUL, this changes that
-//#define SEND_CMD_WITH_TRAILING_NUL
-
-//#define BLOCKING_MODE
-
-static bool _blocking_mode = false;
-static int _blocking_fds = -1;
-
-static struct termios _oldtio;
+static int _RS485_fds = -1;
 
 static struct timespec _last_serial_read_time;
 
@@ -420,98 +406,6 @@ protocolType getProtocolType(const unsigned char* packet) {
 
   return P_UNKNOWN; 
 }
-/*
-unsigned char getProtocolType(unsigned char* packet) {
-  if (packet[0] == DLE)
-    return PCOL_JANDY;
-  else if (packet[0] == PP1)
-    return PCOL_PENTAIR;
-
-  return PCOL_UNKNOWN; 
-}
-*/
-
-#ifndef PLAYBACK_MODE
-/*
-Open and Initialize the serial communications port to the Aqualink RS8 device.
-Arg is tty or port designation string
-returns the file descriptor
-*/
-//#define TXDEN_DUMMY_RS485_MODE
-
-#ifdef TXDEN_DUMMY_RS485_MODE
-
-#include <linux/serial.h>
-/* RS485 ioctls: */
-#define TIOCGRS485      0x542E
-#define TIOCSRS485      0x542F
-
-int init_serial_port_Pi(const char* tty)
-{
-  struct serial_rs485 rs485conf = {0};
-
-  //int fd = open(tty, O_RDWR | O_NOCTTY | O_NONBLOCK);
-  int fd = open(tty, O_RDWR);
-  if (fd < 0)  {
-    LOG(RSSD_LOG,LOG_ERR, "Unable to open port: %s\n", tty);
-    return -1;
-  }
-
-  LOG(RSSD_LOG,LOG_DEBUG_SERIAL, "Openeded serial port %s\n",tty);
-
-  if (ioctl (fd, TIOCGRS485, &rs485conf) < 0) {
-    LOG(RSSD_LOG,LOG_ERR, "Error reading ioctl port (%d): %s\n",  errno, strerror( errno ));
-    return -1;
-  }
-
-  LOG(RSSD_LOG,LOG_DEBUG, "Port currently RS485 mode is %s\n", (rs485conf.flags & SER_RS485_ENABLED) ? "set" : "NOT set");
-
-  /* Enable RS485 mode: */
-	rs485conf.flags |= SER_RS485_ENABLED;
-
-	/* Set logical level for RTS pin equal to 1 when sending: */
-	rs485conf.flags |= SER_RS485_RTS_ON_SEND;
-	/* or, set logical level for RTS pin equal to 0 when sending: */
-	//rs485conf.flags &= ~(SER_RS485_RTS_ON_SEND);
-
-	/* Set logical level for RTS pin equal to 1 after sending: */
-	rs485conf.flags |= SER_RS485_RTS_AFTER_SEND;
-	/* or, set logical level for RTS pin equal to 0 after sending: */
-	//rs485conf.flags &= ~(SER_RS485_RTS_AFTER_SEND);
-
-  /* Set this flag if you want to receive data even whilst sending data */
-	//rs485conf.flags |= SER_RS485_RX_DURING_TX;
-
-	if (ioctl (fd, TIOCSRS485, &rs485conf) < 0) {
-		LOG(RSSD_LOG,LOG_ERR, "Unable to set port to RS485 %s (%d): %s\n", tty, errno, strerror( errno ));
-    return -1;
-	}
-
-  return fd;
-}
-#endif // TXDEN_DUMMY_RS485_MODE
-
-int _init_serial_port(const char* tty, bool blocking, bool readahead);
-
-int init_serial_port(const char* tty)
-{
-#ifdef AQ_NO_THREAD_NETSERVICE
-  if (_aqconfig_.rs_poll_speed < 0) {
-    return init_blocking_serial_port(_aqconfig_.serial_port);
-  }
-#else
-  return init_blocking_serial_port(_aqconfig_.serial_port);
-#endif
-  
-}
-
-int init_blocking_serial_port(const char* tty)
-{
-  _blocking_fds = _init_serial_port(tty, true, false);
-  return _blocking_fds;
-}
-
-
 
 
 int set_port_low_latency(int fd, const char* tty)
@@ -573,112 +467,137 @@ int is_valid_port(int fd) {
 }
 
 
+void print_file_flags(int fd) {
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags == -1) {
+        perror("fcntl(F_GETFL)");
+        return;
+    }
+    if (flags & O_RDONLY) {
+        printf("  - O_RDONLY (Read-only access)\n");
+    }
+    if (flags & O_WRONLY) {
+        printf("  - O_WRONLY (Write-only access)\n");
+    }
+    if (flags & O_RDWR) {
+        printf("  - O_RDWR (Read/write access)\n");
+    }
+    if (flags & O_ACCMODE) {
+        printf("  - O_ACCMODE (mask for above modes)\n");
+    }
+    if (flags & O_NONBLOCK) {
+        printf("  - O_NONBLOCK (Non-blocking I/O)\n");
+    }
+    if (flags & O_APPEND) {
+        printf("  - O_APPEND (Append mode)\n");
+    }
+    /*
+    if (flags & O_SHLOCK) {
+        printf("  - O_SHLOCK (open with shared file lock)\n");
+    }
+     if (flags & O_EXLOCK) {
+        printf("  - O_EXLOCK (open with exclusive file lock)\n");
+    }
+        */
+    if (flags & O_ASYNC) {
+        printf("  - O_ASYNC (Asynchronous I/O signal)\n");
+    }
+    if (flags & O_NOFOLLOW) {
+        printf("  - O_NOFOLLOW (don't follow symlinks)\n");
+    }
+    if (flags & O_DSYNC) {
+        printf("  - O_DSYNC (Synchronous I/O data integrity)\n");
+    }
+    if (flags & O_SYNC) {
+        printf("  - O_SYNC (Synchronous I/O file integrity)\n");
+    }
+    if (flags & O_NOCTTY) {
+        printf("  - O_NOCTTY (don't assign controlling terminal)\n");
+    }
+}
+
 // https://www.cmrr.umn.edu/~strupp/serial.html#2_5_2
 // http://unixwiz.net/techtips/termios-vmin-vtime.html
 
-// Unless AQ_RS_EXTRA_OPTS is defined, blocking will always be true
-int _init_serial_port(const char* tty, bool blocking, bool readahead)
+int init_serial_port(const char* port)
 {
-  //B1200, B2400, B4800, B9600, B19200, B38400, B57600, B115200, B230400
-  const int BAUD = B9600;
-  const int PARITY = 0;
-  struct termios newtio;   
+  struct termios tty;
 
-  _blocking_mode = blocking;
+  // Have to open with O_NONBLOCK so we don't wait for the Data Carrier Detect (DCD) signal to go high
+  _RS485_fds = open(port, O_RDWR | O_NOCTTY | O_NONBLOCK | O_CLOEXEC); 
 
-  //int fd = open(tty, O_RDWR | O_NOCTTY | O_NONBLOCK | O_NDELAY);
-
-  int fd = open(tty, O_RDWR | O_NOCTTY | O_NONBLOCK | O_NDELAY | O_CLOEXEC);
-  
-
-  //int fd = open(tty, O_RDWR | O_NOCTTY | O_SYNC); // This is way to slow at reading
-  if (fd < 0)  {
-    LOG(RSSD_LOG,LOG_ERR, "Unable to open port: %s, error %d\n", tty, errno);
+  if (_RS485_fds < 0)  {
+    LOG(RSSD_LOG,LOG_ERR, "Unable to open port: %s: %s\n", port, strerror(errno));
     return -1;
   }
 
-  LOG(RSSD_LOG,LOG_DEBUG, "Openeded serial port %s\n",tty);
+  LOG(RSSD_LOG,LOG_DEBUG, "Openeded serial port %s\n",port);
+  //print_file_flags(fd);
 
-  if (tcgetattr(fd, &newtio) != 0) {
-    LOG(RSSD_LOG,LOG_ERR, "Unable to get port attributes: %s, error %d\n", tty,errno);
-    return -1;
-  }
-
-  if ( lock_port(fd, tty) < 0) {
-    //LOG(RSSD_LOG,LOG_ERR, "Unable to lock port: %s, error %d\n", tty, errno);
-    return -1;
+  if ( lock_port(_RS485_fds, port) < 0) {
+    LOG(RSSD_LOG,LOG_ERR, "Unable to lock port: %s: %s\n", port, strerror(errno));
+    //return -1;
   }
 
   if (_aqconfig_.ftdi_low_latency)
-    set_port_low_latency(fd, tty);
-
-  memcpy(&_oldtio, &newtio, sizeof(struct termios));
-
-  cfsetospeed(&newtio, BAUD);
-  cfsetispeed(&newtio, BAUD);
-
-  newtio.c_cflag = (newtio.c_cflag & ~CSIZE) | CS8; // 8-bit chars
-  // disable IGNBRK for mismatched speed tests; otherwise receive break
-  // as \000 chars
-  //newtio.c_iflag &= ~IGNBRK; // disable break processing
-  newtio.c_iflag = 0;        // raw input
-  newtio.c_lflag = 0;        // no signaling chars, no echo,
-                             // no canonical processing
-  newtio.c_oflag = 0;        // no remapping, no delays, raw output
-
-  if (_blocking_mode) {
-    fcntl(fd, F_SETFL, 0);     //efficient blocking for the read
-    //newtio.c_cc[VMIN] = 1;     // read blocks for 1 character or timeout below
-    //newtio.c_cc[VTIME] = 0;    // 0.5 seconds read timeout
-    //newtio.c_cc[VTIME] = 255;  // 25 seconds read timeout
-    //newtio.c_cc[VTIME] = 10;  // (1 to 255)  1 = 0.1 sec, 255 = 25.5 sec
-    newtio.c_cc[VTIME] = SERIAL_BLOCKING_TIME;
-    newtio.c_cc[VMIN] = 0;    
-  } else {
-    newtio.c_cc[VMIN]= 0;   // read doesn't block
-    //newtio.c_cc[VTIME]= 1;
-    newtio.c_cc[VTIME]= (readahead?0:1);
-  }
-  /*
-  Raw output is selected by resetting the OPOST option in the c_oflag member:
-  newtio.c_oflag &= ~OPOST;
-  When the OPOST option is disabled, all other option bits in c_oflag are ignored.
-  */
-  //newtio.c_oflag &= ~OPOST; // Raw output
-
-  newtio.c_iflag &= ~(IXON | IXOFF | IXANY); // shut off xon/xoff ctrl
-
-  newtio.c_cflag |= (CLOCAL | CREAD);   // ignore modem controls,
-                                        // enable reading
-  newtio.c_cflag &= ~(PARENB | PARODD); // shut off parity
-  newtio.c_cflag |= PARITY;
-  newtio.c_cflag &= ~CSTOPB;
-  newtio.c_cflag &= ~CRTSCTS;
-
-  tcflush(fd, TCIFLUSH);
-  if (tcsetattr(fd, TCSANOW, &newtio) != 0) {
-    LOG(RSSD_LOG,LOG_ERR, "Unable to set port attributes: %s, error %d\n", tty,errno);
+    set_port_low_latency(_RS485_fds, port);
+  
+  if (tcgetattr(_RS485_fds, &tty) != 0) {
+    LOG(RSSD_LOG,LOG_ERR, "Unable to get port attributes: %s: %s\n", port,strerror(errno));
     return -1;
   }
 
-  LOG(RSSD_LOG,LOG_INFO, "Port %s set I/O %s attributes\n",tty,_blocking_mode?"blocking":"non blocking");
+  // Set up Modbus protocol in raw mode (no canonical processing)
+  // This function automatically unsets ICRNL and other processing flags. (stops conversion of 0x0d to 0x0a rc to lf)
+  cfmakeraw(&tty); // Going to be more precise using below
 
-  return fd;
-}
+  // Set baud rates to 9600
+  cfsetispeed(&tty, B9600);
+  cfsetospeed(&tty, B9600);
 
+  // 8 data bits (CS8), no parity (PARENB cleared), 1 stop bit (CSTOPB cleared)
+  // Note: CSIZE is a mask, so we must first clear it before setting CS8.
+  tty.c_cflag &= ~PARENB; // No parity
+  tty.c_cflag &= ~CSTOPB; // 1 stop bit
+  tty.c_cflag &= ~CSIZE;  // Clear all data bit size flags.
+  tty.c_cflag |= CS8;     // 8 data bits.
 
+  // Disable hardware (RTS/CTS) and software (XON/XOFF) flow control
+  tty.c_cflag &= ~CRTSCTS; // Disable hardware flow control
+  tty.c_iflag &= ~(IXON | IXOFF | IXANY); // Disable software flow control
 
-void close_blocking_serial_port()
-{
-  if (_blocking_fds >= 0) {
-    LOG(RSSD_LOG,LOG_INFO, "Forcing close of blocking serial port, ignore following read errors\n");
-    close_serial_port(_blocking_fds);
-  } else {
-    LOG(RSSD_LOG,LOG_ERR, "Didn't find valid blocking serial port file descriptor\n");
+  // Set other control options for "raw" mode
+  tty.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG); // Non-canonical input, disable echo
+  tty.c_oflag &= ~OPOST; // Raw output
+
+  // Enable receiver and ignore modem control lines
+  tty.c_cflag |= (CREAD | CLOCAL);
+
+  // Set timeout for read operations
+  // VMIN = 0, VTIME > 0 for a read timeout
+  // In this case, 1 second (10 * 0.1s) timeout.
+  tty.c_cc[VMIN] = 0;
+  tty.c_cc[VTIME] = 10;
+
+  // Below resets the open with O_NONBLOCK
+  //fcntl(fd, F_SETFL, 0);
+  
+  // Write the modified settings
+  if (tcsetattr(_RS485_fds, TCSANOW, &tty) != 0) {
+    LOG(RSSD_LOG,LOG_ERR,"Error %i from tcsetattr: %s\n", errno, strerror(errno));
+    return -1;
   }
+
+  // Clear out buffer
+  if (tcflush(_RS485_fds, TCIFLUSH) == -1) {
+    LOG(RSSD_LOG,LOG_ERR,"Error %i from tcflush: %s\n", errno, strerror(errno));
+  }
+
+  return _RS485_fds;
 }
+
 /* close tty port */
-void close_serial_port(int fd)
+void _close_serial_port(int fd)
 {
   if ( fcntl(fd, F_GETFD, 0) == -1 || errno == EBADF ) {
     // Looks like bad fd or already closed. return with no error since we can get called twice
@@ -686,14 +605,23 @@ void close_serial_port(int fd)
   }
 
   unlock_port(fd);
-  tcsetattr(fd, TCSANOW, &_oldtio);
   close(fd);
   LOG(RSSD_LOG,LOG_DEBUG_SERIAL, "Closed serial port\n");
 }
 
-bool serial_blockingmode()
+// Can pass NULL for serialport
+void close_serial_port(int port)
 {
-  return _blocking_mode;
+  if (port >= 0) {
+    _close_serial_port(port);
+  } else {
+    if (_RS485_fds < 0) {
+      LOG(RSSD_LOG,LOG_ERR, "Didn't find valid serial port file descriptor to close\n");
+      return;
+    }
+    LOG(RSSD_LOG,LOG_NOTICE, "Closing serial port\n");
+    _close_serial_port(_RS485_fds);
+  }
 }
 
 
@@ -890,7 +818,7 @@ void send_packet(int fd, unsigned char *packet, int length)
 
   clock_gettime(CLOCK_REALTIME, &now);
 
-  if (_blocking_mode) {
+  if (true) {
     //int nwrite = write(fd, packet, length);
     //LOG(RSSD_LOG,LOG_DEBUG, "Serial write %d bytes of %d\n",nwrite,length);
     int nwrite = write(fd, packet, length);
@@ -945,8 +873,7 @@ void send_packet(int fd, unsigned char *packet, int length)
 #ifndef SERIAL_LOGGER
   if (_aqconfig_.frame_delay > 0) {
     timespec_subtract(&elapsed_time, &now, &_last_serial_read_time);
-    LOG(RSTM_LOG, LOG_DEBUG, "Time from recv to %s send is %.3f sec\n",
-                            (_blocking_mode?"blocking":"non-blocking"), 
+    LOG(RSTM_LOG, LOG_DEBUG, "Time from recv to send is %.3f sec\n",
                             roundf3(timespec2float(&elapsed_time)));
   }
 #endif
@@ -1144,6 +1071,14 @@ int fix_packet(unsigned char *packet_buffer, int packet_length, bool getCached) 
 
 #endif
 
+
+
+/*
+LXi status | HEX: 0x10|0x02|0x00|0x0d|0x00|0x00|0x00|0x1f|0x10|0x03|
+             HEX: 0x10|0x02|0x00|0x0a|0x00|0x00|0x00|0x1f|0x10|0x03| // New read seems to use 0x0a and not 0x0d
+*/
+
+
 int get_packet(int fd, unsigned char* packet)
 {
   unsigned char byte = 0x00;
@@ -1161,46 +1096,48 @@ int get_packet(int fd, unsigned char* packet)
   struct timespec packet_elapsed;
   struct timespec packet_end_time;
 
+  int wait_val;
+  struct timeval read_tv;
+  read_tv.tv_sec = SERIAL_READ_TIMEOUT_SEC;  // 1-second timeout
+  read_tv.tv_usec = 0;
+
   memset(packet, 0, AQ_MAXPKTLEN);
 
-#ifdef DUMMY_READER
-  static bool haveFixedPacket = false;
-  if (haveFixedPacket) {
-    haveFixedPacket = false;
-    int rtn = fix_packet(packet, AQ_MAXPKTLEN, true);
-    if (rtn > 0) {
-      LOG(RSSD_LOG,LOG_DEBUG, "RETURNING PART 2 OF FIXED PACKET:\n");
-      return rtn;
-    }
-  }
-#endif
   // Read packet in byte order below
   // DLE STX ........ ETX DLE
   // sometimes we get ETX DLE and no start, so for now just ignoring that.  Seem to be more applicable when busy RS485 traffic
 
-//#ifndef OLD_SERIAL_INIT .. Need to re-do ERROR like EAGAIN with new init
-
-
   while (!endOfPacket) {
-//printf("READ SERIAL\n");
+    fd_set readfds;
+    FD_ZERO(&readfds);
+    FD_SET(fd, &readfds);
+    // Wait for up to read_tv.tv_sec second for data to become available
+    wait_val = select(fd + 1, &readfds, NULL, NULL, &read_tv);
+    if (wait_val == -1) {
+      return AQSERR_READ;
+    } else if (wait_val == 0) {
+      //return AQSERR_TIMEOUT;
+      return 0; // Should probably change to above
+    }
+
     bytesRead = read(fd, &byte, 1);
-//printf("Read %d 0x%02hhx err=%d fd=%d\n",bytesRead,byte,errno,fd);
-    //if (bytesRead < 0 && errno == EAGAIN && packetStarted == FALSE && lastByteDLE == FALSE) {
-    //if (bytesRead < 0 && (errno == EAGAIN || errno == 0) && 
-    if (bytesRead <= 0 && (errno == EAGAIN || errno == 0 || errno == ENOTTY) ) { // We also get ENOTTY on some non FTDI adapters
-      if (_blocking_mode) {
-         // Something is wrong wrong
-        return AQSERR_TIMEOUT;
-      } else if (jandyPacketStarted == false && pentairPacketStarted == false && lastByteDLE == false) {
-          // We just have nothing else to read
+
+    if (bytesRead <= 0 && errno == EAGAIN ) { // We also get ENOTTY on some non FTDI adapters
+      if (jandyPacketStarted == false && pentairPacketStarted == false && lastByteDLE == false) {
         return 0;
-      } else if (++retry > 120 ) {
+      } else if (++retry > 10 ) {
         LOG(RSSD_LOG,LOG_WARNING, "Serial read timeout\n");
-          //log_packet(LOG_WARNING, "Bad receive packet ", packet, index);
         if (index > 0) { logPacketError(packet, index); }
-        return AQSERR_TIMEOUT;
+        return AQSERR_READ;
+      } else {
+        continue;
       }
-      delay(1);
+    } else if(bytesRead <= 0) {
+      if (! isAqualinkDStopping() ) {
+        return AQSERR_READ;
+      } else {
+        return 0;
+      }
     } else if (bytesRead == 1) {
       retry = 0;
       if (_aqconfig_.log_raw_bytes)
@@ -1283,20 +1220,6 @@ int get_packet(int fd, unsigned char* packet)
         else if (byte != PP1) // Don't reset counter if multiple PP1's
           PentairPreCnt = 0;
       }
-    } else if(bytesRead < 0) {
-      // Got a read error. Wait one millisecond for the next byte to
-      // arrive.
-      if (! isAqualinkDStopping() ) {
-        LOG(RSSD_LOG,LOG_WARNING, "Read error: %d - %s\n", errno, strerror(errno));
-        if(errno == 9) {
-        // Bad file descriptor. Port has been disconnected for some reason.
-        // Return a -1.
-          return AQSERR_READ;
-        }
-        delay(100);
-      } else {
-        return 0;
-      }
     }
 
     // Break out of the loop if we exceed maximum packet
@@ -1309,7 +1232,6 @@ int get_packet(int fd, unsigned char* packet)
       break;
     }
   }
-  
 
   // Report any unusual size packets.
   if (index >= AQ_MAXPKTLEN_WARNING) {
@@ -1385,19 +1307,6 @@ int get_packet(int fd, unsigned char* packet)
   // Return the packet length.
   return index;
 }
-
-
-
-#else // PLAYBACKMODE
-
-// Need to re-write this if we ever use playback mode again.  Pull info from aq_serial.old.c
-
-
-#endif
-
-
-
-
 
 
 

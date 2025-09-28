@@ -104,7 +104,7 @@ bool isAqualinkDStopping() {
 void intHandler(int sig_num)
 {
   if (sig_num == SIGRUPGRADE) {
-    if (! run_aqualinkd_upgrade(false)) {
+    if (! run_aqualinkd_upgrade(_aqualink_data.updatetype)) {
       LOG(AQUA_LOG,LOG_ERR, "AqualinkD upgrade failed!\n");
     }
     return; // Let the upgrade process terminate us.
@@ -132,20 +132,9 @@ void intHandler(int sig_num)
   //LOG(AQUA_LOG,LOG_NOTICE, "Stopping!\n");
   //if (dummy){}// stop compile warnings
 
-  // In blocking mode, die as cleanly as possible.
-#ifdef AQ_NO_THREAD_NETSERVICE
-  if (_aqconfig_.rs_poll_speed < 0) {
-    stopPacketLogger();
-    // This should force port to close and do somewhat gracefull exit.
-    close_blocking_serial_port();
-    //exit(-1);
-  }
-#else
   stopPacketLogger();
-  // This should force port to close and do somewhat gracefull exit.
-  if (serial_blockingmode())
-    close_blocking_serial_port();
-#endif
+  close_serial_port(-1);
+
 }
 
 bool isVirtualButtonEnabled() {
@@ -941,7 +930,7 @@ void main_loop()
   bool got_probe_extended = false;
   bool got_probe_rssa = false;
   bool print_once = false;
-  int blank_read_reconnect = MAX_ZERO_READ_BEFORE_RECONNECT_BLOCKING; // Will get reset if non blocking
+  int blank_read_reconnect = MAX_ZERO_READ_BEFORE_RECONNECT; // Will get reset if non blocking
   bool auto_config_complete = true;
 
 
@@ -1037,7 +1026,7 @@ void main_loop()
 
   if (!start_net_services(&_aqualink_data))
   {
-    LOG(AQUA_LOG,LOG_ERR, "Can not start webserver on port %s.\n", _aqconfig_.socket_port);
+    LOG(AQUA_LOG,LOG_ERR, "Can not start webserver at address %s.\n", _aqconfig_.listen_address);
     exit(EXIT_FAILURE);
   }
 
@@ -1047,28 +1036,12 @@ void main_loop()
 
   rs_fd = init_serial_port(_aqconfig_.serial_port);
 
-  /*
-  if (rs_fd == -1) {
-    LOG(AQUA_LOG,LOG_ERR, "Error Aqualink setting serial port: %s\n", _aqconfig_.serial_port);
-    //_aqualink_data.panelstatus = SERIAL_ERROR;
-    AddAQDstatusMask(ERROR_SERIAL);
-    _aqualink_data.updated = true;
-#ifndef AQ_CONTAINER    
-    exit(EXIT_FAILURE);
-#endif 
-  } else {
-    //AddAQDstatusMask(CHECKING_CONFIG);
-  }
-*/
   if (is_valid_port(rs_fd)) {
     LOG(AQUA_LOG,LOG_NOTICE, "Listening to Aqualink %s on serial port: %s\n", getPanelString(), _aqconfig_.serial_port);
   } else {
-    LOG(AQUA_LOG,LOG_ERR, "Error Aqualink bad serial port: %s\n", _aqconfig_.serial_port);
+    LOG(AQUA_LOG,LOG_ERR, "Bad serial port: %s\n", _aqconfig_.serial_port);
     AddAQDstatusMask(ERROR_SERIAL);
   }
-
-  if (!serial_blockingmode())
-    blank_read_reconnect = MAX_ZERO_READ_BEFORE_RECONNECT_NONBLOCKING;
 
 #ifdef AQ_PDA
   if (isPDA_PANEL) {
@@ -1207,15 +1180,7 @@ void main_loop()
 
     else if (packet_length <= 0) {
       blank_read++;
-#ifdef AQ_NO_THREAD_NETSERVICE
-      if (_aqconfig_.rs_poll_speed < 0)
-        LOG(AQUA_LOG,LOG_DEBUG, "Blank RS485 read\n");
-      else
-        delay(2);
-#else
-      if (serial_blockingmode())
-        LOG(AQUA_LOG,LOG_DEBUG, "Blank RS485 read\n");
-#endif
+      LOG(AQUA_LOG,LOG_DEBUG, "Blank RS485 read\n");
     }
     else if (packet_length > 0) {
       blank_read = 0;
@@ -1306,10 +1271,6 @@ void main_loop()
   LOG(AQUA_LOG,LOG_NOTICE, "Starting communication with Control Panel\n");
 
   // Not the best way to do this, but ok for moment
-#ifdef AQ_NO_THREAD_NETSERVICE
-  if (_aqconfig_.rs_poll_speed == 0)
-    blank_read_reconnect = blank_read_reconnect * 50;
-#endif
 
   //int loopnum=0;
   blank_read = 0;
@@ -1331,10 +1292,6 @@ void main_loop()
         //broadcast_aqualinkstate_error(CONNECTION_ERROR);
         broadcast_aqualinkstate_error(getAqualinkDStatusMessage(&_aqualink_data));
         sleep(10);
-#ifdef AQ_NO_THREAD_NETSERVICE
-        poll_net_services(1000);
-        poll_net_services(3000);
-#endif
         // broadcast_aqualinkstate_error(mgr.active_connections, "No connection to RS control panel");
       }
       else
@@ -1368,29 +1325,25 @@ void main_loop()
     }
 #endif
 
+
     packet_length = get_packet(rs_fd, packet_buffer);
 
-    if (packet_length <= 0)
+    if (packet_length <= 0 && _keepRunning)
     {
-      
       // AQSERR_2SMALL // no reset (-5)
       // AQSERR_2LARGE // no reset (-4)
       // AQSERR_CHKSUM // no reset (-3)
       // AQSERR_TIMEOUT // reset blocking mode (-2)
-      // AQSERR_READ // reset (-1)
-      
-#ifdef AQ_NO_THREAD_NETSERVICE
-      if (_aqconfig_.rs_poll_speed < 0) {
-#else
-      if (serial_blockingmode() && (packet_length == AQSERR_READ || packet_length == AQSERR_TIMEOUT) ) {
-#endif
-        LOG(AQUA_LOG,LOG_ERR, "Nothing read on blocking serial port\n");
-        blank_read = blank_read_reconnect;
+      // AQSERR_READ // reset (-1)   
+      if (packet_length == AQSERR_TIMEOUT) {
+        LOG(AQUA_LOG,LOG_WARNING, "Timeout read on serial port\n");
+        //blank_read = blank_read_reconnect;
       } else if (packet_length == AQSERR_READ) {
+        LOG(AQUA_LOG,LOG_ERR, "Error read on serial port, resetting\n");
         blank_read = blank_read_reconnect;
       } else {
         // In non blocking, so sleep for 2 milliseconds
-        delay(NONBLOCKING_SERIAL_DELAY);
+        LOG(AQUA_LOG,LOG_WARNING, "Nothing read on serial port\n");
       }
       //if (blank_read > max_blank_read) {
       //  LOG(AQUA_LOG,LOG_NOTICE, "Nothing read on serial %d\n",blank_read);
@@ -1495,19 +1448,7 @@ void main_loop()
       } else {
         DEBUG_TIMER_CLEAR(_rs_packet_timer); // Clear timer, no need to print anything
       }
-
-#ifdef AQ_NO_THREAD_NETSERVICE
-      if (_aqualink_data.updated) {
-        broadcast_aqualinkstate();
-      }
-#endif
     }
-
-#ifdef AQ_NO_THREAD_NETSERVICE
-    poll_net_services(packet_length>0?0:_aqconfig_.rs_poll_speed); // Don;t wait if we read something.
-#endif
-   // NSF might want to wait if we are on a non blocking serial port.
-
     // Any unactioned commands
     if (_aqualink_data.unactioned.type != NO_ACTION)
     {

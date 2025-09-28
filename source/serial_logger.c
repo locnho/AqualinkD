@@ -42,7 +42,7 @@
 #define PACKET_MAX 1200
 #define PROBE_CYCLES 2
 
-#define VERSION "serial_logger V2.10"
+#define VERSION "serial_logger V2.11"
 
 /*
 typedef enum used {
@@ -553,7 +553,6 @@ int main(int argc, char *argv[]) {
   int logLevel = LOG_NOTICE;
   bool panleProbe = true;
   bool rsSerialSpeedTest = false;
-  bool serialBlocking = true;
   bool errorMonitor = false;
   bool printAllIDs = false;
   bool timePackets = false;
@@ -626,7 +625,6 @@ int main(int argc, char *argv[]) {
       panleProbe = false;
     } else if (strcmp(argv[i], "-s") == 0) {
       rsSerialSpeedTest = true;
-      serialBlocking = false;
     } else if (strcmp(argv[i], "-e") == 0) {
       errorMonitor = true;
     } else if (strcmp(argv[i], "-a") == 0) {
@@ -651,11 +649,7 @@ int main(int argc, char *argv[]) {
       return -1;
     }
   } else {
-    if (!serialBlocking)
-      rs_fd = init_serial_port(argv[1]);
-    else
-      rs_fd = init_blocking_serial_port(argv[1]);
-
+    rs_fd = init_serial_port(argv[1]);
     if (rs_fd < 0)  {
       LOG(SLOG_LOG, LOG_ERR, "Unable to open port: %s\n", argv[1]);
       displayLastSystemError(argv[1]);

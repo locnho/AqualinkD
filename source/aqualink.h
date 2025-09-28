@@ -17,26 +17,14 @@
 #define SIGRESTART SIGUSR1
 #define SIGRUPGRADE SIGUSR2
 
-#ifdef AQ_NO_THREAD_NETSERVICE
-  #define DEFAULT_POLL_SPEED -1
-  #define DEFAULT_POLL_SPEED_NON_THREADDED 2
-#endif
-
-
 #define CLIGHT_PANEL_FIX // Overcome bug in some jandy panels where color light status of on is not in LED status
 
 #define TIME_CHECK_INTERVAL  3600
 //#define TIME_CHECK_INTERVAL  100 // DEBUG ONLY
 #define ACCEPTABLE_TIME_DIFF 120
 
-// Use these settings to test time
-//#define TIME_CHECK_INTERVAL  100
-//#define ACCEPTABLE_TIME_DIFF 10
 
-#define MAX_ZERO_READ_BEFORE_RECONNECT_NONBLOCKING 100000 // 10k normally
-#define MAX_ZERO_READ_BEFORE_RECONNECT_BLOCKING (25 / (SERIAL_BLOCKING_TIME / 10) ) // Want this to be 25 seconds, so it's depdand on how long the serial blocking is
-// Time in ms to delay between read requests in non blocking serial port.  Have to set something to stop CPU spiking.
-#define NONBLOCKING_SERIAL_DELAY 2
+#define MAX_ZERO_READ_BEFORE_RECONNECT 10
 
 // The below will change state of devices before that are actually set on the control panel, this helps
 // with duplicate messages that come in quick succession that can catch the state before it happens.
@@ -117,7 +105,6 @@ typedef struct aqualinkkey
 //#endif
   unsigned char code;
   unsigned char rssd_code;
-  int dz_idx;
   uint8_t special_mask;
   void *special_mask_ptr;
 } aqkey;
@@ -257,6 +244,12 @@ typedef enum panel_vsp_status
 #define ERROR_NO_DEVICE_ID  ( 1 << 8 )                    // maybe covered in NOT_CONNECTED
 #define ERROR_SERIAL        ( 1 << 9 )
 
+
+
+#define INSTALLDEVRELEASE  ( 1 << 0 )
+#define UPDATERELEASE      ( 1 << 1 )
+#define CHECKONLY          ( 1 << 3 )
+
 typedef struct pumpd
 {
   int rpm;
@@ -304,19 +297,18 @@ typedef enum {
   MD_HEATPUMP
 } heatmump_mode;
 */
-typedef struct vbuttond
+typedef struct altlabeld
 {
   char *altlabel;
   bool in_alt_mode;  // Example if altlabel="chiller", if last seen was chiller message this is true. 
   //heatmump_mode chiller_mode;
   // Add any other special params for virtual button
-} vbutton_detail;
+} altlabel_detail;
 
 typedef enum {
   NET_MQTT=0, 
   NET_API, 
-  NET_WS, 
-  NET_DZMQTT,
+  NET_WS,
   NET_TIMER,       // Timer or Scheduler (eg poweron/freezeprotect check)
   UNACTION_TIMER
 } request_source;
@@ -343,7 +335,7 @@ struct aqualinkdata
   uint16_t status_mask;
   char version[AQ_MSGLEN*2]; // Will be replaced by below in future
   char revision[AQ_MSGLEN]; // Will be replaced by below in future
-  
+  uint8_t updatetype;
   // The below 4 are set (sometimes) but not used yet
   char panel_rev[AQ_MSGLEN];    // From panel
   char panel_cpu[AQ_MSGLEN];    // From panel

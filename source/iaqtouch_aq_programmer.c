@@ -512,7 +512,7 @@ void *set_aqualink_iaqtouch_device_on_off( void *ptr )
   button = iaqtFindButtonByLabel(aq_data->aqbuttons[device].label);
   
   if (button == NULL && isVBUTTON_ALTLABEL(aq_data->aqbuttons[device].special_mask) ) { // Try alt button name
-    button = iaqtFindButtonByLabel(((vbutton_detail *)aq_data->aqbuttons[device].special_mask_ptr)->altlabel);
+    button = iaqtFindButtonByLabel(((altlabel_detail *)aq_data->aqbuttons[device].special_mask_ptr)->altlabel);
   }
 
   if (button == NULL) {
@@ -523,7 +523,7 @@ void *set_aqualink_iaqtouch_device_on_off( void *ptr )
     button = iaqtFindButtonByLabel(aq_data->aqbuttons[device].label);
 
     if (button == NULL && isVBUTTON_ALTLABEL(aq_data->aqbuttons[device].special_mask) ) { // Try alt button name
-      button = iaqtFindButtonByLabel(((vbutton_detail *)aq_data->aqbuttons[device].special_mask_ptr)->altlabel);
+      button = iaqtFindButtonByLabel(((altlabel_detail *)aq_data->aqbuttons[device].special_mask_ptr)->altlabel);
     }
  
   // If not found see if page has next

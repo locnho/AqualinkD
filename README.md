@@ -136,10 +136,30 @@ NEED TO FIX FOR THIS RELEASE.
 * Use set_allbutton_light_dimmer for all lights (ie color lights)
 
 -->
-# Updates in 2.6.12 (dev)
-* Reading TruSense. (Jandy protocols working, need to finish off read_RS485_TruSense support)
-* ToDo assigning light mode & functionality to a vbutton (for JAndy Infinate water color support)
+# Updates in 3.0.0 (dev)
+* Serial optimization for HAT.
+* upgraded network library ( HTTP(S), MQTT(S), WS )
+* Added options to force upgrades in aqmanager. (add ?upgrade or ?devupgrade to url to enable upgrade button)
+* MQTT Discovery for all supporting hubs (HomeAssistant Domoticz Hubitat OpenHAB etc)
+* Moved Domoticz support over to MQTT autodiscovery.
+* Change tile color & label for ph / orp & ppm tiles when values are out of optimal range.
+* Add mV as the UOM for ORP tile.
+* Fixed bug with sensor UOM.
+* UI code cleanup.
+* Included program advance to AqualinkD programmable light mode. (lot quicker for lights that remember state)
 
+* Need to finish off :-
+  * HAT serial optimizations broke some USB serial adapters
+  * Reading TruSense. (Jandy protocols working, need to finish off read_RS485_TruSense support) 
+  * Finish off assigning light mode & functionality to a vbutton (for Jandy Infinite water color support )
+  * cleanup rs_msg_utils.c
+  *  -D AQ_MANAGER.  reset default to on, not off
+  * With aqmanager is packet_logger still valid? (maybe for raw, but it's not been used in years)
+  * Get panel size and clean up the ap_panel code around config size/type and reported size/type
+  * WebUI Config in aqmanager.
+  * button pre-state was for domotics, delete
+
+  
 # Updates in 2.6.11 (Sept 14 2025)
 * Cleaned up exit codes.
 * Fixed delay in shutting down when no data received on RS485

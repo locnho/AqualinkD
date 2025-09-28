@@ -51,6 +51,10 @@
       --tile_on_text: #000;
       --tile_status_text: rgb(87, 87, 87);
 
+      --value_tile_normal_color: rgb(4, 159, 248);
+      --value_tile_attention_color:  rgb(255, 187, 0);
+      --value_tile_outofrange_color:  rgb(255, 123, 0);
+
       --options_radio_ball: 20px;
       --options_radio_highlight: #2196F3;
       --options_radio_lowlight: #d3d3d3;
@@ -346,6 +350,28 @@
       color: rgb(220, 220, 220);
     }
 
+    .rangeoptimal {
+     /*background-color: rgb(255, 123, 0);*/
+      background-color: var(--value_tile_normal_color);
+      color: rgb(255, 255, 255);
+    }
+
+    .rangewarning {
+     /*background-color: rgb(255, 187, 0);*/
+      background-color: var(--value_tile_attention_color);
+      color: rgb(255, 255, 255);
+    }
+
+    .rangecritical {
+      /*background-color: rgb(255, 123, 0);*/
+      background-color: var(--value_tile_outofrange_color);   
+      color: rgb(255, 255, 255);
+    }
+
+    .uom_text {
+      font-size: 75%;
+    }
+
     /* All for options panel */
 
     .option_switch {
@@ -587,6 +613,7 @@
 
   <script type='text/javascript'>
     //'use strict';
+    
     var _lightProgramDropdown = false;
     var _pressEvent;
     var _ignoreMouseEvent = false;
@@ -595,9 +622,16 @@
     var _landscape = false;
     var _displayNames = [];
     var _scheduler_devices_json= [];
+    var _tile_line_char_limit = 0;
 
 
-    var _swgALLStatus = {
+    if (typeof config_js === 'undefined') {
+      console.log("Looks like you have a bad config.js file");
+      // Maybe not alert,  But try to post to aqualinkd ERROR.
+    }
+
+    // If swgStatus was defined in config.js, use it, else create our own
+    const _swgStatus = (typeof swgStatus !== 'undefined')? swgStatus : {
           0: "On",
           1: "No flow",
           2: "Low salt",
@@ -613,22 +647,25 @@
         255: "Off"
     }
 
-    if (typeof show_vsp_gpm !== 'undefined' && show_vsp_gpm == false)
-      var _show_vsp_gpm=false;
-    else
-      var _show_vsp_gpm=true;
-
-    if (typeof link_spa_and_spa_heater !== 'undefined' && link_spa_and_spa_heater == true)
-      var _link_spa_and_heater=true;
-    else
-      var _link_spa_and_heater=false;
-
-    // If swgStatus was defined in config.js, use it, else create our own
-    if (typeof swgStatus !== 'undefined') {
-      var _swgStatus = swgStatus;
-    } else {
-      var _swgStatus = _swgALLStatus
+    // If tile_thresholds was defined in config.js, use it, else create our own
+    const _tile_thresholds = (typeof tile_thresholds !== 'undefined') ? tile_thresholds:{
+        "SWG/PPM": {
+          outofrange: {min: 2600, max: 3500},
+          attention: {min: 2700, max: 3400}
+        },
+        "CHEM/pH": {
+          outofrange: {min: 7, max: 8},
+          attention: {min: 7.2, max: 7.8}
+        },
+        "CHEM/ORP": {
+          outofrange: {min: 560, max: 900},
+          attention: {min: 650, max: 850}
+        }
     }
+
+    const _turn_off_sensortiles = (typeof turn_off_sensortiles !== 'undefined') ? turn_off_sensortiles : false;
+    const _show_vsp_gpm = (typeof show_vsp_gpm !== 'undefined') ? show_vsp_gpm : true;
+    const _link_spa_and_heater = (typeof link_spa_and_spa_heater !== 'undefined') ? link_spa_and_spa_heater : false;
 
     function init() {
       setSizeSpecifics();
@@ -673,6 +710,8 @@
       } else {
         //console.log("The code is not running inside an iframe.");
       }
+
+      console.log("Tile width "+window.getComputedStyle(document.documentElement).getPropertyValue('--tile-width'));
     }
 
     function populateLightProgram(type=0, current_mode="") {
@@ -701,6 +740,7 @@
         var html2 = '';
         var fLen = light_program.length;
         var i;
+        var selected = "";
         for (i = 0; i < fLen; i++) {
           selected = "";
           if (current_mode != "" && light_program[i].startsWith(current_mode)) {
@@ -747,6 +787,10 @@
       setProp("tile_on_background");
       setProp("tile_on_text");
       setProp("tile_status_text");
+
+      setProp("value_tile_normal_color");
+      setProp("value_tile_outofrange_color");
+      setProp("value_tile_attention_color");
     }
 
     function setSizeSpecifics() {
@@ -773,6 +817,9 @@
       /*
         Future change element sizes here if needed
       */
+      _tile_line_char_limit = getComputedStyle(document.documentElement).getPropertyValue('--tile_name-charlimit');
+
+
       window.addEventListener("orientationchange", function() {
         var w = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
         var h = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
@@ -922,17 +969,18 @@
              valdiv.textContent = '--';
              subdiv.appendChild(valdiv);
            } */
-      title_subdiv = document.createElement('div');
+      var title_subdiv = document.createElement('div');
       title_subdiv.setAttribute('class', 'tile_name');
       title_subdiv.setAttribute('id', id + '_name');
-      title_subdiv.textContent = name;
+      title_subdiv.textContent = cutContentTextLength(name, 2);
       div.appendChild(title_subdiv);
       // Value and Thermostat are the same, but value is read only and no state
-      if (type != "value") {
+      //if (type != "value") {
+      {
         // Add extra status line to VSP if we can
         if (subtype == "switch_vsp") {
-          var title1linechatlimit = getComputedStyle(document.documentElement).getPropertyValue('--tile_name-charlimit');
-          if ( name.length <= title1linechatlimit ) {
+          //var title1linechatlimit = getComputedStyle(document.documentElement).getPropertyValue('--tile_name-charlimit');
+          if ( name.length <= _tile_line_char_limit ) {
             subdiv = document.createElement('div');
             subdiv.setAttribute('class', 'tile_status');
             subdiv.setAttribute('id', id + '_status_line2');
@@ -944,7 +992,9 @@
         subdiv = document.createElement('div');
         subdiv.setAttribute('class', 'tile_status');
         subdiv.setAttribute('id', id + '_status');
-        subdiv.textContent = formatSatus(status);
+        if (type != 'value') {
+          subdiv.textContent = formatSatus(status);
+        }
         div.appendChild(subdiv);
         if (type == "switch" && (subtype != "switch_program" && subtype != "switch_vsp" && 
                                 subtype != "switch_timer" && subtype != "light_dimmer") ) {
@@ -957,6 +1007,40 @@
         }
       }
       document.getElementById('wrapper').appendChild(div);
+    }
+
+    function cutContentTextLength(text, lines) {
+      //var title1linechatlimit = getComputedStyle(document.documentElement).getPropertyValue('--tile_name-charlimit');
+      // 12 or 15.
+      if ( countLines(text, _tile_line_char_limit-1 ) > lines ) {
+        console.log ("Text '"+text+"' will take 3+ lines");
+        text = text.replace(/\bChemistry\b/, "Chem");
+        console.log ("new Text '"+text+"'");
+      }
+      return text
+    }
+
+    function countLines(text, limit = 15) {
+      const words = text.split(/\s+/);  // split on spaces (multiple OK)
+      let lines = 1;
+      let currentLen = 0;
+
+      for (const word of words) {
+        if (word.length === 0) continue; // skip empty strings
+
+        if (currentLen === 0) {
+      // first word on the line
+          currentLen = word.length;
+        } else if (currentLen + 1 + word.length <= limit) {
+      // add word + 1 space
+          currentLen += 1 + word.length;
+        } else {
+      // new line
+          lines++;
+          currentLen = word.length;
+        }
+      }
+      return lines;
     }
 
     function switchTileState(id, details) {
@@ -1024,6 +1108,7 @@
     function setTileValue(id, value) {
       var ext = '';
       var type = null;
+//console.log("setTileValue "+id+" "+value);
       try {
         type = document.getElementById(id).getAttribute('type');
 
@@ -1037,19 +1122,26 @@
               ext = '&deg;';
             else if (type == 'setpoint_swg')
               ext = '%';
+            else if (type == 'value' && id == 'CHEM/ORP')
+              ext = '<span class="uom_text">mV</span>';
+            //else if (type == 'value' && id == 'CHEM/pH')
+            //  ext = '<span class="uom_text">pH</span>';
           }
         }
 
-        if ((type == 'temperature' || type == 'value') && turn_on_sensortiles == true) {
+        if ((type == 'temperature' || type == 'value') && _turn_off_sensortiles == false) {
           // Anything specific (SWG PPM should be off if SWG is off)
           // This needs a try catch, or is above try block good enough?
-          if (id == 'SWG/PPM' && document.getElementById('SWG').getAttribute('status') != 'on' )
+          if (id == 'SWG/PPM' && document.getElementById('SWG').getAttribute('status') != 'on' ) {
             setTileOn(id, 'off');
+            setTileOnText(id, "");
           // Generic for all.
-          else if (value == 0 || value == '--')
+           } else if (value == 0 || value == '--') {
             setTileOn(id, 'off');
-          else
-            setTileOn(id, 'on');
+            setTileOnText(id, "");
+          } else {
+            setTileThresholds(id, value)
+          }
         }
       } catch (e) {
           // Devices that are hidden are not found
@@ -1061,19 +1153,60 @@
         tile.innerHTML = value + ext;
     }
 
+    function setTileThresholds(id, value) {
+      const thresholds = _tile_thresholds[id];
+
+      if (!thresholds) {
+        // No thresholds defined for this tile
+        setTileOn(id, 'on');
+        setTileOnText(id, '');
+        return;
+      }
+
+      let status = 'on';
+      let text = '';
+
+      if (value <= thresholds.outofrange.min || value >= thresholds.outofrange.max) {
+        status = 'rangecritical';
+        if ( value <= thresholds.outofrange.min && thresholds.outofrange.mintext != null)
+          text = thresholds.outofrange.mintext;
+        else if ( value >= thresholds.outofrange.max && thresholds.outofrange.maxtext != null)
+          text = thresholds.outofrange.maxtext;
+        else
+          text = 'Out of range';
+      } else if (value <= thresholds.attention.min || value >= thresholds.attention.max) {
+        status = 'rangewarning';
+        if ( value <= thresholds.attention.min && thresholds.attention.mintext != null)
+          text = thresholds.attention.mintext;
+        else if ( value >= thresholds.attention.max && thresholds.attention.maxtext != null)
+          text = thresholds.attention.maxtext;
+        else if (_tile_line_char_limit < 15)
+          text = 'Attention';
+        else
+          text = 'Needs attention';
+      }
+
+      setTileOn(id, status);
+      setTileOnText(id, text);
+    }
+
     function setTileUOM(id, uom) {
       try {
         type = document.getElementById(id).setAttribute('UOM', uom);
-        console.log("Set UOM to "+uom+" for "+id);
+        //console.log("Set UOM to "+uom+" for "+id);
       } catch (e) {}
     }
 
     function setTileOnText(id, text) {
+      //console.log("setTileOnText() "+id+" "+text);
       try {
         var tile = document.getElementById(id);
         if (tile.getAttribute('status') == 'on' || tile.getAttribute('status') == 'enabled') {
           document.getElementById(id + '_status').innerHTML = text;
+        } else if (tile.getAttribute('status') == 'rangeoptimal' || tile.getAttribute('status') == 'rangewarning' || tile.getAttribute('status') == 'rangecritical') {
+          document.getElementById(id + '_status').innerHTML = text;
         } else {
+          //document.getElementById(id + '_status').innerHTML = text;
           //console.log("Tile "+id+" status is '"+document.getElementById(id).getAttribute('status')+"' not setting text to '"+text+"'");
         }
       } catch(exception) {}
@@ -1158,7 +1291,7 @@
 
 
     function setTileOn(id, status) {
-      //console.log("setTileOn "+id+ " "+status);
+  //console.log("setTileOn "+id+ " "+status);
       var tile;
       var text;
       if ((tile = document.getElementById(id)) == null) {
@@ -1166,7 +1299,8 @@
         return;
       }
       // Display is a special status to "brighten up" sensor values. 
-      if (status != "on" && status != "off" && status != "enabled" && status != "flash") {
+      if (status != "on" && status != "off" && status != "enabled" && status != "flash" 
+                         && status != "rangecritical" && status != "rangewarning" && status != "rangeoptimal") {
         if (status == "unknown") {
           status = "off"; // Just set it off for the moment
         } else {
@@ -1240,13 +1374,48 @@
         text = "Off";
       }
 
-      try {
-        document.getElementById(id + '_status').innerHTML = text;
-        // Clear line 2 status if we have it.
-        document.getElementById(id + '_status_line2').innerHTML = "";
-      } catch (e) {} 
-      var tile_icon = document.getElementById(id + '_tile_icon_value');
       type = tile.getAttribute('type');
+      try {
+        if (type != "value" && type != "temperature") {
+          //console.log("Set Text "+id+" "+" - "+type+" "+text);
+          document.getElementById(id + '_status').innerHTML = text;
+          // Clear line 2 status if we have it.
+          document.getElementById(id + '_status_line2').innerHTML = "";
+        } else if ( status == "off" (type == "value" || type == "temperature") ) {
+          document.getElementById(id + '_status').innerHTML = "";
+          document.getElementById(id + '_status_line2').innerHTML = "";
+        }
+      } catch (e) {}
+
+      if (status != null) {
+        if (status == 'enabled' || status == 'flash') {
+          setTileIconClassList(id, "enabled");
+        } else if (status == 'off') {
+          setTileIconClassList(id, "disabled");
+        } else if (status == 'on' && type == 'setpoint_thermo') {
+          setTileIconClassList(id, "heat");
+        } else if (status == 'on' && type == 'setpoint_chiller') {
+          var tile_icon = document.getElementById(id + '_tile_icon_value');
+          if ( tile_icon.parentElement.parentElement.getAttribute("mode") == "heat" ) {
+            setTileIconClassList(id, "heat");
+          } else {
+            setTileIconClassList(id, "cool");
+          }
+        } else if (status == 'on') {
+          if (type == 'value') {
+            setTileIconClassList(id, "rangeoptimal");
+          }else{
+            setTileIconClassList(id, "cool");
+          }
+        } else if (status == 'rangecritical') {
+          setTileIconClassList(id, "rangecritical");
+        } else if (status == 'rangewarning') {
+          setTileIconClassList(id, "rangewarning");
+        }
+      }
+/*
+      var tile_icon = document.getElementById(id + '_tile_icon_value');
+      
       if (status != null && tile_icon != null) {
         if (status == 'enabled' || status == 'flash') {
           tile_icon.classList.add("enabled");
@@ -1258,6 +1427,8 @@
           tile_icon.classList.add("disabled");
           tile_icon.classList.remove("cool");
           tile_icon.classList.remove("heat");
+          tile_icon.classList.remove("outofrange");
+          tile_icon.classList.remove("attention");
         //} else if (status == 'on' && type != 'setpoint_swg' && type != 'setpoint_freeze' && type != 'temperature' && type != 'value') {
         } else if (status == 'on' && type == 'setpoint_thermo') {
           tile_icon.classList.remove("enabled");
@@ -1278,8 +1449,49 @@
         } else if (status == 'on') {
           tile_icon.classList.remove("enabled");
           tile_icon.classList.remove("disabled");
+          tile_icon.classList.remove("attention");
           tile_icon.classList.add("cool");
           tile_icon.classList.remove("heat");
+          tile_icon.classList.remove("outofrange");
+        } else if (status == 'outofrange') {
+          tile_icon.classList.remove("enabled");
+          tile_icon.classList.remove("disabled");
+          tile_icon.classList.remove("attention");
+          tile_icon.classList.add("outofrange");
+          tile_icon.classList.remove("cool");
+        } else if (status == 'attention') {
+          tile_icon.classList.remove("enabled");
+          tile_icon.classList.remove("disabled");
+          tile_icon.classList.remove("outofrange");
+          tile_icon.classList.add("attention");
+          tile_icon.classList.remove("cool");
+        }
+      }
+  */
+    }
+
+    function setTileIconClassList(id, ...classes) {
+      const tile_icon_classes = [
+        "enabled",
+        //"flash",
+        "disabled",
+        "cool",
+        "heat",
+        "rangeoptimal",
+        "rangewarning",
+        "rangecritical"
+      ];
+
+      const tile_icon = document.getElementById(id + "_tile_icon_value");
+      if (!tile_icon) return; // exit early if element not found
+
+      const allowed = new Set(classes.filter(Boolean)); // keep only non-null/undefined
+
+      for (const cls of tile_icon_classes) {
+        if (allowed.has(cls)) {
+          tile_icon.classList.add(cls);
+        } else {
+          tile_icon.classList.remove(cls);
         }
       }
     }
@@ -1326,7 +1538,7 @@
             document.getElementById(object.id).setAttribute('lighttype', object.Light_Type);
           
             if (typeof object.Light_Program !== 'undefined') {
-              light_mode = parseInt(object.Light_Program);
+              var light_mode = parseInt(object.Light_Program);
               if ( object.Light_Type != "10" && object.type_ext != 'light_dimmer' ) {
                 document.getElementById(object.id).setAttribute('spvalue', light_mode-1);
                 //console.log("Light_Program spvalue = "+document.getElementById(object.id).getAttribute('spvalue'));
@@ -1879,8 +2091,8 @@
 
 
 
-    _displayMsgTimer=0;
-    _displayMsgTimeout=0;
+    var _displayMsgTimer=0;
+    var _displayMsgTimeout=0;
 
     function displayMessage(message, timeoutSeconds) {
       // Check to see if we can display message

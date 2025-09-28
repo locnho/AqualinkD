@@ -26,7 +26,6 @@
 #include "utils.h"
 //#include "web_server.h"
 #include "json_messages.h"
-#include "domoticz.h"
 #include "aq_mqtt.h"
 #include "devices_jandy.h"
 #include "version.h"
@@ -311,7 +310,7 @@ char *get_aux_information(aqkey *button, struct aqualinkdata *aqdata, char *buff
   }
   if (isVBUTTON_ALTLABEL(button->special_mask))
   {
-    length += sprintf(buffer, ",\"alt_label\":\"%s\", \"in_alt_mode\": \"%s\" ",((vbutton_detail *)button->special_mask_ptr)->altlabel, ((vbutton_detail *)button->special_mask_ptr)->in_alt_mode?JSON_ON:JSON_OFF );
+    length += sprintf(buffer, ",\"alt_label\":\"%s\", \"in_alt_mode\": \"%s\" ",((altlabel_detail *)button->special_mask_ptr)->altlabel, ((altlabel_detail *)button->special_mask_ptr)->in_alt_mode?JSON_ON:JSON_OFF );
     //return buffer;
   }
 
@@ -553,16 +552,22 @@ int build_device_JSON(struct aqualinkdata *aqdata, char* buffer, int size, bool 
         ((homekit)?2:0),
         ((homekit_f)?aqdata->sensors[i].value:aqdata->sensors[i].value));*/
 
-      temperatureUOM uom = getTemperatureUOM(aqdata->sensors[i].uom);
+      temperatureUOM t_uom = getTemperatureUOM(aqdata->sensors[i].uom);
 
-      if (uom == UNKNOWN) {
+      if (aqdata->sensors[i].uom == NULL) {
+        length += sprintf(buffer+length, "{\"type\": \"value\", \"id\": \"%s\", \"name\": \"%s\", \"state\": \"on\", \"value\": \"%.*f\", \"uom\": \"\" },",
+        aqdata->sensors[i].ID,
+        aqdata->sensors[i].label,
+        2,
+        aqdata->sensors[i].value);
+      } else if (t_uom == UNKNOWN) {
         length += sprintf(buffer+length, "{\"type\": \"value\", \"id\": \"%s\", \"name\": \"%s\", \"state\": \"on\", \"value\": \"%.*f\", \"uom\": \"%s\" },",
         aqdata->sensors[i].ID,
         aqdata->sensors[i].label,
         2,
         aqdata->sensors[i].value,
         aqdata->sensors[i].uom);
-      } else if ( !homekit && (aqdata->temp_units == FAHRENHEIT && uom == CELSIUS) ) {
+      } else if ( !homekit && (aqdata->temp_units == FAHRENHEIT && t_uom == CELSIUS) ) {
         length += sprintf(buffer+length, "{\"type\": \"temperature\", \"id\": \"%s\", \"name\": \"%s\", \"state\": \"on\", \"value\": \"%.*f\" },",
         aqdata->sensors[i].ID,
         aqdata->sensors[i].label,
@@ -587,6 +592,12 @@ int build_device_JSON(struct aqualinkdata *aqdata, char* buffer, int size, bool 
     length--;
 
   length += sprintf(buffer+length, "]}");
+
+  // Really crap test
+  if (length >= size) {
+    LOG(NET_LOG,LOG_ERR, "JSON: %s went over buffer size %d of %d\n", homekit?"homebridge":"web", length, size);
+    buffer[size - 1] = '\0';
+  }
 
   LOG(NET_LOG,LOG_DEBUG, "JSON: %s used %d of %d\n", homekit?"homebridge":"web", length, size);
 
@@ -717,7 +728,7 @@ int build_aqualink_status_JSON(struct aqualinkdata *aqdata, char* buffer, int si
   if ( (ENABLE_CHILLER || aqdata->chiller_set_point != TEMP_UNKNOWN) && aqdata->chiller_button != NULL) {
     length += sprintf(buffer+length, ",\"chiller_set_pnt\":\"%d\"",aqdata->chiller_set_point );//"0",
     if (isVBUTTON_CHILLER(aqdata->chiller_button->special_mask))
-      length += sprintf(buffer+length, ",\"chiller_mode\":\"%s\"",((vbutton_detail *)aqdata->chiller_button->special_mask_ptr)->in_alt_mode?"cool":"heat");
+      length += sprintf(buffer+length, ",\"chiller_mode\":\"%s\"",((altlabel_detail *)aqdata->chiller_button->special_mask_ptr)->in_alt_mode?"cool":"heat");
   }
   
   if ( aqdata->air_temp == TEMP_UNKNOWN )
@@ -860,7 +871,7 @@ printf("Pump Type %d\n",aqdata->pumps[i].pumpType);
     for (i=aqdata->virtual_button_start; i < aqdata->total_buttons; i++) 
     {
       if (isVBUTTON_ALTLABEL(aqdata->aqbuttons[i].special_mask)) {
-        length += sprintf(buffer+length, "\"%s\": \"%s\",",aqdata->aqbuttons[i].name, ((vbutton_detail *)aqdata->aqbuttons[i].special_mask_ptr)->in_alt_mode?JSON_ON:JSON_OFF );
+        length += sprintf(buffer+length, "\"%s\": \"%s\",",aqdata->aqbuttons[i].name, ((altlabel_detail *)aqdata->aqbuttons[i].special_mask_ptr)->in_alt_mode?JSON_ON:JSON_OFF );
       }
     }
     if (buffer[length-1] == ',')
@@ -1125,57 +1136,6 @@ bool parseJSONwebrequest(char *buffer, struct JSONwebrequest *request)
   }
   
   return true;
-}
-
-bool parseJSONmqttrequest(const char *str, size_t len, int *idx, int *nvalue, char *svalue) {
-  unsigned int i = 0;
-  int found = 0;
-  
-  svalue[0] = '\0';
-
-  for (i = 0; i < len && str[i] != '\0'; i++) {
-    if (str[i] == '"') {
-      if (strncmp("\"idx\"", (char *)&str[i], 5) == 0) {
-        i = i + 5;
-        for (; str[i] != ',' && str[i] != '\0'; i++) {
-          if (str[i] == ':') {
-            *idx = atoi(&str[i + 1]);
-            found++;
-          }
-        }
-        //if (*idx == 45) 
-        //  printf("%s\n",str);
-      } else if (strncmp("\"nvalue\"", (char *)&str[i], 8) == 0) {
-        i = i + 8;
-        for (; str[i] != ',' && str[i] != '\0'; i++) {
-          if (str[i] == ':') {
-            *nvalue = atoi(&str[i + 1]);
-            found++;
-          }
-        }
-      } else if (strncmp("\"svalue1\"", (char *)&str[i], 9) == 0) {
-        i = i + 9;
-        for (; str[i] != ',' && str[i] != '\0'; i++) {
-          if (str[i] == ':') {
-            while(str[i] == ':' || str[i] == ' ' || str[i] == '"' || str[i] == '\'') i++;
-            int j=i+1;
-            while(str[j] != '"' && str[j] != '\'' && str[j] != ',' && str[j] != '}') j++;
-            strncpy(svalue, &str[i], ((j-i)>DZ_SVALUE_LEN?DZ_SVALUE_LEN:(j-i)));
-            svalue[((j-i)>DZ_SVALUE_LEN?DZ_SVALUE_LEN:(j-i))] = '\0'; // Simply force the last termination
-            found++;
-          }
-        }
-      } 
-      if (found >= 4) {
-        return true;
-      }
-    }
-  }
-  // Just incase svalue is not found, we really don;t care for most devices.
-  if (found >= 2) {
-    return true;
-  }
-  return false;
 }
 
 /*
@@ -1561,7 +1521,7 @@ int build_aqualink_config_JSON(char* buffer, int size, struct aqualinkdata *aq_d
           length += result;
     } else if ( isVBUTTON_ALTLABEL(aq_data->aqbuttons[i].special_mask)) {
       sprintf(buf,"%s_altlabel", prefix);
-      if ((result = json_cfg_element(buffer+length, size-length, buf, &((vbutton_detail *)aq_data->aqbuttons[i].special_mask_ptr)->altlabel, CFG_STRING, 0, NULL, 0)) <= 0) {
+      if ((result = json_cfg_element(buffer+length, size-length, buf, &((altlabel_detail *)aq_data->aqbuttons[i].special_mask_ptr)->altlabel, CFG_STRING, 0, NULL, 0)) <= 0) {
         LOG(NET_LOG,LOG_ERR, "Config json buffer full in, result truncated! size=%d curently used=%d\n",size,length);
         return length;
       } else

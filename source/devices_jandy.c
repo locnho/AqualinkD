@@ -537,85 +537,52 @@ aqledstate get_swg_led_state(struct aqualinkdata *aqdata)
   }
 }
 
-void get_swg_status_msg(struct aqualinkdata *aqdata, char *message)
-{
-  int tmp1;
-  int tmp2;
-
-  return get_swg_status_mqtt(aqdata, message, &tmp1, &tmp2);
-}
-
-void get_swg_status_mqtt(struct aqualinkdata *aqdata, char *message, int *status, int *dzalert) 
+const char *get_swg_status_msg(struct aqualinkdata *aqdata)
 {
   switch (aqdata->ar_swg_device_status) {
-  // Level = (0=gray, 1=green, 2=yellow, 3=orange, 4=red)
+
   case SWG_STATUS_ON:
-    *status = (aqdata->swg_percent > 0?SWG_ON:SWG_OFF);
-    sprintf(message, "AQUAPURE GENERATING CHLORINE");
-    *dzalert = 1;
+    return "AQUAPURE GENERATING CHLORINE";
     break;
   case SWG_STATUS_NO_FLOW:
-    *status = SWG_OFF;
-    sprintf(message, "AQUAPURE NO FLOW");
-    *dzalert = 2;
+    return "AQUAPURE NO FLOW";
     break;
   case SWG_STATUS_LOW_SALT:
-    *status = (aqdata->swg_percent > 0?SWG_ON:SWG_OFF);
-    sprintf(message, "AQUAPURE LOW SALT");
-    *dzalert = 2;
+    return "AQUAPURE LOW SALT";
     break;
   case SWG_STATUS_HI_SALT:
-    *status = (aqdata->swg_percent > 0?SWG_ON:SWG_OFF);
-    sprintf(message, "AQUAPURE HIGH SALT");
-    *dzalert = 3;
+    return "AQUAPURE HIGH SALT";
     break;
   case SWG_STATUS_HIGH_CURRENT:
-    *status = (aqdata->swg_percent > 0?SWG_ON:SWG_OFF);
-    sprintf(message, "AQUAPURE HIGH CURRENT");
-    *dzalert = 4;
+    return "AQUAPURE HIGH CURRENT";
     break;
   case SWG_STATUS_TURNING_OFF:
-    *status = SWG_OFF;
-    sprintf(message, "AQUAPURE TURNING OFF");
-    *dzalert = 0;
+    return "AQUAPURE TURNING OFF";
     break;
   case SWG_STATUS_CLEAN_CELL:
-    *status = (aqdata->swg_percent > 0?SWG_ON:SWG_OFF);
-    sprintf(message, "AQUAPURE CLEAN CELL");
-    *dzalert = 2;
+    return "AQUAPURE CLEAN CELL";
     break;
   case SWG_STATUS_LOW_VOLTS:
-    *status = (aqdata->swg_percent > 0?SWG_ON:SWG_OFF);
-    sprintf(message, "AQUAPURE LOW VOLTAGE");
-    *dzalert = 3;
+    return "AQUAPURE LOW VOLTAGE";
     break;
   case SWG_STATUS_LOW_TEMP:
-    *status = SWG_OFF;
-    sprintf(message, "AQUAPURE WATER TEMP LOW");
-    *dzalert = 2;
+    return "AQUAPURE WATER TEMP LOW";
     break;
   case SWG_STATUS_CHECK_PCB:
-    *status = SWG_OFF;
-    sprintf(message, "AQUAPURE CHECK PCB");
-    *dzalert = 4;
+    return "AQUAPURE CHECK PCB";
     break;
   case SWG_STATUS_OFF: // THIS IS OUR OFF STATUS, NOT AQUAPURE
-    *status = SWG_OFF;
-    sprintf(message, "AQUAPURE OFF");
-    *dzalert = 0;
+    return "AQUAPURE OFF";
     break;
   case SWG_STATUS_GENFAULT:
-    *status = (aqdata->swg_percent > 0?SWG_ON:SWG_OFF);
-    sprintf(message, "AQUAPURE GENERAL FAULT");
-    *dzalert = 2;
+    return "AQUAPURE GENERAL FAULT";
     break;
   default:
-    *status = (aqdata->swg_percent > 0?SWG_ON:SWG_OFF);
-    sprintf(message, "AQUAPURE UNKNOWN STATUS");
-    *dzalert = 4;
+    return "AQUAPURE UNKNOWN STATUS";
     break;
   }
 }
+
 
 
 #define EP_HI_B_WAT 8
@@ -977,16 +944,95 @@ bool processPacketFromJandyChemFeeder(unsigned char *packet_buffer, int packet_l
   LOG(DJAN_LOG, LOG_INFO, "%s\n", msg);
 
   /*
+  I think the below may be accurate
   ph_setpoint  = float(raw_data[8]) / 10
   acl_setpoint = raw_data[9] * 10
   ph_current   = float(raw_data[10]) / 10
   acl_current  = raw_data[11] * 10
+  */
+  
+  /*
+  from https://community.home-assistant.io/t/reading-orp-ph-from-old-watermatic-jandy-chemlink1500/933085
+  10 02                                  <-- uartex header
+  00 21                                  <-- chemistry frame marker
+  02 41                                  <-- tag02: ORP=0x41=65 → 650 mV
+  03 4B                                  <-- tag03: pH=0x4B=75 → 7.5
+  08 00                                  <-- tag08: pH feeder active (0x00)
+  18 01                                  <-- tag18: ORP feed ON
+  60                                     <-- checksum (sum&0x7F)
+  10 03                                  <-- uartex footer
+
+  ORP is tag 0x02 (0x41=65)          (value × 10, 200–1200 mV accepted).
+  pH is found at tag 0x03 (0x4B=75). (value ÷ 10, only 5.0–10.0 accepted).
+
+  0x41 (65) ×10 = 650 mV (ORP)
+  0x4B (75) ÷10 = 7.5 pH
+  tag08=0x00 → pH feeder running
+  tag18=0x01 → ORP feed ON
+  
+  0x10|0x02|0x00|0x21|0x02|0x41|0x03|0x4B|0x08|0x00|0x18|0x01|0x60|0x10|0x03
+
   */
 
   return false;
 }
 
 
+
+
+// ---- pH ----
+float ph_from_counts(int counts, float temp_c) {
+    
+    //    Convert ADC counts + water temperature to pH.
+    //    counts  : ADC counts (0..4095)
+    //    temp_c  : water temperature in °C
+    //    returns : pH value
+    
+
+    const int n_bits = 12;
+    const float v_ref = 3.3f;       // ADC reference voltage
+    const float v_mid = 1.650f;     // mid-rail voltage representing pH 7
+    const float gain_pH = 12.745f;  // amplifier gain
+
+    // Step 1: counts -> voltage
+    float v = ((float)counts / (float)((1 << n_bits) - 1)) * v_ref;
+
+    // Step 2: electrode mV after gain removal
+    float v_elec_mV = (v - v_mid) * 1000.0f / gain_pH;
+
+    // Step 3: Nernst slope at water temperature
+    float slope = 59.16f * (temp_c + 273.15f) / 298.15f; // mV/pH
+
+    // Step 4: pH
+    return 7.0f + (v_elec_mV / slope);
+}
+
+// ---- ORP ----
+float orp_from_counts(int counts) {
+    /*
+        Convert ADC counts to ORP (mV)
+        counts : ADC counts (0..4095)
+        returns: ORP in millivolts
+    */
+    return -1909.25f + 0.93294f * (float)counts;
+}
+
+// ---- Example usage ----
+/*
+int main(void) {
+    int counts_ph  = 2341;  // example from Group 1
+    int counts_orp = 2916;  // example from Group 2
+    float temp_c   = 38.0f; // water temperature in °C
+
+    float ph_value  = ph_from_counts(counts_ph, temp_c);
+    float orp_value = orp_from_counts(counts_orp);
+
+    printf("pH  = %.2f\n", ph_value);
+    printf("ORP = %.0f mV\n", orp_value);
+
+    return 0;
+}
+*/
 
 bool processPacketToJandyChemAnalyzer(unsigned char *packet_buffer, int packet_length, struct aqualinkdata *aqdata)
 {
@@ -998,11 +1044,32 @@ bool processPacketToJandyChemAnalyzer(unsigned char *packet_buffer, int packet_l
 
 bool processPacketFromJandyChemAnalyzer(unsigned char *packet_buffer, int packet_length, struct aqualinkdata *aqdata, const unsigned char previous_packet_to){
   
+  int watertemp = 0;
 
   if (isCOMBO_PANEL && aqdata->aqbuttons[SPA_INDEX].led->state == ON) {
+    watertemp = aqdata->spa_temp;
     LOG(DJAN_LOG, LOG_INFO, "Last panel info pH=%f, ORP=%d, Spa water temp=%d (Spamode)\n",aqdata->ph, aqdata->orp, aqdata->spa_temp  );
   } else {
+    watertemp = aqdata->pool_temp;
     LOG(DJAN_LOG, LOG_INFO, "Last panel info pH=%f, ORP=%d, Pool water temp=%d\n",aqdata->ph, aqdata->orp, aqdata->pool_temp  );
+  }
+
+
+  if (watertemp <= 0) {
+    if (previous_packet_to == 0x84){
+      if (packet_buffer[3] == 0x28 && packet_buffer[5] == 0x01) {
+        float ph = ph_from_counts( ((packet_buffer[6] * 256) + packet_buffer[7]),
+                                    aqdata->temp_units==FAHRENHEIT?roundf(degFtoC(watertemp)):watertemp);
+        LOG(DJAN_LOG, LOG_INFO, "Guess at caculating pH=%f\n", ph);                            
+      }
+    } else if (previous_packet_to == 0x84){
+      if (packet_buffer[3] == 0x28 && packet_buffer[5] == 0x02) {
+        float orp = orp_from_counts( ((packet_buffer[6] * 256) + packet_buffer[7]));
+        LOG(DJAN_LOG, LOG_INFO, "Guess at caculating ORP=%f\n", orp);
+      }
+    }
+  } else {
+    LOG(DJAN_LOG, LOG_INFO, "ORP & pH not caculated as watertemp %d is out of range\n", watertemp);
   }
 
   return false;
@@ -1108,7 +1175,7 @@ void processHeatPumpDisplayMessage(char *msg, struct aqualinkdata *aqdata) {
   // are we heat pump or chiller
   if (stristr(msg,"Chiller") != NULL) {
     // NSF Should check alt_mode is Chiller and not Heat Pump
-    ((vbutton_detail *)aqdata->chiller_button->special_mask_ptr)->in_alt_mode = true;
+    ((altlabel_detail *)aqdata->chiller_button->special_mask_ptr)->in_alt_mode = true;
     hpstate = HP_COOL;
   }
   if (stristr(msg," ENA") != NULL) {
@@ -1120,7 +1187,7 @@ void processHeatPumpDisplayMessage(char *msg, struct aqualinkdata *aqdata) {
   }
 
   LOG(AQUA_LOG,LOG_DEBUG, "Set %s to %s from message '%s'",
-    ((vbutton_detail *)aqdata->chiller_button->special_mask_ptr)->in_alt_mode?((vbutton_detail *)aqdata->chiller_button->special_mask_ptr)->altlabel:aqdata->chiller_button->label,
+    ((altlabel_detail *)aqdata->chiller_button->special_mask_ptr)->in_alt_mode?((altlabel_detail *)aqdata->chiller_button->special_mask_ptr)->altlabel:aqdata->chiller_button->label,
       LED2text(aqdata->chiller_button->led->state), msg);
 }
 
@@ -1142,9 +1209,9 @@ void updateHeatPumpLed(heatpumpstate state, aqledstate ledstate, struct aqualink
   }
 
   if (state == HP_COOL) {
-    ((vbutton_detail *)aqdata->chiller_button->special_mask_ptr)->in_alt_mode = true;
+    ((altlabel_detail *)aqdata->chiller_button->special_mask_ptr)->in_alt_mode = true;
   } else if (state == HP_HEAT) {
-    ((vbutton_detail *)aqdata->chiller_button->special_mask_ptr)->in_alt_mode = false;
+    ((altlabel_detail *)aqdata->chiller_button->special_mask_ptr)->in_alt_mode = false;
   }
 /*
   // If LED state is enable (that's a reqest), so only change if off.
@@ -1379,6 +1446,85 @@ packet To 0x00 of type   Unknown '0x33' | HEX: 0x10|0x02|0x00|0x33|0x2d|0x10|0x8
 packet To 0xf0 of type         iAq Poll | HEX: 0x10|0x02|0xf0|0x30|0x00|0x32|0x10|0x03|
 packet To 0x00 of type iAq receive read | HEX: 0x10|0x02|0x00|0x31|0x2d|0x06|0x02|0x22|0x02|0x21|0x01|0x22|0x02|0x21|0x01|0x23|0x01|0x23|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0xff|0x00|0x19|0x64|0x64|0x64|0x00|0x00|0x00|0x01|0x0c|0x0f|0x03|0xa5|0x10|0x03|
 
+
+
+
+
+*/
+
+
+
+/*
+
+**************
+
+TruSense
+
+Below is the repeat look (looks like 2 ID's) = is one for ORP and other pH ?????
+
+First 3 to 0x84, are requests 0x00,0x01,0x03. So ignore that in reply and everything else you get data at
+Last 2 bytes (below)
+0x02|0x14
+0x09|0x21
+0x00|0x00
+
+Similar for 0x86 at you get
+0x0b|0x6a
+
+
+As two independent bytes	9 and 33
+Unsigned 16-bit, big-endian (0x09 is high byte)	
+0x09 × 256 + 0x21 = 2304 + 33 = 2337
+0x09×256+0x21= 2304+33 =2337
+
+Unsigned 16-bit, little-endian (0x21 is high byte)	
+0x21 × 256 + 0x09 = 8448 + 9 = 8457
+0x21×256+0x09= 8448+9 = 8457
+
+
+
+To 0x84 of type            Probe | HEX: 0x10|0x02|0x84|0x00|0x96|0x10|0x03|
+To 0x00 of type              Ack | HEX: 0x10|0x02|0x00|0x01|0x00|0x00|0x13|0x10|0x03|
+
+To 0x84 of type   Unknown '0x20' | HEX: 0x10|0x02|0x84|0x20|0x00|0xb6|0x10|0x03|
+To 0x00 of type      iAq PageEnd | HEX: 0x10|0x02|0x00|0x28|0x20|0x00|0x02|0x14|0x70|0x10|0x03|
+
+To 0x84 of type   Unknown '0x20' | HEX: 0x10|0x02|0x84|0x20|0x01|0xb7|0x10|0x03|
+To 0x00 of type      iAq PageEnd | HEX: 0x10|0x02|0x00|0x28|0x20|0x01|0x09|0x21|0x85|0x10|0x03|
+
+To 0x84 of type   Unknown '0x20' | HEX: 0x10|0x02|0x84|0x20|0x03|0xb9|0x10|0x03|
+To 0x00 of type      iAq PageEnd | HEX: 0x10|0x02|0x00|0x28|0x20|0x03|0x00|0x00|0x5d|0x10|0x03|
+
+To 0x86 of type            Probe | HEX: 0x10|0x02|0x86|0x00|0x98|0x10|0x03|
+To 0x00 of type              Ack | HEX: 0x10|0x02|0x00|0x01|0x00|0x00|0x13|0x10|0x03|
+
+To 0x86 of type   Unknown '0x20' | HEX: 0x10|0x02|0x86|0x20|0x02|0xba|0x10|0x03|
+To 0x00 of type      iAq PageEnd | HEX: 0x10|0x02|0x00|0x28|0x20|0x02|0x0b|0x6a|0xd1|0x10|0x03|
+
+
+
+# list of unique 0x84 returns all represent ORP:810 or pH:7.3 (water temp 100 and 102)
+To 0x00 of type              Ack | HEX: 0x10|0x02|0x00|0x01|0x00|0x00|0x13|0x10|0x03|
+To 0x00 of type      iAq PageEnd | HEX: 0x10|0x02|0x00|0x28|0x20|0x00|0x02|0x14|0x70|0x10|0x03|
+
+To 0x00 of type      iAq PageEnd | HEX: 0x10|0x02|0x00|0x28|0x20|0x01|0x09|0x21|0x85|0x10|0x03|
+To 0x00 of type      iAq PageEnd | HEX: 0x10|0x02|0x00|0x28|0x20|0x01|0x09|0x22|0x86|0x10|0x03|
+To 0x00 of type      iAq PageEnd | HEX: 0x10|0x02|0x00|0x28|0x20|0x01|0x09|0x27|0x8b|0x10|0x03|
+To 0x00 of type      iAq PageEnd | HEX: 0x10|0x02|0x00|0x28|0x20|0x01|0x09|0x28|0x8c|0x10|0x03|
+
+To 0x00 of type      iAq PageEnd | HEX: 0x10|0x02|0x00|0x28|0x20|0x03|0x00|0x00|0x5d|0x10|0x03|
+
+# list of unique 0x86 returns all represent ORP:810 or pH:7.3 (water temp 100 and 102)
+To 0x00 of type              Ack | HEX: 0x10|0x02|0x00|0x01|0x00|0x00|0x13|0x10|0x03|
+To 0x00 of type      iAq PageEnd | HEX: 0x10|0x02|0x00|0x28|0x20|0x02|0x0b|0x54|0xbb|0x10|0x03|
+To 0x00 of type      iAq PageEnd | HEX: 0x10|0x02|0x00|0x28|0x20|0x02|0x0b|0x55|0xbc|0x10|0x03|
+To 0x00 of type      iAq PageEnd | HEX: 0x10|0x02|0x00|0x28|0x20|0x02|0x0b|0x57|0xbe|0x10|0x03|
+To 0x00 of type      iAq PageEnd | HEX: 0x10|0x02|0x00|0x28|0x20|0x02|0x0b|0x59|0xc0|0x10|0x03|
+To 0x00 of type      iAq PageEnd | HEX: 0x10|0x02|0x00|0x28|0x20|0x02|0x0b|0x69|0xd0|0x10|0x03|
+To 0x00 of type      iAq PageEnd | HEX: 0x10|0x02|0x00|0x28|0x20|0x02|0x0b|0x6a|0xd1|0x10|0x03|
+To 0x00 of type      iAq PageEnd | HEX: 0x10|0x02|0x00|0x28|0x20|0x02|0x0b|0x6b|0xd2|0x10|0x03|
+To 0x00 of type      iAq PageEnd | HEX: 0x10|0x02|0x00|0x28|0x20|0x02|0x0b|0x6c|0xd3|0x10|0x03|
+To 0x00 of type      iAq PageEnd | HEX: 0x10|0x02|0x00|0x28|0x20|0x02|0x0b|0x6d|0xd4|0x10|0x03|
 
 
 

@@ -30,7 +30,7 @@
 #include "aq_panel.h"
 //#include "utils.h"
 #include "aq_systemutils.h"
-
+#include "net_interface.h"
 
 
 /*
@@ -122,6 +122,7 @@ int save_schedules_js(const char* inBuf, int inSize, char* outBuf, int outSize)
   aqs_cron cline;
   bool fileexists = false;
   bool fs = false;
+  const net_iface *iface = get_first_valid_interface();
 
   if ( !_aqconfig_.enable_scheduler) {
     LOG(SCHD_LOG,LOG_WARNING, "Schedules are disabled\n");
@@ -159,8 +160,10 @@ int save_schedules_js(const char* inBuf, int inSize, char* outBuf, int outSize)
       } else if ( inarray && inBuf[i] == '{') {
         passJson_scObj( &inBuf[i], (inSize-i), &cline);
         LOG(SCHD_LOG,LOG_DEBUG, "Write to cron Min:%s Hour:%s DayM:%s Month:%s DayW:%s URL:%s Value:%s\n",cline.minute,cline.hour,cline.daym,cline.month,cline.dayw,cline.url,cline.value);
-        LOG(SCHD_LOG,LOG_INFO, "%s%s %s %s %s %s curl -s -S --show-error -o /dev/null localhost:%s%s -d value=%s -X PUT\n",(cline.enabled?"":"#"),cline.minute, cline.hour, cline.daym, cline.month, cline.dayw, _aqconfig_.socket_port, cline.url, cline.value);
-        fprintf(fp, "%s%s %s %s %s %s root curl -s -S --show-error -o /dev/null localhost:%s%s -d value=%s -X PUT\n",(cline.enabled?"":"#"),cline.minute, cline.hour, cline.daym, cline.month, cline.dayw, _aqconfig_.socket_port, cline.url, cline.value);
+        //LOG(SCHD_LOG,LOG_INFO, "%s%s %s %s %s %s curl -s -S --show-error -o /dev/null localhost:%s%s -d value=%s -X PUT\n",(cline.enabled?"":"#"),cline.minute, cline.hour, cline.daym, cline.month, cline.dayw, _aqconfig_.socket_port, cline.url, cline.value);
+        //fprintf(fp, "%s%s %s %s %s %s root curl -s -S --show-error -o /dev/null localhost:%s%s -d value=%s -X PUT\n",(cline.enabled?"":"#"),cline.minute, cline.hour, cline.daym, cline.month, cline.dayw, _aqconfig_.socket_port, cline.url, cline.value);
+        LOG(SCHD_LOG,LOG_INFO, "%s%s %s %s %s %s curl -s -S --show-error -o /dev/null %s%s -d value=%s -X PUT\n",(cline.enabled?"":"#"),cline.minute, cline.hour, cline.daym, cline.month, cline.dayw, (iface->localurl==NULL?_aqconfig_.listen_address:iface->localurl), cline.url, cline.value);
+        fprintf(fp, "%s%s %s %s %s %s root curl -s -S --show-error -o /dev/null %s%s -d value=%s -X PUT\n",(cline.enabled?"":"#"),cline.minute, cline.hour, cline.daym, cline.month, cline.dayw, (iface->localurl==NULL?_aqconfig_.listen_address:iface->localurl), cline.url, cline.value);      
       }
   }
     
