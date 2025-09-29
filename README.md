@@ -137,7 +137,7 @@ NEED TO FIX FOR THIS RELEASE.
 
 -->
 # Updates in 3.0.0 (dev)
-* Serial optimization for HAT.
+* Serial optimization for AqualinkD HAT.
 * upgraded network library ( HTTP(S), MQTT(S), WS )
 * Added options to force upgrades in aqmanager. (add ?upgrade or ?devupgrade to url to enable upgrade button)
 * MQTT Discovery for all supporting hubs (HomeAssistant Domoticz Hubitat OpenHAB etc)

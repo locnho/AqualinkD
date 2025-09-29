@@ -111,6 +111,7 @@
       // This will turn on/off the Spa Heater when you turn on/off Spa Mode.
       //var link_spa_and_spa_heater = true;
 
+      /*
       var tile_thresholds = {
         "SWG/PPM": {
           outofrange: {min: 2600, max: 3500, mintext:"Add Salt"},
@@ -130,6 +131,7 @@
         //  attention: {min: 0, max: 140,  maxtext:"High"}
         //},
       }
+      */
 
       // Change the min max for heater slider
       var heater_slider_min = 36;
