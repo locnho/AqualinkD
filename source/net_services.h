@@ -11,9 +11,12 @@
 //#define CONTENT_JS   "Content-Type: text/javascript"
 //#define CONTENT_TEXT  "Content-Type: text/plain"
 
-#define CONTENT_JSON "Content-Type: application/json\r\n"
-#define CONTENT_JS   "Content-Type: text/javascript\r\n"
-#define CONTENT_TEXT "Content-Type: text/plain\r\n"
+//#define CACHE    "Cache-Control: public, max-age=31536000,immutable\r\n" // 1 year
+#define CACHE    "Cache-Control: public, max-age=604800, immutable\r\n" // 7 days
+#define NO_CACHE "Cache-Control: no-cache, no-store, must-revalidate\r\nPragma: no-cache\r\nExpires: 0\r\n"
+#define CONTENT_JSON NO_CACHE"Content-Type: application/json\r\n"
+#define CONTENT_JS   NO_CACHE"Content-Type: text/javascript\r\n"
+#define CONTENT_TEXT NO_CACHE "Content-Type: text/plain\r\n"
 
 
 //void main_server();

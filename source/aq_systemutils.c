@@ -255,7 +255,8 @@ bool run_aqualinkd_upgrade(uint8_t type)
 
 #if MG_TLS > 0
 
-char* read_pem_file(const char* fmt, ...) {
+// silentError is only silent if the file does not exist.
+char* read_pem_file(bool silentError, const char* fmt, ...) {
     char filepath[1024];
 
     // Build file path from format + arguments
@@ -266,7 +267,7 @@ char* read_pem_file(const char* fmt, ...) {
 
     FILE* file = fopen(filepath, "rb");
     if (!file) {
-        LOG(AQUA_LOG, LOG_ERR, "Failed to open file %s\n",filepath);
+        if (!silentError){LOG(AQUA_LOG, LOG_ERR, "Failed to open file %s\n",filepath);}
         return NULL;
     }
 

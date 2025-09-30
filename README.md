@@ -148,6 +148,7 @@ NEED TO FIX FOR THIS RELEASE.
 * Fixed bug with sensor UOM.
 * UI code cleanup.
 * Included program advance to AqualinkD programmable light mode. (lot quicker for lights that remember state)
+* Changed caching of HTTP server. (Better for UI config updates)
 
 * Need to finish off :-
   * HAT serial optimizations broke some USB serial adapters

@@ -57,7 +57,7 @@ DBGFLAGS = -g -O0 -Wall -D AQ_DEBUG -D AQ_TM_DEBUG
 
 # Mongoose 7.19 flags
 #MGFLAGS = -D MG_TLS=2 #(2=MG_TLS_OPENSSL. 3=MG_TLS_BUILTIN) --or--  -DMG_TLS=MG_TLS_BUILTIN
-MGFLAGS = -D MG_TLS=3
+MGFLAGS = -D MG_TLS=3 -D MG_ENABLE_SSI=0
 
 # Detect OS and set some specifics
 ifeq ($(OS),Windows_NT)

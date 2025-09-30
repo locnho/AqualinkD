@@ -95,7 +95,7 @@ bool uri_strcmp(const char *uri, const char *string);
 //static const char *s_http_port = "8080";
 //static struct mg_serve_http_opts _http_server_opts;
 static struct mg_http_serve_opts _http_server_opts;
-
+static struct mg_http_serve_opts _http_server_opts_nocache;
 
 static void net_signal_handler(int sig_num) {
   intHandler(sig_num); // Force signal handler to aqualinkd.c
@@ -1605,7 +1605,11 @@ void action_web_request(struct mg_connection *nc, struct mg_http_message *http_m
   // If we have a get request, pass it
   if (strncmp(http_msg->uri.buf, "/api", 4 ) != 0) {
       DEBUG_TIMER_START(&tid);
-      mg_http_serve_dir(nc, http_msg, &_http_server_opts);
+      if ( FAST_SUFFIX_3_CI(http_msg->uri.buf, http_msg->uri.len, ".js") ) {
+        mg_http_serve_dir(nc, http_msg, &_http_server_opts_nocache);
+      } else {
+        mg_http_serve_dir(nc, http_msg, &_http_server_opts);
+      }
       DEBUG_TIMER_STOP(tid, NET_LOG, "action_web_request() serve file took");
   } else {
     char buf[JSON_BUFFER_SIZE];
@@ -1709,14 +1713,14 @@ void action_web_request(struct mg_connection *nc, struct mg_http_message *http_m
           }
           LOG(NET_LOG, LOG_DEBUG, "Downloading log of max %d lines\n",value>0?(int)value:DEFAULT_LOG_DOWNLOAD_LINES);
           if (write_systemd_logmessages_2file("/dev/shm/aqualinkd.log", value>0?(int)value:DEFAULT_LOG_DOWNLOAD_LINES) ) {
-            mg_http_serve_file(nc, http_msg, "/dev/shm/aqualinkd.log", &_http_server_opts);
+            mg_http_serve_file(nc, http_msg, "/dev/shm/aqualinkd.log", &_http_server_opts_nocache);
             remove("/dev/shm/aqualinkd.log");
           }
         break;
 
         case uConfigDownload:
           LOG(NET_LOG, LOG_DEBUG, "Downloading config\n");
-          mg_http_serve_file(nc, http_msg, _aqconfig_.config_file, &_http_server_opts);
+          mg_http_serve_file(nc, http_msg, _aqconfig_.config_file, &_http_server_opts_nocache);
         break;
 #endif
         case uBad:
@@ -1941,25 +1945,20 @@ static void ev_handler(struct mg_connection *nc, int ev, void *ev_data) {
     if (nc->is_tls) {
       static char *crt;
       static char *key; 
+      static char *ca;
       
       struct mg_tls_opts opts;
       memset(&opts, 0, sizeof(opts));
 
       if (crt == NULL || key == NULL) {
         LOG(NET_LOG,LOG_NOTICE, "HTTPS: loading certs from : %s\n", _aqconfig_.cert_dir);
-        crt = read_pem_file("%s/crt.pem",_aqconfig_.cert_dir);
-        key = read_pem_file("%s/key.pem",_aqconfig_.cert_dir);
+        crt = read_pem_file(false, "%s/crt.pem",_aqconfig_.cert_dir);
+        key = read_pem_file(false, "%s/key.pem",_aqconfig_.cert_dir);
+        ca = read_pem_file(true, "%s/ca.pem",_aqconfig_.cert_dir); // If this doesn't exist we don't care. If it exists, 2 way auth
       }
+      opts.ca = mg_str(ca);    // Most cases this will be null, only get's set for 2 way auth (ie load cert and authority onto client)
       opts.cert = mg_str(crt);
-      opts.key = mg_str(key);
-
-#ifdef TLS_TWOWAY
-      static char *ca;
-      if (ca == NULL)
-        ca = read_pem_file("%s/ca.pem",_aqconfig_.cert_dir);
-      opts.ca = mg_str(ca);
-#endif
-      
+      opts.key = mg_str(key);      
       mg_tls_init(nc, &opts);
     }
 #endif
@@ -1981,9 +1980,9 @@ static void ev_handler(struct mg_connection *nc, int ev, void *ev_data) {
 
       if (crt == NULL || key == NULL) {
         LOG(NET_LOG,LOG_NOTICE, "MQTTS: loading certs from : %s\n", _aqconfig_.mqtt_cert_dir);
-        crt = read_pem_file("%s/crt.pem",_aqconfig_.cert_dir);
-        key = read_pem_file("%s/key.pem",_aqconfig_.cert_dir);
-        ca = read_pem_file("%s/ca.pem",_aqconfig_.cert_dir);
+        crt = read_pem_file(false, "%s/crt.pem",_aqconfig_.cert_dir);
+        key = read_pem_file(false, "%s/key.pem",_aqconfig_.cert_dir);
+        ca = read_pem_file(true, "%s/ca.pem",_aqconfig_.cert_dir);
       }
       opts.cert = mg_str(crt);
       opts.key = mg_str(key);
@@ -2186,11 +2185,13 @@ bool _start_net_services(struct mg_mgr *mgr, struct aqualinkdata *aqdata) {
   }
 
   // Set default web options
-  _http_server_opts.root_dir = _aqconfig_.web_directory;  // Serve current directory
-  _http_server_opts.extra_headers = "Cache-Control: public, max-age=604800, immutable\r\n"; // 7 days
-  //_http_server_opts.extra_headers = "Cache-Control: public, max-age=31536000,immutable\r\n"; // 1 year.  Let's be as agressive on browser caching.
-  // Need to disable directory_listing somehow
-  
+  _http_server_opts.root_dir = _aqconfig_.web_directory;
+  _http_server_opts.extra_headers = CACHE; 
+  _http_server_opts.ssi_pattern = NULL;
+
+  _http_server_opts_nocache.root_dir = _aqconfig_.web_directory;
+  _http_server_opts_nocache.extra_headers = NO_CACHE;
+  _http_server_opts_nocache.ssi_pattern = NULL;
   // Start MQTT
   start_mqtt(mgr);
 

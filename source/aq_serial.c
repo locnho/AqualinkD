@@ -438,12 +438,12 @@ int lock_port(int fd, const char* tty)
     LOG(RSSD_LOG,LOG_ERR, "Can't put (%s) into exclusive mode (%d): %s\n", tty,errno, strerror( errno ));
     return -1;
   }
-
+/*
   if (flock(fd, LOCK_EX | LOCK_NB) < 0) {
     LOG(RSSD_LOG,LOG_ERR, "Can't lock (%s) (%d): %s\n", tty,errno, strerror( errno ));
     return -1;
   }
-  
+*/
   return 0;
 }
 
@@ -453,12 +453,14 @@ int unlock_port(int fd)
     LOG(RSSD_LOG,LOG_ERR, "Failed to remove into exclusive mode (%d): %s\n", errno, strerror( errno ));
   }
 
+  /*
   if (flock(fd, LOCK_UN) < 0) {
     //if (!isAqualinkDStopping()) {
       LOG(RSSD_LOG,LOG_ERR, "Can't unlock serial port (%d): %s\n",errno, strerror( errno ));
     //}
     return -1;
   }
+*/
   return 0;
 }
 
