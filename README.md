@@ -139,6 +139,7 @@ NEED TO FIX FOR THIS RELEASE.
 # Updates in 3.0.0 (dev)
 * Serial optimization for AqualinkD HAT.
 * upgraded network library ( HTTP(S), MQTT(S), WS )
+* Added support for HTTPS and MQTTS
 * Added options to force upgrades in aqmanager. (add ?upgrade or ?devupgrade to url to enable upgrade button)
 * MQTT Discovery for all supporting hubs (HomeAssistant Domoticz Hubitat OpenHAB etc)
 * Moved Domoticz support over to MQTT autodiscovery.
@@ -157,7 +158,6 @@ NEED TO FIX FOR THIS RELEASE.
   * With aqmanager is packet_logger still valid? (maybe for raw, but it's not been used in years)
   * Get panel size and clean up the ap_panel code around config size/type and reported size/type
   * WebUI Config in aqmanager.
-  * button pre-state was for domotics, delete
 
   
 # Updates in 2.6.11 (Sept 14 2025)

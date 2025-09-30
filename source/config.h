@@ -42,6 +42,10 @@
 
 struct aqconfig
 {
+#if MG_TLS > 0
+  char *cert_dir;  // for future
+  char *mqtt_cert_dir;
+#endif
   char *config_file;
   char *listen_address;
   char *serial_port;
@@ -233,6 +237,8 @@ int _numCfgParams;
 #define CFG_N_MG_log_level                      "mg_log_level"
 #define CFG_V_log_level                         "[\"DEBUG_SERIAL\", \"DEBUG\", \"INFO\", \"NOTICE\", \"WARNING\", \"ERROR\"]"
 #define CFG_N_listen_address                    "listen_address" 
+#define CFG_N_cert_dir                          "https_cert_dir"
+
 #define CFG_N_web_directory                     "web_directory"
 #define CFG_N_device_id                         "device_id"
 
@@ -262,6 +268,7 @@ int _numCfgParams;
 #define CFG_N_mqtt_discovery_topic              "mqtt_discovery_topic"
 #define CFG_N_mqtt_discovery_use_mac            "mqtt_discovery_use_mac"
 #define CFG_N_mqtt_timed_update                 "mqtt_timed_update"
+#define CFG_N_mqtt_cert_dir                     "mqtt_cert_dir"
 
 #define CFG_N_light_programming_mode            "light_programming_mode"
 #define CFG_N_light_programming_initial_on      "light_programming_initial_on"

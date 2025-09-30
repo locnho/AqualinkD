@@ -191,6 +191,20 @@ void init_parameters (struct aqconfig * parms)
   _cfgParams[_numCfgParams].config_mask |= CFG_FORCE_RESTART;
   _cfgParams[_numCfgParams].default_value = (void *)_dcfg_web_port;
 
+
+#if MG_TLS > 0
+  _numCfgParams++;
+  _cfgParams[_numCfgParams].value_ptr = &_aqconfig_.cert_dir;
+  _cfgParams[_numCfgParams].value_type = CFG_STRING;
+  _cfgParams[_numCfgParams].name = CFG_N_cert_dir;
+  _cfgParams[_numCfgParams].default_value = (void *)&_dcfg_null;
+  _cfgParams[_numCfgParams].config_mask |= CFG_ALLOW_BLANK;
+  //_cfgParams[_numCfgParams].config_mask |= CFG_READONLY;
+  _cfgParams[_numCfgParams].config_mask |= CFG_GRP_ADVANCED;
+  _cfgParams[_numCfgParams].config_mask |= CFG_FORCE_RESTART;
+#endif 
+
+
   _numCfgParams++;
   _cfgParams[_numCfgParams].value_ptr = &_aqconfig_.serial_port;
   _cfgParams[_numCfgParams].value_type = CFG_STRING;
@@ -319,11 +333,24 @@ void init_parameters (struct aqconfig * parms)
   _cfgParams[_numCfgParams].default_value = (void *)_dcfg_mqtt_discovery;
   _cfgParams[_numCfgParams].config_mask |= CFG_ALLOW_BLANK;
 
-   _numCfgParams++;
+  _numCfgParams++;
   _cfgParams[_numCfgParams].value_ptr = &_aqconfig_.mqtt_discovery_use_mac;
   _cfgParams[_numCfgParams].value_type = CFG_BOOL;
   _cfgParams[_numCfgParams].name = CFG_N_mqtt_discovery_use_mac;
   _cfgParams[_numCfgParams].default_value = (void *)&_dcfg_true;
+  
+
+#if MG_TLS > 0
+  _numCfgParams++;
+  _cfgParams[_numCfgParams].value_ptr = &_aqconfig_.mqtt_cert_dir;
+  _cfgParams[_numCfgParams].value_type = CFG_STRING;
+  _cfgParams[_numCfgParams].name = CFG_N_mqtt_cert_dir;
+  _cfgParams[_numCfgParams].default_value = (void *)&_dcfg_null;
+  _cfgParams[_numCfgParams].config_mask |= CFG_ALLOW_BLANK;
+  //_cfgParams[_numCfgParams].config_mask |= CFG_READONLY;
+  _cfgParams[_numCfgParams].config_mask |= CFG_GRP_ADVANCED;
+  _cfgParams[_numCfgParams].config_mask |= CFG_FORCE_RESTART;
+#endif
 
   _numCfgParams++;
   _cfgParams[_numCfgParams].value_ptr = &_aqconfig_.mqtt_timed_update;

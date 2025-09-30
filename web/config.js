@@ -104,14 +104,13 @@
       // this will show RPM for all pumps (ie Jandy VF pumps)
       //var show_vsp_gpm=false;
 
-      // By default all Temperatures & Value tiles are on when they have a value other than 0.
-      // this will turn them off permanently
-      //var turn_off_sensortiles = true;
+      // Keeps sensor tiles in on state showing last reading. (default true= turn off tiles when device is off.  ie SWG=off turn off PPM tile)
+      //var turn_off_sensortiles = false;
 
       // This will turn on/off the Spa Heater when you turn on/off Spa Mode.
       //var link_spa_and_spa_heater = true;
 
-      /*
+      /* Example of setting custom range and appropriate messages
       var tile_thresholds = {
         "SWG/PPM": {
           outofrange: {min: 2600, max: 3500, mintext:"Add Salt"},

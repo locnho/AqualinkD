@@ -71,7 +71,10 @@
 //#define DEFAULT_CONFIG_FILE "./aqualinkd.conf"
 
 static volatile bool _keepRunning = true;
+
+#ifdef SELF_RESTART
 static volatile bool _restart = false;
+#endif
 //char** _argv;
 //static struct aqconfig _aqconfig_;
 static struct aqualinkdata _aqualink_data;
@@ -125,8 +128,10 @@ void intHandler(int sig_num)
         execve(newargv[0], newargv, newenviron);
         exit (EXIT_SUCCESS);
       }
+#ifdef SELF_RESTART
     } else {
       _restart = true;
+#endif
     }
   }
   //LOG(AQUA_LOG,LOG_NOTICE, "Stopping!\n");
@@ -405,7 +410,9 @@ void printHelp()
 
 int main(int argc, char *argv[])
 {
+#ifdef SELF_RESTART
   _restart = false;
+#endif
   char defaultCfg[] = "./aqualinkd.conf";
   char *cfgFile;
   
@@ -538,6 +545,13 @@ int startup(char *self, char *cfgFile)
   _aqualink_data.updated = true;
   //_aqualink_data.chiller_button == NULL; // HATE having this here, but needs to be null before config.
 
+  //sd_journal_print(LOG_NOTICE, "Starting %s v%s !\n", AQUALINKD_NAME, AQUALINKD_VERSION);
+
+
+  // Setup a log level just to get this message out, will be re-set once config is read
+  setSystemLogLevel(LOG_NOTICE);
+  LOG(AQUA_LOG,LOG_NOTICE, "Starting %s v%s !\n", AQUALINKD_NAME, AQUALINKD_VERSION);
+
   sprintf(_aqualink_data.self, basename(self));
   clearDebugLogMask();
   read_config(&_aqualink_data, cfgFile);
@@ -561,7 +575,7 @@ int startup(char *self, char *cfgFile)
     setLoggingPrms(_aqconfig_.log_level, _aqconfig_.deamonize, _aqconfig_.log_file, NULL);
 #endif
 
-  LOG(AQUA_LOG,LOG_NOTICE, "Starting %s v%s !\n", AQUALINKD_NAME, AQUALINKD_VERSION);
+  //LOG(AQUA_LOG,LOG_NOTICE, "Starting %s v%s !\n", AQUALINKD_NAME, AQUALINKD_VERSION);
 
   check_upgrade_log();
 
@@ -1479,7 +1493,11 @@ void main_loop()
   //if (_aqconfig_.debug_RSProtocol_packets) stopPacketLogger();
   stopPacketLogger();
 
-  if (! _restart) { // Stop network if we are not restarting
+#ifdef SELF_RESTART
+  if (! _restart) 
+#endif
+  {
+     // Stop network if we are not restarting
      stop_net_services();
      stop_sensors_thread();
   }
@@ -1488,7 +1506,7 @@ void main_loop()
   close_serial_port(rs_fd);
   // Clear webbrowser
   //mg_mgr_free(&mgr);
-
+/*
   if (! _restart) {
   // NSF need to run through config memory and clean up.
     LOG(AQUA_LOG,LOG_NOTICE, "Exit!\n");
@@ -1502,6 +1520,24 @@ void main_loop()
     _restart = false;
     startup(_self, _cfgFile);
   }
+*/
+  #ifdef SELF_RESTART
+   if (! _restart) {
+    LOG(AQUA_LOG,LOG_WARNING, "Waiting for process to fininish!\n");
+    delay(5 * 1000);
+    LOG(AQUA_LOG,LOG_WARNING, "Restarting!\n");
+    _keepRunning = true;
+    _restart = false;
+    startup(_self, _cfgFile);
+   } else
+  #else
+  {
+    // NSF need to run through config memory and clean up.
+    LOG(AQUA_LOG,LOG_NOTICE, "Exit!\n");
+    //exit(EXIT_FAILURE);
+    exit(exit_code);
+  }
+  #endif
 
 }
 

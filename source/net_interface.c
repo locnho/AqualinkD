@@ -145,6 +145,13 @@ const net_iface *get_first_valid_interface()
     } else {
       LOG(NET_LOG, LOG_ERR,"Could not understand URL '%s' (unable to get protocol & port) \n",_aqconfig_.listen_address);
     }
+
+    if (_aqconfig_.listen_address[(int)(protocol - _aqconfig_.listen_address)-1] == 's' ||
+        _aqconfig_.listen_address[(int)(protocol - _aqconfig_.listen_address)-1] == 'S')
+      info.isLocalurlTLS = true;
+    else
+      info.isLocalurlTLS = false;
+
     LOG(NET_LOG, LOG_DEBUG, "Interface %s = %s, %s\n", info.name, info.ip, info.mac);
   } else {
     LOG(NET_LOG, LOG_ERR,"Could not find a valid network interface");

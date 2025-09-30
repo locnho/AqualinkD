@@ -22,9 +22,11 @@
 #include <sys/mount.h>
 #include <sys/statvfs.h>
 #include <sys/wait.h>
+#include <stdarg.h>
 
 #include "aqualink.h"
 #include "aq_scheduler.h"
+#include "aq_systemutils.h"
 
 bool remount_root_ro(bool readonly)
 {
@@ -248,3 +250,67 @@ bool run_aqualinkd_upgrade(uint8_t type)
     LOG(AQUA_LOG, LOG_NOTICE, "AqualinkD is upgrading!");
     return true;
 }
+
+
+
+#if MG_TLS > 0
+
+char* read_pem_file(const char* fmt, ...) {
+    char filepath[1024];
+
+    // Build file path from format + arguments
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(filepath, sizeof(filepath), fmt, args);
+    va_end(args);
+
+    FILE* file = fopen(filepath, "rb");
+    if (!file) {
+        LOG(AQUA_LOG, LOG_ERR, "Failed to open file %s\n",filepath);
+        return NULL;
+    }
+
+    // Move to end to check file size
+    if (fseek(file, 0, SEEK_END) != 0) {
+        LOG(AQUA_LOG, LOG_ERR, "fseek failed on %s\n",filepath);
+        fclose(file);
+        return NULL;
+    }
+
+    long filesize = ftell(file);
+    if (filesize < 0) {
+        LOG(AQUA_LOG, LOG_ERR, "ftell failed on %s\n",filepath);
+        fclose(file);
+        return NULL;
+    }
+
+    // Enforce size sanity check
+    if (filesize > MAX_PEM_SIZE) {
+        LOG(AQUA_LOG, LOG_ERR, "Error: PEM file %s too large (%ld bytes, limit is %d)\n", filepath, filesize, MAX_PEM_SIZE);
+        fclose(file);
+        return NULL;
+    }
+
+    // Allocate buffer (+1 for null terminator)
+    char* buffer = malloc(filesize + 1);
+    if (!buffer) {
+        LOG(AQUA_LOG, LOG_ERR, "malloc failed on %s\n",filepath);
+        fclose(file);
+        return NULL;
+    }
+
+    rewind(file);
+    size_t bytesRead = fread(buffer, 1, filesize, file);
+    if (bytesRead != (size_t)filesize) {
+        LOG(AQUA_LOG, LOG_ERR, "fread failed on %s\n",filepath);
+        free(buffer);
+        fclose(file);
+        return NULL;
+    }
+
+    buffer[filesize] = '\0'; // Null-terminate
+
+    fclose(file);
+    return buffer;
+}
+#endif

@@ -11,6 +11,7 @@ typedef struct {
     char url[INET_ADDRSTRLEN + 14]; // allow for "https://" and ":80801"
     char localurl[10 + 14]; // allow for "https://" "localhost" ":80801"
     char rawmac[18];
+    bool isLocalurlTLS;
 } net_iface;
 
 /*

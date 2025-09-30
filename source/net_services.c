@@ -47,6 +47,7 @@
 #include "version.h"
 #include "color_lights.h"
 #include "net_interface.h"
+#include "aq_systemutils.h"
 
 #ifdef AQ_PDA
 #include "pda.h"
@@ -55,6 +56,14 @@
 struct mg_connection *mg_next(struct mg_mgr *s, struct mg_connection *conn) {
   return conn == NULL ? s->conns : conn->next;
 }
+
+
+#define FAST_SUFFIX_3_CI(str, len, SUFFIX) ( \
+    (len) >= 3 && \
+    tolower((unsigned char)(str)[(len)-3]) == tolower((unsigned char)(SUFFIX)[0]) && \
+    tolower((unsigned char)(str)[(len)-2]) == tolower((unsigned char)(SUFFIX)[1]) && \
+    tolower((unsigned char)(str)[(len)-1]) == tolower((unsigned char)(SUFFIX)[2]) \
+)
 
 
 /*
@@ -111,7 +120,8 @@ static int is_websocket_aqmanager(const struct mg_connection *nc) {
   return nc->aq_flags & AQ_MG_CON_WS_AQM;
 }
 static int is_mqtt(const struct mg_connection *nc) {
-  return nc->aq_flags & AQ_MG_CON_MQTT;
+  //return nc->aq_flags & AQ_MG_CON_MQTT;
+  return nc->aq_flags & (AQ_MG_CON_MQTT | AQ_MG_CON_MQTT_CONNECTING);
 }
 /*
 static void set_mqtt(struct mg_connection *nc) {
@@ -575,21 +585,6 @@ void send_mqtt_swg_state_msg(struct mg_connection *nc, char *dev_name, aqledstat
 void send_mqtt_heater_state_msg(struct mg_connection *nc, char *dev_name, aqledstate state)
 {
   send_mqtt_led_state_msg(nc, dev_name, state, MQTT_ON, MQTT_OFF);
-/*
-  static char mqtt_pub_topic[250];
-
-  sprintf(mqtt_pub_topic, "%s/%s",_aqconfig_.mqtt_aq_topic, dev_name);
-
-  if (state == ENABLE) {
-    send_mqtt(nc, mqtt_pub_topic, MQTT_OFF);
-    sprintf(mqtt_pub_topic, "%s/%s%s",_aqconfig_.mqtt_aq_topic, dev_name, ENABELED_SUBT);
-    send_mqtt(nc, mqtt_pub_topic, MQTT_ON);
-  } else {
-    send_mqtt(nc, mqtt_pub_topic, (state==OFF?MQTT_OFF:MQTT_ON));
-    sprintf(mqtt_pub_topic, "%s/%s%s",_aqconfig_.mqtt_aq_topic, dev_name, ENABELED_SUBT);
-    send_mqtt(nc, mqtt_pub_topic, (state==OFF?MQTT_OFF:MQTT_ON));
-  }
-*/
 }
 
 
@@ -604,18 +599,7 @@ void send_mqtt_temp_msg(struct mg_connection *nc, char *dev_name, long value)
   sprintf(mqtt_pub_topic, "%s/%s", _aqconfig_.mqtt_aq_topic, dev_name);
   send_mqtt(nc, mqtt_pub_topic, degC);
 }
-/*
-void send_mqtt_temp_msg_new(struct mg_connection *nc, char *dev_name, long value)
-{
-  static char mqtt_pub_topic[250];
-  static char degC[5];
-  // NSF remove false below once we have finished.
-  sprintf(degC, "%.2f", (false && _aqualink_data->temp_units==FAHRENHEIT && _aqconfig_.convert_mqtt_temp)?degFtoC(value):value );
-  //sprintf(degC, "%d", value );
-  sprintf(mqtt_pub_topic, "%s/%s", _aqconfig_.mqtt_aq_topic, dev_name);
-  send_mqtt(nc, mqtt_pub_topic, degC);
-}
-*/
+
 void send_mqtt_setpoint_msg(struct mg_connection *nc, char *dev_name, long value)
 {
   static char mqtt_pub_topic[250];
@@ -646,14 +630,6 @@ void send_mqtt_float_msg(struct mg_connection *nc, char *dev_name, float value) 
 
 void send_mqtt_int_msg(struct mg_connection *nc, char *dev_name, int value) {
   send_mqtt_numeric_msg(nc, dev_name, value);
-  /*
-  static char mqtt_pub_topic[250];
-  static char msg[10];
-
-  sprintf(msg, "%d", value);
-  sprintf(mqtt_pub_topic, "%s/%s", _aqconfig_.mqtt_aq_topic, dev_name);
-  send_mqtt(nc, mqtt_pub_topic, msg);
-  */
 }
 
 void send_mqtt_string_msg(struct mg_connection *nc, const char *dev_name, const char *msg) {
@@ -1628,19 +1604,9 @@ void action_web_request(struct mg_connection *nc, struct mg_http_message *http_m
 
   // If we have a get request, pass it
   if (strncmp(http_msg->uri.buf, "/api", 4 ) != 0) {
-    //if (strstr(http_msg->method.p, "GET") && http_msg->query_string.len > 0) {
-    //  log_http_request(LOG_ERR, "Old API stanza requested, ignoring request :", http_msg);
-    //} else {
       DEBUG_TIMER_START(&tid);
-
-      //mg_serve_http(nc, http_msg, _http_server_opts);
-      //mg_http_serve_file(nc, http_msg, _http_server_opts.root_dir, &_http_server_opts);
       mg_http_serve_dir(nc, http_msg, &_http_server_opts);
-      // _aqconfig_.web_directory
-               
       DEBUG_TIMER_STOP(tid, NET_LOG, "action_web_request() serve file took");
-    //}
-  //} else if (strstr(http_msg->method.p, "PUT")) {
   } else {
     char buf[JSON_BUFFER_SIZE];
     float value = 0;
@@ -1771,7 +1737,6 @@ void action_web_request(struct mg_connection *nc, struct mg_http_message *http_m
     DEBUG_TIMER_STOP(tid, NET_LOG, buf);
   }
 }
-
 
 void action_websocket_request(struct mg_connection *nc, struct mg_ws_message *wm) {
   char buffer[100];
@@ -1907,17 +1872,6 @@ void action_websocket_request(struct mg_connection *nc, struct mg_ws_message *wm
   }
 }
 
-/*
-static void mqtt_subscribe(struct mg_connection *c, const char *topic) {
-  static uint8_t qos=1;// PUT IN FUNCTION HEADDER can't be bothered with ack, so set to 0
-  struct mg_mqtt_opts opts = {};
-  memset(&opts, 0, sizeof(opts));
-  opts.topic = mg_str(topic);
-  opts.qos = qos;
-  mg_mqtt_sub(c, &opts);
-  LOG(NET_LOG,LOG_INFO, "MQTT: Subscribing to '%s'\n", topic);
-}
-*/
 
 static void ev_handler(struct mg_connection *nc, int ev, void *ev_data) {
   struct mg_mqtt_message *mqtt_msg;
@@ -1978,11 +1932,65 @@ static void ev_handler(struct mg_connection *nc, int ev, void *ev_data) {
 
     break;
   
+  case MG_EV_ACCEPT: 
+    if (is_mqtt(nc)) {
+      return;
+    }
+    // Only want HTTPS & WS connections
+#if MG_TLS > 0
+    if (nc->is_tls) {
+      static char *crt;
+      static char *key; 
+      
+      struct mg_tls_opts opts;
+      memset(&opts, 0, sizeof(opts));
+
+      if (crt == NULL || key == NULL) {
+        LOG(NET_LOG,LOG_NOTICE, "HTTPS: loading certs from : %s\n", _aqconfig_.cert_dir);
+        crt = read_pem_file("%s/crt.pem",_aqconfig_.cert_dir);
+        key = read_pem_file("%s/key.pem",_aqconfig_.cert_dir);
+      }
+      opts.cert = mg_str(crt);
+      opts.key = mg_str(key);
+
+#ifdef TLS_TWOWAY
+      static char *ca;
+      if (ca == NULL)
+        ca = read_pem_file("%s/ca.pem",_aqconfig_.cert_dir);
+      opts.ca = mg_str(ca);
+#endif
+      
+      mg_tls_init(nc, &opts);
+    }
+#endif
+    break;
+
   case MG_EV_CONNECT: {
     set_mqttconnected(nc);
     //set_mqtt(nc);
     _mqtt_exit_flag = false;
     LOG(NET_LOG,LOG_DEBUG, "MQTT: Connected to : %s\n", _aqconfig_.mqtt_server);
+#if MG_TLS > 0
+    if (nc->is_tls) {
+      static char *crt;
+      static char *key;
+      static char *ca;
+      
+      struct mg_tls_opts opts;
+      memset(&opts, 0, sizeof(opts));
+
+      if (crt == NULL || key == NULL) {
+        LOG(NET_LOG,LOG_NOTICE, "MQTTS: loading certs from : %s\n", _aqconfig_.mqtt_cert_dir);
+        crt = read_pem_file("%s/crt.pem",_aqconfig_.cert_dir);
+        key = read_pem_file("%s/key.pem",_aqconfig_.cert_dir);
+        ca = read_pem_file("%s/ca.pem",_aqconfig_.cert_dir);
+      }
+      opts.cert = mg_str(crt);
+      opts.key = mg_str(key);
+      opts.ca = mg_str(ca);
+      mg_tls_init(nc, &opts);
+    }
+#endif
   } break;
 
   case MG_EV_MQTT_OPEN:
@@ -2016,17 +2024,9 @@ static void ev_handler(struct mg_connection *nc, int ev, void *ev_data) {
   case MG_EV_MQTT_MSG:
     mqtt_msg = (struct mg_mqtt_message *)ev_data;
     
-    //if ( mqtt_msg->topic.buf[mqtt_msg->topic.len-3] == 's' || mqtt_msg->topic.buf[mqtt_msg->topic.len-3] == 'S')
-    /*
-    if (mqtt_msg->id != 0) { // NSF Not good check mongoose.h # 2842
-      LOG(NET_LOG,LOG_DEBUG, "MQTT: received (msg_id: %d), looks like my own message, ignoring\n", mqtt_msg->id);
-      break;
-    }*/
-// NSF Need to change strlen to a global so it's not executed every time we check a topic
-    if ( ( mqtt_msg->topic.buf[mqtt_msg->topic.len-3] == 's' || mqtt_msg->topic.buf[mqtt_msg->topic.len-3] == 'S') &&
-         ( mqtt_msg->topic.buf[mqtt_msg->topic.len-2] == 'e' || mqtt_msg->topic.buf[mqtt_msg->topic.len-2] == 'E') &&
-         ( mqtt_msg->topic.buf[mqtt_msg->topic.len-1] == 't' || mqtt_msg->topic.buf[mqtt_msg->topic.len-1] == 'T') &&
-         (_aqconfig_.mqtt_aq_topic != NULL && strncmp(mqtt_msg->topic.buf, _aqconfig_.mqtt_aq_topic, strlen(_aqconfig_.mqtt_aq_topic)) == 0) )
+    // We are only subscribed to aqualink topic, (so not checking that).
+    // Just check we have "set" as string end
+    if ( FAST_SUFFIX_3_CI(mqtt_msg->topic.buf, mqtt_msg->topic.len, "set"))
     {
         DEBUG_TIMER_START(&tid); 
         action_mqtt_message(nc, mqtt_msg);

@@ -663,7 +663,7 @@
         }
     }
 
-    const _turn_off_sensortiles = (typeof turn_off_sensortiles !== 'undefined') ? turn_off_sensortiles : false;
+    const _turn_off_sensortiles = (typeof turn_off_sensortiles !== 'undefined') ? turn_off_sensortiles : true;
     const _show_vsp_gpm = (typeof show_vsp_gpm !== 'undefined') ? show_vsp_gpm : true;
     const _link_spa_and_heater = (typeof link_spa_and_spa_heater !== 'undefined') ? link_spa_and_spa_heater : false;
 
@@ -1129,14 +1129,17 @@
           }
         }
 
-        if ((type == 'temperature' || type == 'value') && _turn_off_sensortiles == false) {
+        if ((type == 'temperature' || type == 'value') /*&& _turn_off_sensortiles == false*/) {
           // Anything specific (SWG PPM should be off if SWG is off)
           // This needs a try catch, or is above try block good enough?
-          if (id == 'SWG/PPM' && document.getElementById('SWG').getAttribute('status') != 'on' ) {
+          if (id == 'SWG/PPM' && document.getElementById('SWG').getAttribute('status') != 'on' && _turn_off_sensortiles) {
+            setTileOn(id, 'off');
+            setTileOnText(id, "");
+          } else if ( (id == 'CHEM/ORP' || id == 'CHEM/pH' ) && document.getElementById('Filter_Pump').getAttribute('status') == 'off' && _turn_off_sensortiles) {
             setTileOn(id, 'off');
             setTileOnText(id, "");
           // Generic for all.
-           } else if (value == 0 || value == '--') {
+           } else if ((value == 0 || value == '--') && _turn_off_sensortiles) {
             setTileOn(id, 'off');
             setTileOnText(id, "");
           } else {
