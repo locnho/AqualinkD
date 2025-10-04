@@ -154,8 +154,7 @@ NEED TO FIX FOR THIS RELEASE.
 * Autoconfigure will *try* to work for PDA panels.
 * Added example script to generate HTTPS certificates. (./extras/generate-certs.sh)
 * Cleaned up exit & errors when running as daemon and docker.
-
-* Need to finish off :-
+- Need to finish off :-
   * HAT serial optimizations broke some USB serial adapters
   * Finish off assigning light mode & functionality to a vbutton (for Jandy Infinite water color support )
   * cleanup rs_msg_utils.c
