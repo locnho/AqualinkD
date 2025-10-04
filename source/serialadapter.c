@@ -35,10 +35,10 @@ unsigned char getAux15[] = {0x00,0x01,0x00,RS_SA_AUX15};
 
 
 // processLEDstate exists in allbutton.c
-//void processLEDstate(struct aqualinkdata *aq_data, unsigned char *packet, logmask_t from);
-void processRSSALEDstate(struct aqualinkdata *aq_data, unsigned char *packet)
+//void processLEDstate(struct aqualinkdata *aqdata, unsigned char *packet, logmask_t from);
+void processRSSALEDstate(struct aqualinkdata *aqdata, unsigned char *packet)
 {
-  processLEDstate(aq_data, packet, RSSA_LOG);
+  processLEDstate(aqdata, packet, RSSA_LOG);
 }
 
 
@@ -225,12 +225,12 @@ void get_aqualink_rssadapter_button_status(aqkey *button)
   if (button->rssd_code != NUL)
     rssadapter_device_state(button->rssd_code, 0x00);
 }
-void get_aqualink_rssadapter_colorlight_statuses(struct aqualinkdata *aq_data)
+void get_aqualink_rssadapter_colorlight_statuses(struct aqualinkdata *aqdata)
 {
-  for (int i=0; i < aq_data->num_lights; i++) {
-    if (aq_data->lights[i].lightType != LC_PROGRAMABLE ) {
+  for (int i=0; i < aqdata->num_lights; i++) {
+    if (aqdata->lights[i].lightType != LC_PROGRAMABLE ) {
       // LC_PROGRAMABLE is aqualinkd to set, so works as normal button
-      rssadapter_device_state(aq_data->lights[i].button->rssd_code, 0x00); // 0x00 meand Get curent state
+      rssadapter_device_state(aqdata->lights[i].button->rssd_code, 0x00); // 0x00 meand Get curent state
     }
   }
 }
@@ -247,7 +247,7 @@ void get_aqualink_rssadapter_setpoints() {
 }
 
 // Return true if we change the state.
-bool setLEDstate( aqled *led, unsigned char state, struct aqualinkdata *aq_data)
+bool setLEDstate( aqled *led, unsigned char state, struct aqualinkdata *aqdata)
 {
   if (state == 0x00) {
     if (led->state != OFF) {
@@ -267,7 +267,7 @@ bool setLEDstate( aqled *led, unsigned char state, struct aqualinkdata *aq_data)
   return false;
 }
 
-bool process_rssadapter_packet(unsigned char *packet, int length, struct aqualinkdata *aq_data) {
+bool process_rssadapter_packet(unsigned char *packet, int length, struct aqualinkdata *aqdata) {
 //RSSA_LOG
   bool rtn = false;
   static int cnt=-5;
@@ -278,7 +278,7 @@ bool process_rssadapter_packet(unsigned char *packet, int length, struct aqualin
   //debuglogPacket(RSSA_LOG, packet, length, true);
 #ifdef CLIGHT_PANEL_FIX 
   if ( (cnt % 10 == 0) || cnt == 0 ) { // NSF Change to 20 and 1
-    get_aqualink_rssadapter_colorlight_statuses(aq_data);
+    get_aqualink_rssadapter_colorlight_statuses(aqdata);
   }
 #endif
   if (cnt == 0 || cnt >= 100) {
@@ -287,7 +287,7 @@ bool process_rssadapter_packet(unsigned char *packet, int length, struct aqualin
     if (cnt == 0) {
       // The below inturn calls get_aqualink_rssadapter_setpoints()
       // But do it here as it's the first init, cnt=0 will only happen once  
-      queueGetProgramData(RSSADAPTER, aq_data);
+      queueGetProgramData(RSSADAPTER, aqdata);
     } else {
       push_rssa_cmd(getPoolSP);
     
@@ -309,14 +309,14 @@ bool process_rssadapter_packet(unsigned char *packet, int length, struct aqualin
 
   if (packet[PKT_CMD] == CMD_PROBE) {
     LOG(RSSA_LOG,LOG_DEBUG, "Probe received, will queue device update shortly\n");
-    //queueGetProgramData(RSSADAPTER, aq_data);
+    //queueGetProgramData(RSSADAPTER, aqdata);
     cnt=-5; // Connection reset, so queue the status update
   
   } else if (packet[PKT_CMD] == CMD_STATUS) {
     // This is identical to allbutton status packet.
     //LOG(RSSA_LOG,LOG_DEBUG, "RS Received STATUS length %d.\n", length);
     //debuglogPacket(RSSA_LOG, packet, length, true, true);
-    processRSSALEDstate(aq_data, packet);
+    processRSSALEDstate(aqdata, packet);
   } else if (packet[PKT_CMD] == 0x13) {
     //beautifyPacket(buff, packet, length);
     //LOG(RSSA_LOG,LOG_DEBUG, "%s", buff);
@@ -333,77 +333,77 @@ bool process_rssadapter_packet(unsigned char *packet, int length, struct aqualin
     } else if (packet[4] == RS_SA_UNITS) {
       if (packet[6] == 0x01) {
         LOG(RSSA_LOG,LOG_INFO,"Units are Deg C\n");
-        aq_data->temp_units = CELSIUS;
-        rtn = true;
+        SET_IF_CHANGED(aqdata->temp_units, CELSIUS, aqdata->is_dirty);
+        rtn |= true;
       } else if (packet[6] == 0x00) {
         LOG(RSSA_LOG,LOG_INFO,"Units are Deg F\n");
-        aq_data->temp_units = FAHRENHEIT;
-        rtn = true;
+        SET_IF_CHANGED(aqdata->temp_units, FAHRENHEIT, aqdata->is_dirty);
+        rtn |= true;
       } else {
         LOG(RSSA_LOG,LOG_ERR,"Units are Unknown\n");
       }
     } else if (packet[4] == RS_SA_POOLSP) {
       LOG(RSSA_LOG,LOG_INFO,"Pool SP is %d\n", packet[6]);
-      aq_data->pool_htr_set_point = (int) packet[6];
-      rtn = true;
+      SET_IF_CHANGED(aqdata->pool_htr_set_point, (int) packet[6], aqdata->is_dirty);
+      rtn |= true;
     } else if (packet[4] == RS_SA_SPASP) {
       LOG(RSSA_LOG,LOG_INFO,"Spa SP is %d\n", packet[6]);
-      aq_data->spa_htr_set_point = (int) packet[6];
-      rtn = true;
+      SET_IF_CHANGED(aqdata->spa_htr_set_point, (int) packet[6], aqdata->is_dirty);
+      rtn |= true;
     } else if (packet[4] == RS_SA_POOLSP2) {
       LOG(RSSA_LOG,LOG_INFO,"Pool SP2 is %d\n", packet[6]);
-      aq_data->spa_htr_set_point = (int) packet[6];
-      rtn = true;
+      SET_IF_CHANGED(aqdata->spa_htr_set_point, (int) packet[6], aqdata->is_dirty);
+      rtn |= true;
     } else if (packet[4] == 0x03 || packet[4] == 0x02) { // 03 reply from query state, 02 reply from set state
       // These are device status messages
 
-      for (int i=0; i < aq_data->num_lights; i++) {
-        if (aq_data->lights[i].lightType != LC_PROGRAMABLE && 
-            aq_data->lights[i].button->rssd_code == packet[7] ) {
+      for (int i=0; i < aqdata->num_lights; i++) {
+        if (aqdata->lights[i].lightType != LC_PROGRAMABLE && 
+            aqdata->lights[i].button->rssd_code == packet[7] ) {
          
           // CHANGE TO DEBUG BEFORE RELEASE
-          if (aq_data->lights[i].lightType == LC_DIMMER || aq_data->lights[i].lightType == LC_DIMMER2) {
+          if (aqdata->lights[i].lightType == LC_DIMMER || aqdata->lights[i].lightType == LC_DIMMER2) {
             LOG(RSSA_LOG,LOG_DEBUG,"DimmerLight '%s' is %s, rawvalue 0x%02hhx  value '%d'%%\n",
-                                  aq_data->lights[i].button->label,
+                                  aqdata->lights[i].button->label,
                                   packet[6]==0x00?"OFF":"ON",
                                   packet[6],
                                   packet[6]==0x00?0:(packet[6] - RSSD_DIMMER_LIGHT_OFFSET));
           }else{
             LOG(RSSA_LOG,LOG_DEBUG,"ColorLight '%s' is %s 0x%02hhx  value name '%s'\n",
-                                  aq_data->lights[i].button->label,
+                                  aqdata->lights[i].button->label,
                                   packet[6]==0x00?"OFF":"ON",
                                   packet[6],
-                                  packet[6]==0x00?"--":light_mode_name( aq_data->lights[i].lightType,(packet[6] - RSSD_COLOR_LIGHT_OFFSET), RSSADAPTER) );
+                                  packet[6]==0x00?"--":light_mode_name( aqdata->lights[i].lightType,(packet[6] - RSSD_COLOR_LIGHT_OFFSET), RSSADAPTER) );
           } 
 
-          aq_data->lights[i].RSSDstate = (packet[6]==0x00?OFF:ON);
+          SET_IF_CHANGED(aqdata->lights[i].RSSDstate, (packet[6]==0x00?OFF:ON), aqdata->is_dirty);
 #ifdef CLIGHT_PANEL_FIX 
           // Set LED to the correct state, but only print warning if light is on and panel states off.
-          if (aq_data->lights[i].RSSDstate == ON && aq_data->lights[i].button->led->state == OFF) {
+          if (aqdata->lights[i].RSSDstate == ON && aqdata->lights[i].button->led->state == OFF) {
             // 0x00 is off, 0x01 is usually on, but get 0x44 for color light 0x4e=gemstone, 0x41=vodo
             LOG(RSSA_LOG,LOG_DEBUG,"ColorLight '%s' is out of sync with panel, light is '%s', panel states '%s', Fixed Jany bug!\n",
-                                     aq_data->lights[i].button->label,
+                                     aqdata->lights[i].button->label,
                                      packet[6]==0x00?"OFF":"ON",
-                                     aq_data->lights[i].button->led->state==OFF?"OFF":"ON");
+                                     aqdata->lights[i].button->led->state==OFF?"OFF":"ON");
           }
-          aq_data->lights[i].button->led->state = aq_data->lights[i].RSSDstate;
+          SET_IF_CHANGED(aqdata->lights[i].button->led->state, aqdata->lights[i].RSSDstate, aqdata->is_dirty);
 #endif 
-          switch(aq_data->lights[i].lightType) {
+          switch(aqdata->lights[i].lightType) {
             case LC_DIMMER:
-              set_currentlight_value(&aq_data->lights[i], (packet[6] - RSSD_DIMMER_LIGHT_OFFSET) / 25);
+              rtn |= set_currentlight_value(&aqdata->lights[i], (packet[6] - RSSD_DIMMER_LIGHT_OFFSET) / 25);
             break;
             case LC_DIMMER2:
-              set_currentlight_value(&aq_data->lights[i], (packet[6] - RSSD_DIMMER_LIGHT_OFFSET));
+              rtn |= set_currentlight_value(&aqdata->lights[i], (packet[6] - RSSD_DIMMER_LIGHT_OFFSET));
             break;
             default:
-              set_currentlight_value(&aq_data->lights[i], (packet[6] - RSSD_COLOR_LIGHT_OFFSET));
+              rtn |= set_currentlight_value(&aqdata->lights[i], (packet[6] - RSSD_COLOR_LIGHT_OFFSET));
             break;
           }
           /*
-          if (aq_data->lights[i].lightType != LC_DIMMER ) {
-            set_currentlight_value(&aq_data->lights[i], (packet[6] - RSSD_COLOR_LIGHT_OFFSET));
-          } else if (aq_data->lights[i].lightType == LC_DIMMER) {
-            set_currentlight_value(&aq_data->lights[i], (packet[6] - RSSD_DIMMER_LIGHT_OFFSET) / 25);
+          if (aqdata->lights[i].lightType != LC_DIMMER ) {
+            set_currentlight_value(&aqdata->lights[i], (packet[6] - RSSD_COLOR_LIGHT_OFFSET));
+          } else if (aqdata->lights[i].lightType == LC_DIMMER) {
+            set_currentlight_value(&aqdata->lights[i], (packet[6] - RSSD_DIMMER_LIGHT_OFFSET) / 25);
           }*/
         }
       }
@@ -411,25 +411,24 @@ bool process_rssadapter_packet(unsigned char *packet, int length, struct aqualin
 
       if (packet[7] == RS_SA_AUX12) {
         LOG(RSSA_LOG,LOG_INFO,"AUX12 %d\n", packet[6]);
-        rtn = setLEDstate(aq_data->aqbuttons[13].led,  packet[6], aq_data);
+        rtn |= setLEDstate(aqdata->aqbuttons[13].led,  packet[6], aqdata);
         //_aqualink_data.aqbuttons[13].led->state = OFF;
       } else if (packet[7] == RS_SA_AUX13) {
         LOG(RSSA_LOG,LOG_INFO,"AUX13 %d\n", packet[6]);
-        rtn = setLEDstate(aq_data->aqbuttons[14].led,  packet[6], aq_data);
+        rtn |= setLEDstate(aqdata->aqbuttons[14].led,  packet[6], aqdata);
       } else if (packet[7] == RS_SA_AUX14) {
         LOG(RSSA_LOG,LOG_INFO,"AUX14 %d\n", packet[6]);
-        rtn = setLEDstate(aq_data->aqbuttons[15].led,  packet[6], aq_data);
+        rtn |= setLEDstate(aqdata->aqbuttons[15].led,  packet[6], aqdata);
       } else if (packet[7] == RS_SA_AUX15) {
         LOG(RSSA_LOG,LOG_INFO,"AUX15 %d\n", packet[6]);
-        rtn = setLEDstate(aq_data->aqbuttons[16].led,  packet[6], aq_data);
+        rtn |= setLEDstate(aqdata->aqbuttons[16].led,  packet[6], aqdata);
       }
 
       
     }
   }
 
-  if (rtn == true)
-    aq_data->updated  = true;
+  if (rtn){SET_DIRTY(aqdata->is_dirty);}
 
   return rtn;
 }

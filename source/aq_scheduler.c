@@ -321,7 +321,7 @@ void get_cron_pump_times()
 }
 
 
-bool event_happened_set_device_state(reset_event_type type, struct aqualinkdata *aq_data)
+bool event_happened_set_device_state(reset_event_type type, struct aqualinkdata *aqdata)
 {
   if (! isAQS_START_PUMP_EVENT_ENABLED) {
     LOG(SCHD_LOG,LOG_DEBUG, "Event scheduler is not enabled\n");
@@ -356,50 +356,50 @@ bool event_happened_set_device_state(reset_event_type type, struct aqualinkdata 
   // Check event type.
   switch(type){
     case AQS_POWER_ON:
-      if (scheduledOn && isAQS_POWER_ON_ENABED && aq_data->aqbuttons[0].led->state == OFF) {
+      if (scheduledOn && isAQS_POWER_ON_ENABED && aqdata->aqbuttons[0].led->state == OFF) {
         LOG(SCHD_LOG,LOG_INFO, "Powered on, schedule is set for pump running and pump is off, turning pump on\n");
-        panel_device_request(aq_data, ON_OFF, 0, true, NET_TIMER);
+        panel_device_request(aqdata, ON_OFF, 0, true, NET_TIMER);
       } else {
         //LOG(SCHD_LOG,LOG_DEBUG, "Powered on, schedule is not set and/or pump is already on, leaving\n");
-        LOG(SCHD_LOG,LOG_DEBUG, "Powered on, schedule Pump on is %sset, time is %sbetween scheduled hours, Pump is %s, (not changing)\n",(isAQS_POWER_ON_ENABED?"":"not "),(scheduledOn?"":" not"), (aq_data->aqbuttons[0].led->state ==OFF?"Off":"On"));
+        LOG(SCHD_LOG,LOG_DEBUG, "Powered on, schedule Pump on is %sset, time is %sbetween scheduled hours, Pump is %s, (not changing)\n",(isAQS_POWER_ON_ENABED?"":"not "),(scheduledOn?"":" not"), (aqdata->aqbuttons[0].led->state ==OFF?"Off":"On"));
       }
     break;
     case AQS_FRZ_PROTECT_OFF:
-      if (scheduledOn && isAQS_FRZ_PROTECT_OFF_ENABED && aq_data->aqbuttons[0].led->state == OFF) {
+      if (scheduledOn && isAQS_FRZ_PROTECT_OFF_ENABED && aqdata->aqbuttons[0].led->state == OFF) {
         LOG(SCHD_LOG,LOG_INFO, "Freeze Protect off, schedule is set for pump running and pump is off, turning pump on\n");
-        panel_device_request(aq_data, ON_OFF, 0, true, NET_TIMER);
+        panel_device_request(aqdata, ON_OFF, 0, true, NET_TIMER);
       } else {
         //LOG(SCHD_LOG,LOG_DEBUG, "Freeze Protect off, schedule is not set and/or pump is already on, leaving\n");
-        LOG(SCHD_LOG,LOG_DEBUG, "Freeze Protect off, schedule Pump on is %sset, time is %sbetween scheduled hours, Pump is %s, (not changing)\n",(isAQS_FRZ_PROTECT_OFF_ENABED?"":"not "),(scheduledOn?"":" not"), (aq_data->aqbuttons[0].led->state ==OFF?"Off":"On"));
+        LOG(SCHD_LOG,LOG_DEBUG, "Freeze Protect off, schedule Pump on is %sset, time is %sbetween scheduled hours, Pump is %s, (not changing)\n",(isAQS_FRZ_PROTECT_OFF_ENABED?"":"not "),(scheduledOn?"":" not"), (aqdata->aqbuttons[0].led->state ==OFF?"Off":"On"));
       }
     break;
     case AQS_BOOST_OFF:
-      if (scheduledOn && isAQS_BOOST_OFF_ENABED && aq_data->aqbuttons[0].led->state == OFF) {
+      if (scheduledOn && isAQS_BOOST_OFF_ENABED && aqdata->aqbuttons[0].led->state == OFF) {
         LOG(SCHD_LOG,LOG_INFO, "Boost off, schedule is set for pump running and pump is off, turning pump on\n");
-        panel_device_request(aq_data, ON_OFF, 0, true, NET_TIMER);
+        panel_device_request(aqdata, ON_OFF, 0, true, NET_TIMER);
       } else {
         //LOG(SCHD_LOG,LOG_DEBUG, "Boost off, schedule is not set and/or pump is already on, leaving\n");
-        LOG(SCHD_LOG,LOG_DEBUG, "Boost off, schedule Pump on is %sset, time is %sbetween scheduled hours, Pump is %s, (not changing)\n",(isAQS_BOOST_OFF_ENABED?"":"not "),(scheduledOn?"":" not"), (aq_data->aqbuttons[0].led->state ==OFF?"Off":"On"));
+        LOG(SCHD_LOG,LOG_DEBUG, "Boost off, schedule Pump on is %sset, time is %sbetween scheduled hours, Pump is %s, (not changing)\n",(isAQS_BOOST_OFF_ENABED?"":"not "),(scheduledOn?"":" not"), (aqdata->aqbuttons[0].led->state ==OFF?"Off":"On"));
       }
 
-      if (aq_data->boost_linked_device != AQ_UNKNOWN && aq_data->boost_linked_device <= aq_data->total_buttons && aq_data->boost_linked_device >= 0) {
-        //aq_data->aqbuttons[aq_data->boost_linked_device].code
-        if (aq_data->aqbuttons[aq_data->boost_linked_device].led->state == OFF) {
-          panel_device_request(aq_data, ON_OFF, aq_data->boost_linked_device, false, NET_TIMER);
-          LOG(SCHD_LOG,LOG_INFO, "Boost off, Turing %s off\n",aq_data->aqbuttons[aq_data->boost_linked_device].label);
+      if (aqdata->boost_linked_device != AQ_UNKNOWN && aqdata->boost_linked_device <= aqdata->total_buttons && aqdata->boost_linked_device >= 0) {
+        //aqdata->aqbuttons[aqdata->boost_linked_device].code
+        if (aqdata->aqbuttons[aqdata->boost_linked_device].led->state == OFF) {
+          panel_device_request(aqdata, ON_OFF, aqdata->boost_linked_device, false, NET_TIMER);
+          LOG(SCHD_LOG,LOG_INFO, "Boost off, Turing %s off\n",aqdata->aqbuttons[aqdata->boost_linked_device].label);
         } else {
-          LOG(SCHD_LOG,LOG_INFO, "Boost off, %s is already off\n",aq_data->aqbuttons[aq_data->boost_linked_device].label);
+          LOG(SCHD_LOG,LOG_INFO, "Boost off, %s is already off\n",aqdata->aqbuttons[aqdata->boost_linked_device].label);
         }
       }
     break;
     case AQS_BOOST_ON:
-      if (aq_data->boost_linked_device != AQ_UNKNOWN && aq_data->boost_linked_device <= aq_data->total_buttons && aq_data->boost_linked_device >= 0) {
-        //aq_data->aqbuttons[aq_data->boost_linked_device].code
-        if (aq_data->aqbuttons[aq_data->boost_linked_device].led->state == OFF) {
-          panel_device_request(aq_data, ON_OFF, aq_data->boost_linked_device, true, NET_TIMER);
-          LOG(SCHD_LOG,LOG_INFO, "Boost on, Turing %s on\n",aq_data->aqbuttons[aq_data->boost_linked_device].label);
+      if (aqdata->boost_linked_device != AQ_UNKNOWN && aqdata->boost_linked_device <= aqdata->total_buttons && aqdata->boost_linked_device >= 0) {
+        //aqdata->aqbuttons[aqdata->boost_linked_device].code
+        if (aqdata->aqbuttons[aqdata->boost_linked_device].led->state == OFF) {
+          panel_device_request(aqdata, ON_OFF, aqdata->boost_linked_device, true, NET_TIMER);
+          LOG(SCHD_LOG,LOG_INFO, "Boost on, Turing %s on\n",aqdata->aqbuttons[aqdata->boost_linked_device].label);
         } else {
-          LOG(SCHD_LOG,LOG_INFO, "Boost on, %s is already on\n",aq_data->aqbuttons[aq_data->boost_linked_device].label);
+          LOG(SCHD_LOG,LOG_INFO, "Boost on, %s is already on\n",aqdata->aqbuttons[aqdata->boost_linked_device].label);
         }
       }
     break;

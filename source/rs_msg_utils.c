@@ -198,6 +198,18 @@ bool rsm_isempy(const char *src, int length)
   }
   return true;
 }
+
+#include "aq_serial.h"
+int rsm_countascii(const char *src)
+{
+  int i;
+  for(i=0; i < AQ_MSGLONGLEN; i++) {
+    if  (src[i] < 32 || src[i] > 126) // 32 is space
+      break;
+  }
+
+  return i;
+}
 /*
   Can probably replace this with rsm_strncasestr in all code.
 */

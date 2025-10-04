@@ -316,17 +316,17 @@ void set_iaqualink_heater_setpoint(int value, SP_TYPE type) {
   _fullcmd[10] = 0x00;
 }
 
-void iAqSetButtonState(struct aqualinkdata *aq_data, int index, const unsigned char byte)
+void iAqSetButtonState(struct aqualinkdata *aqdata, int index, const unsigned char byte)
 {
-  if ( aq_data->aqbuttons[index].led->state != OFF && byte == 0x00) {
-    aq_data->aqbuttons[index].led->state = OFF;
-    LOG(IAQL_LOG, LOG_INFO, "Set %s off\n",aq_data->aqbuttons[index].label);
-  } else if ( aq_data->aqbuttons[index].led->state != ON && byte == 0x01) {
-    aq_data->aqbuttons[index].led->state = ON;
-    LOG(IAQL_LOG, LOG_INFO, "Set %s on\n",aq_data->aqbuttons[index].label);
-  } else if ( aq_data->aqbuttons[index].led->state != ENABLE && byte == 0x03) {
-    aq_data->aqbuttons[index].led->state = ENABLE;
-    LOG(IAQL_LOG, LOG_INFO, "Set %s enabled\n",aq_data->aqbuttons[index].label);
+  if ( aqdata->aqbuttons[index].led->state != OFF && byte == 0x00) {
+    SET_IF_CHANGED(aqdata->aqbuttons[index].led->state, OFF, aqdata->is_dirty);
+    LOG(IAQL_LOG, LOG_INFO, "Set %s off\n",aqdata->aqbuttons[index].label);
+  } else if ( aqdata->aqbuttons[index].led->state != ON && byte == 0x01) {
+    SET_IF_CHANGED(aqdata->aqbuttons[index].led->state, ON, aqdata->is_dirty);
+    LOG(IAQL_LOG, LOG_INFO, "Set %s on\n",aqdata->aqbuttons[index].label);
+  } else if ( aqdata->aqbuttons[index].led->state != ENABLE && byte == 0x03) {
+    SET_IF_CHANGED(aqdata->aqbuttons[index].led->state, ENABLE, aqdata->is_dirty);
+    LOG(IAQL_LOG, LOG_INFO, "Set %s enabled\n",aqdata->aqbuttons[index].label);
   }
 }
 
@@ -336,7 +336,7 @@ void iAqSetButtonState(struct aqualinkdata *aq_data, int index, const unsigned c
     So good to catch in PDA mode when a physical iAqualink device is connected to PDA panel.
     packet has cmd of 0x70, 0x71, 0x72
 */
-bool process_iAqualinkStatusPacket(unsigned char *packet, int length, struct aqualinkdata *aq_data)
+bool process_iAqualinkStatusPacket(unsigned char *packet, int length, struct aqualinkdata *aqdata)
 {
   if (packet[PKT_CMD] == CMD_IAQ_MAIN_STATUS)
   {
@@ -430,15 +430,15 @@ bool process_iAqualinkStatusPacket(unsigned char *packet, int length, struct aqu
 /*
       if (byteType == 0) {
         label = "Filter Pump      ";
-        if (isPDA_PANEL) { iAqSetButtonState(aq_data, 0, byte); }
+        if (isPDA_PANEL) { iAqSetButtonState(aqdata, 0, byte); }
       } else if (byteType == 1) {
         label = "Pool Heater      "; // 0x00 off 0x01=on&heating, 0x03=enabled
-        if (isPDA_PANEL) { iAqSetButtonState(aq_data, aq_data->pool_heater_index , byte); }
+        if (isPDA_PANEL) { iAqSetButtonState(aqdata, aqdata->pool_heater_index , byte); }
       } else if (byteType == 2) {
         label = "Spa              ";
       } else if (byteType == 3) {
         label = "Spa Heater       "; // 0x01=on&heating, 0x03=ena
-        if (isPDA_PANEL) { iAqSetButtonState(aq_data, aq_data->spa_heater_index , byte); }
+        if (isPDA_PANEL) { iAqSetButtonState(aqdata, aqdata->spa_heater_index , byte); }
       } else if (byteType == 6) {
         label = "Pool Htr setpoint";
       } else if (byteType == 8 || byteType == 9) {// 8 usually, also get 9 & 14 (different spa/heater modes not sorted out yet. 14 sometimes blank as well)
@@ -460,14 +460,14 @@ bool process_iAqualinkStatusPacket(unsigned char *packet, int length, struct aqu
       LOG(IAQL_LOG, LOG_INFO, "%-17s = %3d | index=%d type=(%0.2d 0x%02hhx) value=0x%02hhx offset=%d\n", label, byte, i, byteType, byteType, byte, (offsetIndex + i));
     }
     LOG(IAQL_LOG, LOG_INFO, "Status from other protocols Pump %s, Spa %s, SWG %d, PumpRPM %d, PoolSP=%d, SpaSP=%d, WaterTemp=%d, AirTemp=%d\n",
-        aq_data->aqbuttons[0].led->state == OFF ? "Off" : "On ",
-        aq_data->aqbuttons[1].led->state == OFF ? "Off" : "On ",
-        aq_data->swg_percent,
-        aq_data->pumps[0].rpm,
-        aq_data->pool_htr_set_point,
-        aq_data->spa_htr_set_point,
-        (aq_data->aqbuttons[1].led->state == OFF ? aq_data->pool_temp : aq_data->spa_temp),
-        aq_data->air_temp);
+        aqdata->aqbuttons[0].led->state == OFF ? "Off" : "On ",
+        aqdata->aqbuttons[1].led->state == OFF ? "Off" : "On ",
+        aqdata->swg_percent,
+        aqdata->pumps[0].rpm,
+        aqdata->pool_htr_set_point,
+        aqdata->spa_htr_set_point,
+        (aqdata->aqbuttons[1].led->state == OFF ? aqdata->pool_temp : aqdata->spa_temp),
+        aqdata->air_temp);
   }
   else if (packet[PKT_CMD] == CMD_IAQ_1TOUCH_STATUS)
   {
@@ -491,16 +491,15 @@ bool process_iAqualinkStatusPacket(unsigned char *packet, int length, struct aqu
       // Check against virtual onetouch buttons.
 
       // NSF This needs to check strlingth, ie "Spa Mode" vs "Spa"
-     if ( aq_data->virtual_button_start > 0 ) {
-      for (int bi=aq_data->virtual_button_start ; bi < aq_data->total_buttons ; bi++) {
-        //LOG(IAQL_LOG, LOG_INFO, "Check %s against %s\n",(char *)&packet[start + 2], aq_data->aqbuttons[bi].label);
-        if (rsm_strcmp((char *)&packet[start + 2], aq_data->aqbuttons[bi].label) == 0) {
-          //LOG(IAQL_LOG, LOG_INFO, "Status for %s is %s\n",aq_data->aqbuttons[bi].label,(status == 0x00 ? "Off" : "On "));
+     if ( aqdata->virtual_button_start > 0 ) {
+      for (int bi=aqdata->virtual_button_start ; bi < aqdata->total_buttons ; bi++) {
+        //LOG(IAQL_LOG, LOG_INFO, "Check %s against %s\n",(char *)&packet[start + 2], aqdata->aqbuttons[bi].label);
+        if (rsm_strcmp((char *)&packet[start + 2], aqdata->aqbuttons[bi].label) == 0) {
+          //LOG(IAQL_LOG, LOG_INFO, "Status for %s is %s\n",aqdata->aqbuttons[bi].label,(status == 0x00 ? "Off" : "On "));
           // == means doesn;t match, RS 1=on 0=off / LED enum 1=off 0=on
-          if (aq_data->aqbuttons[bi].led->state == status) {
-            LOG(IAQL_LOG, LOG_INFO, "Updated Status for %s is %s\n",aq_data->aqbuttons[bi].label,(status == 0x00 ? "Off" : "On "));
-            aq_data->aqbuttons[bi].led->state = (status == 0x00 ? OFF:ON);
-            aq_data->updated = true;
+          if (aqdata->aqbuttons[bi].led->state == status) {
+            LOG(IAQL_LOG, LOG_INFO, "Updated Status for %s is %s\n",aqdata->aqbuttons[bi].label,(status == 0x00 ? "Off" : "On "));
+            SET_IF_CHANGED(aqdata->aqbuttons[bi].led->state, (status == 0x00 ? OFF:ON), aqdata->is_dirty);
           }
         }
       }
@@ -525,14 +524,15 @@ bool process_iAqualinkStatusPacket(unsigned char *packet, int length, struct aqu
         LOG(IAQL_LOG, LOG_INFO, "%-15.*s = %s | bit1=0x%02hhx bit2=0x%02hhx bit3=0x%02hhx bit4=0x%02hhx\n", labellen, &packet[labelstart], (packet[status] == 0x00 ? "Off" : "On "), packet[status], packet[status + 1], packet[status + 2], packet[status + 3]);
       }
       if (isPDA_PANEL) {
-        for (int bi=2 ; bi < aq_data->total_buttons ; bi++) {
-          if (rsm_strcmp((char *)&packet[labelstart], aq_data->aqbuttons[bi].label) == 0) {
-            if (aq_data->aqbuttons[bi].led->state == packet[status]) {
-              LOG(IAQL_LOG, LOG_INFO, "Updated Status for %s is %s\n",aq_data->aqbuttons[bi].label,(packet[status] == 0x00 ? "Off" : "On "));
-              aq_data->aqbuttons[bi].led->state = (packet[status] == 0x00 ? OFF:ON);
-              aq_data->updated = true;
+        for (int bi=2 ; bi < aqdata->total_buttons ; bi++) {
+          if (rsm_strcmp((char *)&packet[labelstart], aqdata->aqbuttons[bi].label) == 0) {
+            if (aqdata->aqbuttons[bi].led->state == packet[status]) {
+              LOG(IAQL_LOG, LOG_INFO, "Updated Status for %s is %s\n",aqdata->aqbuttons[bi].label,(packet[status] == 0x00 ? "Off" : "On "));
+              //aqdata->aqbuttons[bi].led->state = (packet[status] == 0x00 ? OFF:ON);
+              SET_IF_CHANGED(aqdata->aqbuttons[bi].led->state, (packet[status] == 0x00 ? OFF:ON), aqdata->is_dirty);
+              //aqdata->is_dirty = true;
             }
-            //LOG(IAQL_LOG, LOG_INFO, "Match %s to %.*s state(aqd=%d pnl=%d)\n",aq_data->aqbuttons[bi].label, labellen, (char *)&packet[labelstart], aq_data->aqbuttons[bi].led->state, packet[status]);
+            //LOG(IAQL_LOG, LOG_INFO, "Match %s to %.*s state(aqd=%d pnl=%d)\n",aqdata->aqbuttons[bi].label, labellen, (char *)&packet[labelstart], aqdata->aqbuttons[bi].led->state, packet[status]);
           }
         }
       }
@@ -544,7 +544,7 @@ bool process_iAqualinkStatusPacket(unsigned char *packet, int length, struct aqu
   return true;
 }
 
-bool process_iaqualink_packet(unsigned char *packet, int length, struct aqualinkdata *aq_data)
+bool process_iaqualink_packet(unsigned char *packet, int length, struct aqualinkdata *aqdata)
 {
 
   lastchecksum(packet, length);
@@ -610,13 +610,13 @@ bool process_iaqualink_packet(unsigned char *packet, int length, struct aqualink
         //push_iaqualink_cmd(cmd_getTouchstatus, 2);
         //push_iaqualink_cmd(cmd_getAuxstatus, 2);
         /*
-        if (aq_data->swg_percent != cur_swg && cur_swg != 0) {
+        if (aqdata->swg_percent != cur_swg && cur_swg != 0) {
           LOG(IAQL_LOG, LOG_INFO,"*****************************************\n");
-          LOG(IAQL_LOG, LOG_INFO,"********** SWG Changed to %d ************\n",aq_data->swg_percent);
+          LOG(IAQL_LOG, LOG_INFO,"********** SWG Changed to %d ************\n",aqdata->swg_percent);
           LOG(IAQL_LOG, LOG_INFO,"*****************************************\n");
           exit(0);
         }
-        cur_swg = aq_data->swg_percent;
+        cur_swg = aqdata->swg_percent;
         LOG(IAQL_LOG, LOG_INFO,"******* QUEUE SWG Comand of %d | 0x%02hhx *************\n",ID,ID);
         ID++;*/
 
@@ -627,7 +627,7 @@ bool process_iaqualink_packet(unsigned char *packet, int length, struct aqualink
   }
   else if (packet[PKT_DEST] == _aqconfig_.extended_device_id || (isPDA_PANEL && packet[PKT_DEST] == _aqconfig_.device_id) )
   {
-    process_iAqualinkStatusPacket(packet, length, aq_data);
+    process_iAqualinkStatusPacket(packet, length, aqdata);
   }
 
   return true;

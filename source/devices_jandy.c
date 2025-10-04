@@ -227,40 +227,18 @@ bool processPacketToSWG(unsigned char *packet, int packet_length, struct aqualin
     // In service or timeout mode SWG set % message is very strange. AR %% | HEX: 0x10|0x02|0x50|0x11|0xff|0x72|0x10|0x03|
     // Not really sure what to do with this, just ignore 0xff / 255 for the moment. (if statment above)
 
-    // SWG can get ~10 messages to set to 0 then go back again for some reason, so don't go to 0 until 10 messages are received
-    /*
-    if (swg_zero_cnt < swg_zero_ignore && packet[4] == 0x00) {
-      LOG(DJAN_LOG, LOG_DEBUG, "Ignoring SWG set to %d due to packet packet count %d <= %d from control panel to SWG 0x%02hhx 0x%02hhx\n", (int)packet[4],
-                 swg_zero_cnt, swg_zero_ignore, packet[4], packet[5]);
-      swg_zero_cnt++;
-    } else if (swg_zero_cnt >= swg_zero_ignore && packet[4] == 0x00) {
       if (aqdata->swg_percent != (int)packet[4]) {
         //aqdata->swg_percent = (int)packet[4];
         setSWGpercent(aqdata, (int)packet[4]);
         changedAnything = true;
-        aqdata->updated = true;
-        LOG(DJAN_LOG, LOG_DEBUG, "Set SWG %% to %d from reading control panel RS485 packet sent to SWG\n", aqdata->swg_percent);
-      }
-      // LOG(DJAN_LOG, LOG_DEBUG, "SWG set to %d due to packet packet count %d <= %d from control panel to SWG 0x%02hhx 0x%02hhx\n",
-      // (int)packet[4],swg_zero_cnt,SWG_ZERO_IGNORE_COUNT,packet[4],packet[5]);  swg_zero_cnt++;
-    } else {*/
-      //swg_zero_cnt = 0;
-      if (aqdata->swg_percent != (int)packet[4]) {
-        //aqdata->swg_percent = (int)packet[4];
-        setSWGpercent(aqdata, (int)packet[4]);
-        changedAnything = true;
-        aqdata->updated = true;
+        SET_DIRTY(aqdata->is_dirty);
         LOG(DJAN_LOG, LOG_INFO, "Set SWG %% to %d from control panel to SWG\n", aqdata->swg_percent);
       }
 
-      // LOG(DJAN_LOG, LOG_DEBUG, "SWG set to %d due to packet from control panel to SWG 0x%02hhx 0x%02hhx\n",
-      // aqdata.swg_percent,packet[4],packet[5]);
-    /*}*/
-
     if (aqdata->swg_percent > 100)
-      aqdata->boost = true;
+      SET_IF_CHANGED(aqdata->boost, true, aqdata->is_dirty);
     else
-      aqdata->boost = false;
+      SET_IF_CHANGED(aqdata->boost, false, aqdata->is_dirty);
   }
   return changedAnything;
 }
@@ -294,7 +272,7 @@ bool processPacketFromSWG(unsigned char *packet, int packet_length, struct aqual
       aqdata->swg_ppm = packet[4] * 100;
       LOG(DJAN_LOG, LOG_INFO, "Received SWG PPM %d from SWG packet\n", aqdata->swg_ppm);
       changedAnything = true;
-      aqdata->updated = true;
+      SET_DIRTY(aqdata->is_dirty);
     }
     // logMessage(LOG_DEBUG, "Read SWG PPM %d from ID 0x%02hhx\n", aqdata.swg_ppm, SWG_DEV_ID);
   }
@@ -385,13 +363,13 @@ void setSWGdeviceStatus(struct aqualinkdata *aqdata, emulation_type requester, u
   case SWG_STATUS_LOW_TEMP:
   case SWG_STATUS_CHECK_PCB:
   case SWG_STATUS_GENFAULT:
-    aqdata->ar_swg_device_status = status;
-    aqdata->swg_led_state = isSWGDeviceErrorState(status)?ENABLE:ON;
+    SET_IF_CHANGED(aqdata->ar_swg_device_status, status, aqdata->is_dirty);
+    SET_IF_CHANGED(aqdata->swg_led_state, (isSWGDeviceErrorState(status)?ENABLE:ON), aqdata->is_dirty);
     break;
   case SWG_STATUS_OFF: // THIS IS OUR OFF STATUS, NOT AQUAPURE
   case SWG_STATUS_TURNING_OFF:
-    aqdata->ar_swg_device_status = status;
-    aqdata->swg_led_state = OFF;
+    SET_IF_CHANGED(aqdata->ar_swg_device_status, status, aqdata->is_dirty);
+    SET_IF_CHANGED(aqdata->swg_led_state, OFF, aqdata->is_dirty);
     break;
   default:
     LOG(DJAN_LOG, LOG_WARNING, "Ignoring set SWG device to state '0x%02hhx', state is unknown\n", status);
@@ -423,13 +401,13 @@ bool updateSWG(struct aqualinkdata *aqdata, emulation_type requester, aqledstate
 
 bool setSWGboost(struct aqualinkdata *aqdata, bool on) {
   if (!on) {
-    aqdata->boost = false;
-    aqdata->boost_msg[0] = '\0';
-    aqdata->swg_percent = 0;
+    SET_IF_CHANGED(aqdata->boost, false, aqdata->is_dirty);
+    SET_IF_CHANGED_STRCPY(aqdata->boost_msg, "", aqdata->is_dirty);
+    SET_IF_CHANGED(aqdata->swg_percent, 0, aqdata->is_dirty);
   } else {
-    aqdata->boost = true;
-    aqdata->swg_percent = 101;
-    aqdata->swg_led_state = ON;
+    SET_IF_CHANGED(aqdata->boost, true, aqdata->is_dirty);
+    SET_IF_CHANGED(aqdata->swg_percent, 101, aqdata->is_dirty);
+    SET_IF_CHANGED(aqdata->swg_led_state, ON, aqdata->is_dirty);
   }
 
   return true;
@@ -448,43 +426,40 @@ bool changeSWGpercent(struct aqualinkdata *aqdata, int percent) {
 }
 
 void setSWGoff(struct aqualinkdata *aqdata) {
-  if (aqdata->ar_swg_device_status != SWG_STATUS_OFF || aqdata->swg_led_state != OFF)
-    aqdata->updated = true;
 
-  aqdata->ar_swg_device_status = SWG_STATUS_OFF;
-  aqdata->swg_led_state = OFF;
+  SET_IF_CHANGED(aqdata->ar_swg_device_status, SWG_STATUS_OFF, aqdata->is_dirty);
+  SET_IF_CHANGED(aqdata->swg_led_state, OFF, aqdata->is_dirty);
 
   LOG(DJAN_LOG, LOG_DEBUG, "Set SWG to off\n");
 }
 
 void setSWGenabled(struct aqualinkdata *aqdata) {
   if (aqdata->swg_led_state != ENABLE) {
-    aqdata->updated = true;
-    aqdata->swg_led_state = ENABLE;
+    SET_IF_CHANGED(aqdata->swg_led_state, ENABLE, aqdata->is_dirty);
     LOG(DJAN_LOG, LOG_DEBUG, "Set SWG to Enable\n");
   }
+  //SET_IF_CHANGED(aqdata->swg_led_state, ENABLE, aqdata->is_dirty);
 }
 
 // force a Change SWG percent.
 void setSWGpercent(struct aqualinkdata *aqdata, int percent) {
  
-  aqdata->swg_percent = percent;
-  aqdata->updated = true;
+  SET_IF_CHANGED(aqdata->swg_percent, percent, aqdata->is_dirty);
 
   if (aqdata->swg_percent > 0) {
     //LOG(DJAN_LOG, LOG_DEBUG, "swg_led_state=%d, swg_led_state=%d, isSWGDeviceErrorState=%d, ar_swg_device_status=%d\n",aqdata->swg_led_state, aqdata->swg_led_state, isSWGDeviceErrorState(aqdata->ar_swg_device_status),aqdata->ar_swg_device_status);
     if (aqdata->swg_led_state == OFF || (aqdata->swg_led_state == ENABLE && ! isSWGDeviceErrorState(aqdata->ar_swg_device_status)) ) // Don't change ENABLE / FLASH
-      aqdata->swg_led_state = ON;
+      SET_IF_CHANGED(aqdata->swg_led_state, ON, aqdata->is_dirty);
     
     if (aqdata->ar_swg_device_status == SWG_STATUS_UNKNOWN)
-      aqdata->ar_swg_device_status = SWG_STATUS_ON; 
+      SET_IF_CHANGED(aqdata->ar_swg_device_status, SWG_STATUS_ON, aqdata->is_dirty); 
   
   } if ( aqdata->swg_percent == 0 ) {
     if (aqdata->swg_led_state == ON)
-      aqdata->swg_led_state = ENABLE; // Don't change OFF 
+      SET_IF_CHANGED(aqdata->swg_led_state, ENABLE, aqdata->is_dirty); // Don't change OFF 
     
     if (aqdata->ar_swg_device_status == SWG_STATUS_UNKNOWN)
-      aqdata->ar_swg_device_status = SWG_STATUS_ON; // Maybe this should be off
+      SET_IF_CHANGED(aqdata->ar_swg_device_status, SWG_STATUS_ON, aqdata->is_dirty); // Maybe this should be off
   }
 
   LOG(DJAN_LOG, LOG_DEBUG, "Set SWG %% to %d, LED=%d, FullStatus=0x%02hhx\n", aqdata->swg_percent, aqdata->swg_led_state, aqdata->ar_swg_device_status);
@@ -638,7 +613,8 @@ bool processPacketFromJandyPump(unsigned char *packet_buffer, int packet_length,
     for (int i = 0; i < MAX_PUMPS; i++) {
       if ( aqdata->pumps[i].prclType == JANDY && aqdata->pumps[i].pumpID == previous_packet_to ) {
         LOG(DJAN_LOG, LOG_INFO, "Jandy Pump Status message = RPM %d\n",( (packet_buffer[EP_HI_B_RPM] * 256) + packet_buffer[EP_LO_B_RPM]) / 4 );
-        aqdata->pumps[i].rpm = ( (packet_buffer[EP_HI_B_RPM] * 256) + packet_buffer[EP_LO_B_RPM] ) / 4;
+        //aqdata->pumps[i].rpm = ( (packet_buffer[EP_HI_B_RPM] * 256) + packet_buffer[EP_LO_B_RPM] ) / 4;
+        SET_IF_CHANGED(aqdata->pumps[i].rpm, ( (packet_buffer[EP_HI_B_RPM] * 256) + packet_buffer[EP_LO_B_RPM] ) / 4, aqdata->is_dirty);
         found=true;
       }
     }
@@ -646,7 +622,8 @@ bool processPacketFromJandyPump(unsigned char *packet_buffer, int packet_length,
     for (int i = 0; i < MAX_PUMPS; i++) {
       if ( aqdata->pumps[i].prclType == JANDY && aqdata->pumps[i].pumpID == previous_packet_to ) {
         LOG(DJAN_LOG, LOG_INFO, "Jandy Pump Status message = WATTS %d\n", (packet_buffer[EP_HI_B_WAT] * 256) + packet_buffer[EP_LO_B_WAT]);
-        aqdata->pumps[i].watts = (packet_buffer[EP_HI_B_WAT] * 256) + packet_buffer[EP_LO_B_WAT];
+        //aqdata->pumps[i].watts = (packet_buffer[EP_HI_B_WAT] * 256) + packet_buffer[EP_LO_B_WAT];
+        SET_IF_CHANGED(aqdata->pumps[i].watts, (packet_buffer[EP_HI_B_WAT] * 256) + packet_buffer[EP_LO_B_WAT], aqdata->is_dirty);
         found=true;
       }
     }
@@ -712,24 +689,24 @@ bool processPacketToJandyJXiHeater(unsigned char *packet_buffer, int packet_leng
  
   if (packet_buffer[5] != aqdata->pool_htr_set_point) {
     LOG(DJAN_LOG, LOG_INFO, "JXi pool setpoint %d, Pool heater sp %d (changing to LXi)\n", packet_buffer[5], aqdata->pool_htr_set_point);
-    aqdata->pool_htr_set_point = packet_buffer[5];
+    SET_IF_CHANGED(aqdata->pool_htr_set_point, packet_buffer[5], aqdata->is_dirty);
   }
 
   if (packet_buffer[6] != aqdata->spa_htr_set_point) {
     LOG(DJAN_LOG, LOG_INFO, "JXi spa setpoint %d, Spa heater sp %d (changing to LXi)\n", packet_buffer[6], aqdata->spa_htr_set_point);
-    aqdata->spa_htr_set_point = packet_buffer[6];
+    SET_IF_CHANGED(aqdata->spa_htr_set_point, packet_buffer[6], aqdata->is_dirty);
   }
 
   if (packet_buffer[7] != 0xff && packet_buffer[4] != 0x00) {
     if (packet_buffer[4] == 0x11 || packet_buffer[4] == 0x19) {
       if (aqdata->pool_temp != packet_buffer[7]) {
         LOG(DJAN_LOG, LOG_INFO, "JXi pool water temp %d, pool water temp %d (changing to LXi)\n", packet_buffer[7], aqdata->pool_temp);
-        aqdata->pool_temp = packet_buffer[7];
+        SET_IF_CHANGED(aqdata->pool_temp, packet_buffer[7], aqdata->is_dirty);
       }
     } else if (packet_buffer[4] == 0x12 || packet_buffer[4] == 0x1a) {
       if (aqdata->spa_temp != packet_buffer[7]) {
         LOG(DJAN_LOG, LOG_INFO, "JXi spa water temp %d, spa water temp %d (changing to LXi)\n", packet_buffer[7], aqdata->spa_temp);
-        aqdata->spa_temp = packet_buffer[7];
+        SET_IF_CHANGED(aqdata->spa_temp, packet_buffer[7], aqdata->is_dirty);
       }
     }
   }
@@ -1202,10 +1179,7 @@ void updateHeatPumpLed(heatpumpstate state, aqledstate ledstate, struct aqualink
 
   if ( (ledstate == ENABLE && (from == HP_DISPLAY || from == HP_FROM_PANEL)) ||
        ( (ledstate == ON || ledstate == OFF) && (from == HP_DISPLAY || from == HP_TO_PANEL) )) {
-    if ( ledstate != aqdata->chiller_button->led->state) {
-      aqdata->chiller_button->led->state = ledstate;
-      aqdata->updated = true;
-    }
+    SET_IF_CHANGED(aqdata->chiller_button->led->state, ledstate, aqdata->is_dirty);
   }
 
   if (state == HP_COOL) {
@@ -1213,27 +1187,6 @@ void updateHeatPumpLed(heatpumpstate state, aqledstate ledstate, struct aqualink
   } else if (state == HP_HEAT) {
     ((altlabel_detail *)aqdata->chiller_button->special_mask_ptr)->in_alt_mode = false;
   }
-/*
-  // If LED state is enable (that's a reqest), so only change if off.
-  // if froma displayed message, that's from ON to ENA, so set that one.
-  if ( !fromMessage && ledstate == ENABLE && aqdata->chiller_button->led->state == ON) {
-    //printf("**** Request from %s Heat Pump %s, currently %s, ignore!\n",fromMessage?"Display":"RS485",LED2text(ledstate),LED2text(aqdata->chiller_button->led->state) );
-    return;
-  }
-
-  if (aqdata->chiller_button->led->state != ledstate) {
-    //printf("**** Heat Pump Setting to %s, from %s!\n",LED2text(ledstate),LED2text(aqdata->chiller_button->led->state));
-    aqdata->chiller_button->led->state = ledstate;
-    aqdata->updated = true;
-    if (state == HP_COOL) {
-      ((vbutton_detail *)aqdata->chiller_button->special_mask_ptr)->in_alt_mode = true;
-    } else if (state == HP_HEAT) {
-      ((vbutton_detail *)aqdata->chiller_button->special_mask_ptr)->in_alt_mode = false;
-    }
-  } else {
-    //printf("**** Heat Pump %s, already %s, ignore!\n",LED2text(ledstate),LED2text(aqdata->chiller_button->led->state));
-  }
-    */
 }
 
 

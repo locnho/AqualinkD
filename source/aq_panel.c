@@ -116,6 +116,13 @@ const char* find_rev_chars(const char *str, int length, int *out_len) {
         while (isalpha(str[*out_len]) || isdigit(str[*out_len]) || str[*out_len] == '.') *out_len+=1;
         *out_len = *out_len - i;
         return str + i;
+      } else if ( str[i] == 'P' && str[i+1] == 'D' && str[i+2] == 'A' && str[i+3] == ':') {
+        i=i+4;
+        while (str[i] == ':' || str[i] == ' ') i++;
+        *out_len=i;
+        while (isdigit(str[*out_len]) || str[*out_len] == '.') *out_len+=1;
+        *out_len = *out_len - i;
+        return str + i;
       }
     }
 
@@ -179,24 +186,41 @@ pull board CPU, revision & panel string from strings like
  'CPU p/n: B0029221'
  '. RS-6 Combo'
  '. PD-8 Only'
+
+ ' PDA-PS4 Combo  '
+ '  PPD: PDA 1.2  '
+
+ PDA: 7.1.0
+ PDA-P4 Only
 */
 
 
+
 uint8_t setPanelInformationFromPanelMsg(struct aqualinkdata *aqdata, const char *input, uint8_t type, emulation_type source) {
-    const char *rev_pos = NULL;
+    //const char *rev_pos = NULL;
+    char *rev_pos = NULL;
     uint8_t rtn = 0;
 //printf("Calculate panel from %s\n",input);
     //const char *rev_pos = strstr(input, "REV");  // Find the position of "REV"
     const char *sp;
     int length = 0;
     
+    LOG(PANL_LOG, LOG_DEBUG, "Decoding string '%s'\n",input);
+
     if (isMASK_SET(type, PANEL_REV)) {
       if (aqdata->panel_rev[0] == '\0') {
-       if ( (rev_pos = strstr(input, "REV")) != NULL) {  // Find the position of "REV"
-         length = 0;
-         sp = find_rev_chars(rev_pos, strlen(input) - (rev_pos - input), &length);
 
-         if (length>0 && sp != NULL) {
+       // RS panels use REV Yg, some newer PDA panels use PDA: 7.x.x
+        if ( (rev_pos = strstr(input, "REV")) == NULL) {  // Find the position of "REV"
+          rev_pos = strstr(input, "PDA"); // Find the position of "PDA:"
+          _aqconfig_.paneltype_mask |= RSP_PDA; // Set PDA type so we don't confuse versions
+          _aqconfig_.paneltype_mask &= ~RSP_RS;
+        }
+        if ( rev_pos != NULL) {  // If found Find the position of "REV"
+          length = 0;
+          sp = find_rev_chars(rev_pos, strlen(input) - (rev_pos - input), &length);
+
+          if (length>0 && sp != NULL) {
             strncpy(aqdata->panel_rev, sp, length);
             aqdata->panel_rev[length] = '\0';
             setMASK(rtn, PANEL_REV);
@@ -209,12 +233,12 @@ uint8_t setPanelInformationFromPanelMsg(struct aqualinkdata *aqdata, const char 
             } else {
                checkPanelConfig(aqdata);
             }
-         } else {
-            //printf("Failed to find REV, length\n");
-         }
-       } else {
-        //printf("Failed to find REV, null\n");
-       }
+          } else {
+            //printf("Failed to find rev or version #\n");
+          }
+        } else {
+          //printf("Failed to find REV string, null\n");
+        }
       } else {
         // Already set
       }
@@ -253,14 +277,24 @@ uint8_t setPanelInformationFromPanelMsg(struct aqualinkdata *aqdata, const char 
             break;
           }
         }
+        
+        if ( sp != NULL && *sp == 'P' ){
+          // If PDA make sure to search for - as we can get 'PDA: 7.1.0' and 'PDA-P4 Only' (need to ignore version)
+          if ( strstr(input, "-") == NULL ) {sp = NULL;}
+        }
+
         if (sp != NULL) {
-        // Strip trailing whitespace
+          // Strip trailing whitespace
           for(length=strlen(sp)-1; isspace(sp[length]); length--);
           length++;
           strncpy(aqdata->panel_string, sp, length);
           aqdata->panel_string[length] = '\0';
           setMASK(rtn,PANEL_STRING);
           LOG(PANL_LOG, LOG_NOTICE, "Panel %s from %s\n",aqdata->panel_string,getJandyDeviceName(source));
+          if (source == SIM_NONE) { 
+            // We pass SIM_NONE when we are in auto_config mode,so re-set the actual panel size
+            setPanelByName(aqdata, aqdata->panel_string);
+          }
         } else {
         // ERROR not in string.
         }
@@ -277,7 +311,11 @@ uint16_t setPanelSupport(struct aqualinkdata *aqdata)
 {
 
   if (! isalpha(aqdata->panel_rev[0])) {
-    LOG(PANL_LOG,LOG_WARNING, "Panel revision is not understood '%s', please report this issue", aqdata->panel_rev);
+    if (isPDA_PANEL) {
+      LOG(PANL_LOG,LOG_NOTICE, "PDA Panel revision '%s' unknown support options\n", aqdata->panel_rev);
+    } else {
+      LOG(PANL_LOG,LOG_WARNING, "Panel revision is not understood '%s', please report this issue\n", aqdata->panel_rev);
+    }
   }
 
     // Rev >= F Dimmer.  But need serial protocol so set to I
@@ -623,10 +661,13 @@ void setPanelByName(struct aqualinkdata *aqdata, const char *str)
       size = atoi(&str[3]);
   } else if (str[0] == 'P' && str[1] == 'D') { // PDA Panel
     rs = false;
+    //printf("Char at 0=%c 1=%c 2=%c 3=%c 4=%c 5=%d 6=%c\n", str[0], str[1], str[2], str[3], str[4], str[5], str[6]);
     if (str[2] == '-' || str[2] == ' ') // Account for PD-8
       size = atoi(&str[3]);
-    if (str[3] == '-' && str[4] == 'P') // PDA-PS6 Combo
+    else if (str[3] == '-' && str[4] == 'P' && str[5] == 'S') // PDA-PS4 Combo
       size = atoi(&str[6]);
+    else if (str[3] == '-' && str[4] == 'P') // PDA-P6 Only
+      size = atoi(&str[5]);
     else // Account for PDA-8
       size = atoi(&str[4]);
   } else {

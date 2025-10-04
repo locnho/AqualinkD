@@ -310,23 +310,28 @@ bool isShowMode(const char *mode)
     return false;
 }
 
-void set_currentlight_value(clight_detail *light, int index)
+
+// NSF need to use the SET_IF_CHANGED macro here, so come back and change function parameters.
+bool set_currentlight_value(clight_detail *light, int index)
 {
+  bool rtn=false;
   // Dimmer 2 has different values (range 1 to 100)
   if (light->lightType == LC_DIMMER2) {
     if (index < 0 || index > 100)
-      light->currentValue = 0;
+      SET_IF_CHANGED(light->currentValue, 0, rtn);
     else
-      light->currentValue = index;
+      SET_IF_CHANGED(light->currentValue, index, rtn);
   } else {
   // We want to leave the last color, so if 0 don't do anything, but set to 0 if bad value
     if (index <= 0 || index > LIGHT_COLOR_OPTIONS) {
-      light->currentValue = 0;
+      SET_IF_CHANGED(light->currentValue, 0, rtn);
     } else if (index > 0 && index < LIGHT_COLOR_OPTIONS) {
-      light->currentValue = index;
+      SET_IF_CHANGED(light->currentValue, index, rtn);
       //light->lastValue = index;
     }
   }
+
+  return rtn;
 }
 
 // Used for dynamic config JS 

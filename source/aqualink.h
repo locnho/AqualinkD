@@ -329,6 +329,85 @@ typedef struct clightd
 #include "aq_panel.h"
 
 
+
+/**
+ * SET_IF_CHANGED: Updates a variable and sets a flag if the value has changed.
+ *
+ * @src: The variable to be updated (can be a struct member).
+ * @val: The new value.
+ * @flag: A boolean flag to set to true if a change occurs.
+ *
+ * This macro uses GCC extensions for type safety and to prevent
+ * double-evaluation of the `val` argument.
+ */
+//#define DEBUG_SET_IF_CHANGED
+#ifndef DEBUG_SET_IF_CHANGED
+
+#define SET_IF_CHANGED(src, val, flag) \
+    ({                                                           \
+        typeof(src) __new_val = (val);                           \
+        if ((src) != __new_val) {                                \
+            (src) = __new_val;                                   \
+            (flag) = true;                                       \
+        }                                                        \
+    })
+
+#define SET_IF_CHANGED_STRCPY(src, val, flag)                  \
+    ({                                                         \
+        const char *__new_val = (val);                         \
+        if (strncmp((src), __new_val, sizeof(src)) != 0) {     \
+            strncpy((src), __new_val, sizeof(src));            \
+            (src)[sizeof(src) - 1] = '\0';                     \
+            (flag) = true;                                     \
+        }                                                      \
+    })
+
+#define SET_DIRTY(flag)    ((flag) = true)
+#define CLEAR_DIRTY(flag)  ((flag) = false)
+
+#else
+
+#define SET_IF_CHANGED(src, val, flag) \
+    ({ \
+        typeof(src) __old_val = (src); \
+        typeof(src) __new_val = (val); \
+        if (__old_val != __new_val) { \
+            (src) = __new_val; \
+            (flag) = true; \
+            printf("[%s:%d] Changed %s: %d -> %d\n", __FILE__, __LINE__, #src, (int)__old_val, (int)__new_val); \
+        } \
+    })
+
+#define SET_IF_CHANGED_STRCPY(src, val, flag)                          \
+    ({                                                                 \
+        const char *__new_val = (val);                                 \
+        if (strncmp((src), __new_val, sizeof(src)) != 0) {             \
+            printf("[%s:%d] Changed %s: \"%s\" -> \"%s\"\n", __FILE__, __LINE__, #src, (src), __new_val);        \
+            strncpy((src), __new_val, sizeof(src));                    \
+            (src)[sizeof(src) - 1] = '\0';                             \
+            (flag) = true;                                             \
+        }                                                              \
+    })
+
+#define SET_DIRTY(flag)  \
+    do {                  \
+        if (!(flag)) {    \
+            (flag) = true;\
+            printf("[%s:%d] Set dirty flag\n", __FILE__, __LINE__); \
+        }                 \
+    } while(0)
+
+#define CLEAR_DIRTY(flag)  \
+    do {                  \
+        if ((flag)) {    \
+            (flag) = false;\
+            printf("[%s:%d] Clear dirty flag\n", __FILE__, __LINE__); \
+        }                 \
+    } while(0)
+
+#endif // DEBUG_SET_IF_CHANGED
+
+
 struct aqualinkdata
 {
   //panel_status panelstatus;
@@ -382,7 +461,7 @@ struct aqualinkdata
   float ph;
   int orp;
 
-  // Below this line is not state related. (Future just do a mem compare for change)
+  // Below this line is not state related.
   //aqkey *orderedbuttons[TOTAL_BUTTONS]; // Future to reduce RS4,6,8,12,16 & spa buttons
   //unsigned short total_ordered_buttons;
   unsigned char last_packet_type;
@@ -403,7 +482,8 @@ struct aqualinkdata
   struct action unactioned;
   unsigned char raw_status[AQ_PSTLEN];
   // Multiple threads update this value.
-  volatile bool updated;
+  //volatile bool updated;
+  volatile bool is_dirty;
   char self[AQ_MSGLEN*2];
 
   int num_sensors;

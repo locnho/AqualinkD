@@ -15,12 +15,12 @@
 
 
 
-bool waitForButtonState(struct aqualinkdata *aq_data, aqkey* button, aqledstate state, int numMessageReceived);
-bool waitForMessage(struct aqualinkdata *aq_data, char* message, int numMessageReceived);
-bool waitForEitherMessage(struct aqualinkdata *aq_data, char* message1, char* message2, int numMessageReceived);
+bool waitForButtonState(struct aqualinkdata *aqdata, aqkey* button, aqledstate state, int numMessageReceived);
+bool waitForMessage(struct aqualinkdata *aqdata, char* message, int numMessageReceived);
+bool waitForEitherMessage(struct aqualinkdata *aqdata, char* message1, char* message2, int numMessageReceived);
 
-bool select_sub_menu_item(struct aqualinkdata *aq_data, char* item_string);
-bool select_menu_item(struct aqualinkdata *aq_data, char* item_string);
+bool select_sub_menu_item(struct aqualinkdata *aqdata, char* item_string);
+bool select_menu_item(struct aqualinkdata *aqdata, char* item_string);
 
 void send_cmd(unsigned char cmd);
 void cancel_menu();
@@ -70,12 +70,12 @@ int get_allb_queue_length()
 
 
 
-unsigned char pop_allb_cmd(struct aqualinkdata *aq_data)
+unsigned char pop_allb_cmd(struct aqualinkdata *aqdata)
 {
   unsigned char cmd = NUL;
 
   if ( _expectNextMessage > 0 &&
-       (aq_data->last_packet_type == CMD_MSG || aq_data->last_packet_type == CMD_MSG_LONG || aq_data->last_packet_type == CMD_MSG_LOOP_ST))
+       (aqdata->last_packet_type == CMD_MSG || aqdata->last_packet_type == CMD_MSG_LONG || aqdata->last_packet_type == CMD_MSG_LOOP_ST))
   {
     _expectNextMessage=0;
   } else if (_expectNextMessage > 3) {
@@ -90,9 +90,9 @@ unsigned char pop_allb_cmd(struct aqualinkdata *aq_data)
   // Only send commands on status messages and is we are not in programming mode.
   // In programming move, we don't use the queue. 
   // Are we in programming mode and it's not ONETOUCH programming mode
-  if (in_programming_mode(aq_data) && ( in_ot_programming_mode(aq_data) == false  && in_iaqt_programming_mode(aq_data) == false )) {
-  //if (aq_data->active_thread.thread_id != 0) {
-    if ( _allb_pgm_command != NUL && aq_data->last_packet_type == CMD_STATUS) {
+  if (in_programming_mode(aqdata) && ( in_ot_programming_mode(aqdata) == false  && in_iaqt_programming_mode(aqdata) == false )) {
+  //if (aqdata->active_thread.thread_id != 0) {
+    if ( _allb_pgm_command != NUL && aqdata->last_packet_type == CMD_STATUS) {
       cmd = _allb_pgm_command;
       _allb_pgm_command = NUL;
       LOG(ALLB_LOG, LOG_DEBUG_SERIAL, "RS SEND cmd '0x%02hhx' (programming)\n", cmd);
@@ -101,7 +101,7 @@ unsigned char pop_allb_cmd(struct aqualinkdata *aq_data)
     } else {
       LOG(ALLB_LOG, LOG_DEBUG_SERIAL, "RS SEND cmd '0x%02hhx' empty queue (programming)\n", cmd);
     }
-  } else if (_allb_stack_place > 0 && aq_data->last_packet_type == CMD_STATUS ) {
+  } else if (_allb_stack_place > 0 && aqdata->last_packet_type == CMD_STATUS ) {
     cmd = _allb_commands[0];
     _allb_stack_place--;
     LOG(ALLB_LOG, LOG_DEBUG_SERIAL, "RS SEND cmd '0x%02hhx'\n", cmd);
@@ -111,7 +111,7 @@ unsigned char pop_allb_cmd(struct aqualinkdata *aq_data)
     LOG(ALLB_LOG, LOG_DEBUG_SERIAL, "RS SEND cmd '0x%02hhx'\n", cmd);
   }
 
-//printf("RSM sending cmd '0x%02hhx' in reply to '0x%02hhx'\n",cmd,aq_data->last_packet_type);
+//printf("RSM sending cmd '0x%02hhx' in reply to '0x%02hhx'\n",cmd,aqdata->last_packet_type);
 
   if (cmd == KEY_ENTER || cmd == KEY_RIGHT || cmd == KEY_LEFT || cmd == KEY_MENU ) { //KEY_CANCEL KEY_HOLD KEY_OVERRIDE 
     _expectNextMessage=1;
@@ -123,12 +123,12 @@ unsigned char pop_allb_cmd(struct aqualinkdata *aq_data)
 
 
 
-bool setAqualinkNumericField_new(struct aqualinkdata *aq_data, char *value_label, int value, int increment);
-bool setAqualinkNumericField(struct aqualinkdata *aq_data, char *value_label, int value)
+bool setAqualinkNumericField_new(struct aqualinkdata *aqdata, char *value_label, int value, int increment);
+bool setAqualinkNumericField(struct aqualinkdata *aqdata, char *value_label, int value)
 {
-  return setAqualinkNumericField_new(aq_data, value_label, value, 1);
+  return setAqualinkNumericField_new(aqdata, value_label, value, 1);
 }
-bool setAqualinkNumericField_new(struct aqualinkdata *aq_data, char *value_label, int value, int increment)
+bool setAqualinkNumericField_new(struct aqualinkdata *aqdata, char *value_label, int value, int increment)
 {
   LOG(ALLB_LOG, LOG_DEBUG,"Setting menu item '%s' to %d\n",value_label, value);
   //char leading[10];  // description of the field (POOL, SPA, FRZ)
@@ -141,15 +141,15 @@ bool setAqualinkNumericField_new(struct aqualinkdata *aq_data, char *value_label
   int i=0;
   do 
   {
-    if (waitForMessage(aq_data, searchBuf, 4) != true) {
+    if (waitForMessage(aqdata, searchBuf, 4) != true) {
       LOG(ALLB_LOG, LOG_WARNING, "AQ_Programmer Could not set numeric input '%s', not found\n",value_label);
       cancel_menu();
       return false;
     }
 //LOG(ALLB_LOG, LOG_DEBUG,"WAITING for kick value=%d\n",current_val);     
-    //sscanf(aq_data->last_message, "%s %d%s", leading, &current_val, trailing);
-    //sscanf(aq_data->last_message, "%*[^0123456789]%d", &current_val);
-    sscanf(&aq_data->last_message[val_len], "%*[^0123456789]%d", &current_val);
+    //sscanf(aqdata->last_message, "%s %d%s", leading, &current_val, trailing);
+    //sscanf(aqdata->last_message, "%*[^0123456789]%d", &current_val);
+    sscanf(&aqdata->last_message[val_len], "%*[^0123456789]%d", &current_val);
     LOG(ALLB_LOG, LOG_DEBUG, "%s set to %d, looking for %d\n",value_label,current_val,value);
     
     if(value > current_val) {
@@ -180,7 +180,7 @@ bool setAqualinkNumericField_new(struct aqualinkdata *aq_data, char *value_label
 
 
 
-bool OLD_setAqualinkNumericField_OLD(struct aqualinkdata *aq_data, char *value_label, int value)
+bool OLD_setAqualinkNumericField_OLD(struct aqualinkdata *aqdata, char *value_label, int value)
 { // Works for everything but not SWG
   LOG(ALLB_LOG, LOG_DEBUG,"Setting menu item '%s' to %d\n",value_label, value);
   char leading[10];  // description of the field (POOL, SPA, FRZ)
@@ -192,13 +192,13 @@ bool OLD_setAqualinkNumericField_OLD(struct aqualinkdata *aq_data, char *value_l
   
   do 
   {
-    if (waitForMessage(aq_data, searchBuf, 3) != true) {
+    if (waitForMessage(aqdata, searchBuf, 3) != true) {
       LOG(ALLB_LOG, LOG_WARNING, "AQ_Programmer Could not set numeric input '%s', not found\n",value_label);
       cancel_menu();
       return false;
     }
 //LOG(ALLB_LOG, LOG_DEBUG,"WAITING for kick value=%d\n",current_val);     
-    sscanf(aq_data->last_message, "%s %d%s", leading, &current_val, trailing);
+    sscanf(aqdata->last_message, "%s %d%s", leading, &current_val, trailing);
     LOG(ALLB_LOG, LOG_DEBUG, "%s set to %d, looking for %d\n",value_label,current_val,value);
     
     if(value > current_val) {
@@ -225,11 +225,11 @@ void *threadded_send_cmd( void *ptr )
 {
   struct programmingThreadCtrl *threadCtrl;
   threadCtrl = (struct programmingThreadCtrl *) ptr;
-  struct aqualinkdata *aq_data = threadCtrl->aq_data;
+  struct aqualinkdata *aqdata = threadCtrl->aqdata;
   
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SEND_CMD);
 
-  send_cmd( (unsigned char)*threadCtrl->thread_args, aq_data);
+  send_cmd( (unsigned char)*threadCtrl->thread_args, aqdata);
   
   cleanAndTerminateThread(threadCtrl);
 
@@ -241,7 +241,7 @@ void *set_allbutton_boost( void *ptr )
 {
   struct programmingThreadCtrl *threadCtrl;
   threadCtrl = (struct programmingThreadCtrl *) ptr;
-  struct aqualinkdata *aq_data = threadCtrl->aq_data;
+  struct aqualinkdata *aqdata = threadCtrl->aqdata;
 
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_BOOST);
   /*
@@ -268,7 +268,7 @@ STOP BOOST POOL
 
   LOG(ALLB_LOG, LOG_DEBUG, "programming BOOST to %s\n", val==true?"On":"Off");
 
-  if ( select_menu_item(aq_data, "BOOST POOL") != true ) {
+  if ( select_menu_item(aqdata, "BOOST POOL") != true ) {
     LOG(ALLB_LOG, LOG_WARNING, "Could not select BOOST POOL menu\n");
     cancel_menu();
     cleanAndTerminateThread(threadCtrl);
@@ -276,7 +276,7 @@ STOP BOOST POOL
   }
 
   if (val==true) {
-    waitForMessage(threadCtrl->aq_data, "TO START BOOST POOL", 5);
+    waitForMessage(threadCtrl->aqdata, "TO START BOOST POOL", 5);
     send_cmd(KEY_ENTER);
     longwaitfor_queue2empty();
   } else {
@@ -284,8 +284,8 @@ STOP BOOST POOL
     int i=0;
     while( i++ < wait_messages) 
     {
-      waitForMessage(aq_data, "STOP BOOST POOL", 1);
-      if (stristr(aq_data->last_message, "STOP BOOST POOL") != NULL) {
+      waitForMessage(aqdata, "STOP BOOST POOL", 1);
+      if (stristr(aqdata->last_message, "STOP BOOST POOL") != NULL) {
         // This is a really bad hack, message sequence is out for boost for some reason, so as soon as we see stop message, force enter key.
         //_allb_pgm_command = KEY_ENTER;
         send_cmd(KEY_ENTER);
@@ -293,9 +293,9 @@ STOP BOOST POOL
         //waitfor_queue2empty();
         break;
       } else {
-        LOG(ALLB_LOG, LOG_DEBUG, "Find item in Menu: loop %d of %d looking for 'STOP BOOST POOL' received message '%s'\n",i,wait_messages,aq_data->last_message);
+        LOG(ALLB_LOG, LOG_DEBUG, "Find item in Menu: loop %d of %d looking for 'STOP BOOST POOL' received message '%s'\n",i,wait_messages,aqdata->last_message);
         delay(200);
-        if (stristr(aq_data->last_message, "STOP BOOST POOL") != NULL) {
+        if (stristr(aqdata->last_message, "STOP BOOST POOL") != NULL) {
           //_allb_pgm_command = KEY_ENTER;
           send_cmd(KEY_ENTER);
           LOG(ALLB_LOG, LOG_DEBUG, "**** FOUND STOP BOOST POOL ****\n");
@@ -307,17 +307,17 @@ STOP BOOST POOL
         //printf("FINISHED WAIT\n");
       }
       //waitfor_queue2empty();
-      //waitForMessage(aq_data, NULL, 1);
+      //waitForMessage(aqdata, NULL, 1);
     }
     if (i < wait_messages) {
       // Takes ages to see bost is off from menu, to set it here.
-      setSWGboost(aq_data, false);
+      setSWGboost(aqdata, false);
     }
     /*
     // Extra message overcome.
     send_cmd(KEY_RIGHT);
     waitfor_queue2empty();
-    if ( select_sub_menu_item(aq_data, "STOP BOOST POOL") != true ) {
+    if ( select_sub_menu_item(aqdata, "STOP BOOST POOL") != true ) {
       LOG(ALLB_LOG, LOG_WARNING, "Could not select STOP BOOST POOL menu\n");
       cancel_menu();
       cleanAndTerminateThread(threadCtrl);
@@ -326,7 +326,7 @@ STOP BOOST POOL
     //send_cmd(KEY_ENTER);
   }
 
-  waitForMessage(aq_data,NULL, 1);
+  waitForMessage(aqdata,NULL, 1);
 
   cleanAndTerminateThread(threadCtrl);
 
@@ -339,67 +339,67 @@ void *set_allbutton_SWG( void *ptr )
 {
   struct programmingThreadCtrl *threadCtrl;
   threadCtrl = (struct programmingThreadCtrl *) ptr;
-  struct aqualinkdata *aq_data = threadCtrl->aq_data;
+  struct aqualinkdata *aqdata = threadCtrl->aqdata;
 
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_SWG_PERCENT);
 
   int val = atoi((char*)threadCtrl->thread_args);
-  val = setpoint_check(SWG_SETPOINT, val, aq_data);
+  val = setpoint_check(SWG_SETPOINT, val, aqdata);
 
   //LOG(ALLB_LOG, LOG_NOTICE, "programming SWG percent to %d\n", val);
 
-  if ( select_menu_item(aq_data, "SET AQUAPURE") != true ) {
+  if ( select_menu_item(aqdata, "SET AQUAPURE") != true ) {
     LOG(ALLB_LOG, LOG_WARNING, "Could not select SET AQUAPURE menu\n");
-    LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aq_data->active_thread.ptype ) );
+    LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aqdata->active_thread.ptype ) );
     cancel_menu();
     cleanAndTerminateThread(threadCtrl);
     return ptr;
   }
 
   // If spa is on, set SWG for spa, if not set SWG for pool
-  if (aq_data->aqbuttons[SPA_INDEX].led->state != OFF) {
-    if (select_sub_menu_item(aq_data, "SET SPA SP") != true) {
+  if (aqdata->aqbuttons[SPA_INDEX].led->state != OFF) {
+    if (select_sub_menu_item(aqdata, "SET SPA SP") != true) {
       LOG(ALLB_LOG, LOG_WARNING, "Could not select SWG setpoint menu for SPA\n");
-      LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aq_data->active_thread.ptype ) );
+      LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aqdata->active_thread.ptype ) );
       cancel_menu();
       cleanAndTerminateThread(threadCtrl);
       return ptr;
     }
-    setAqualinkNumericField_new(aq_data, "SPA SP", val, 5);
+    setAqualinkNumericField_new(aqdata, "SPA SP", val, 5);
   } else {
-    if (select_sub_menu_item(aq_data, "SET POOL SP") != true) {
+    if (select_sub_menu_item(aqdata, "SET POOL SP") != true) {
       LOG(ALLB_LOG, LOG_WARNING, "Could not select SWG setpoint menu\n");
-      LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aq_data->active_thread.ptype ) );
+      LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aqdata->active_thread.ptype ) );
       cancel_menu();
       cleanAndTerminateThread(threadCtrl);
       return ptr;
     }
-    setAqualinkNumericField_new(aq_data, "POOL SP", val, 5);
+    setAqualinkNumericField_new(aqdata, "POOL SP", val, 5);
   }
 
   // Let everyone know we set SWG, if it failed we will update on next message, unless it's 0.
-  setSWGpercent(aq_data, val); // Don't use chageSWGpercent as we are in programming mode.
+  setSWGpercent(aqdata, val); // Don't use chageSWGpercent as we are in programming mode.
 
 /*
-  if (select_sub_menu_item(aq_data, "SET POOL SP") != true) {
+  if (select_sub_menu_item(aqdata, "SET POOL SP") != true) {
     LOG(ALLB_LOG, LOG_WARNING, "Could not select SWG setpoint menu\n");
-    cancel_menu(aq_data);
+    cancel_menu(aqdata);
     cleanAndTerminateThread(threadCtrl);
     return ptr;
   }
 
-  setAqualinkNumericField_new(aq_data, "POOL SP", val, 5);
+  setAqualinkNumericField_new(aqdata, "POOL SP", val, 5);
 */
   // usually miss this message, not sure why, but wait anyway to make sure programming has ended
   // NSF have see the below message RS Message :-
   // 'Pool set to 20%'
   // 'POOL SP IS SET TO 20%'
-  waitForMessage(threadCtrl->aq_data, "SET TO", 1);
-  //waitForMessage(threadCtrl->aq_data, "POOL SP IS SET TO", 1);
+  waitForMessage(threadCtrl->aqdata, "SET TO", 1);
+  //waitForMessage(threadCtrl->aqdata, "POOL SP IS SET TO", 1);
 
   // Since we read % directly from RS message, wait for another few messages that way
   // We won't registed a SWG bounce, since we already told clients SWG was at new % before programming started
-  waitForMessage(threadCtrl->aq_data, NULL, 1);
+  waitForMessage(threadCtrl->aqdata, NULL, 1);
 
   cleanAndTerminateThread(threadCtrl);
 
@@ -413,27 +413,27 @@ void *get_allbutton_aux_labels( void *ptr )
 {
   struct programmingThreadCtrl *threadCtrl;
   threadCtrl = (struct programmingThreadCtrl *) ptr;
-  struct aqualinkdata *aq_data = threadCtrl->aq_data;
+  struct aqualinkdata *aqdata = threadCtrl->aqdata;
   
   waitForSingleThreadOrTerminate(threadCtrl, AQ_GET_AUX_LABELS);
 
-  if ( select_menu_item(aq_data, "REVIEW") != true ) {
+  if ( select_menu_item(aqdata, "REVIEW") != true ) {
     LOG(ALLB_LOG, LOG_WARNING, "Could not select REVIEW menu\n");
-    LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aq_data->active_thread.ptype ) );
+    LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aqdata->active_thread.ptype ) );
     cancel_menu();
     cleanAndTerminateThread(threadCtrl);
     return ptr;
   }     
            
-  if (select_sub_menu_item(aq_data, "AUX LABELS") != true) {
+  if (select_sub_menu_item(aqdata, "AUX LABELS") != true) {
     LOG(ALLB_LOG, LOG_WARNING, "Could not select AUX LABELS menu\n");
-    LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aq_data->active_thread.ptype ) );
+    LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aqdata->active_thread.ptype ) );
     cancel_menu();
     cleanAndTerminateThread(threadCtrl);
     return ptr;
   }
 
-  waitForMessage(aq_data, NULL, 5); // Receive 5 messages
+  waitForMessage(aqdata, NULL, 5); // Receive 5 messages
 
   cleanAndTerminateThread(threadCtrl);
   
@@ -446,7 +446,7 @@ void *set_allbutton_light_colormode( void *ptr )
   int i;
   struct programmingThreadCtrl *threadCtrl;
   threadCtrl = (struct programmingThreadCtrl *) ptr;
-  struct aqualinkdata *aq_data = threadCtrl->aq_data;
+  struct aqualinkdata *aqdata = threadCtrl->aqdata;
   
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_LIGHTCOLOR_MODE);
 
@@ -457,13 +457,13 @@ void *set_allbutton_light_colormode( void *ptr )
   int typ = atoi(&buf[10]);
   bool use_current_mode = false;
 
-  if (btn < 0 || btn >= aq_data->total_buttons ) {
+  if (btn < 0 || btn >= aqdata->total_buttons ) {
     LOG(ALLB_LOG, LOG_ERR, "Can't program light mode on button %d\n", btn);
     cleanAndTerminateThread(threadCtrl);
     return ptr;
   }
 
-  aqkey *button = &aq_data->aqbuttons[btn];
+  aqkey *button = &aqdata->aqbuttons[btn];
   unsigned char code = button->code;
 
   //LOG(ALLB_LOG, LOG_NOTICE, "Light Programming #: %d, on button: %s, color light type: %d\n", val, button->label, typ);
@@ -497,7 +497,7 @@ void *set_allbutton_light_colormode( void *ptr )
     LOG(ALLB_LOG, LOG_INFO, "Light Programming Initial state on, turning off\n");
     send_cmd(code);
     waitfor_queue2empty();
-    if ( !waitForMessage(threadCtrl->aq_data, "OFF", 5)) // Message like 'Aux3 Off'
+    if ( !waitForMessage(threadCtrl->aqdata, "OFF", 5)) // Message like 'Aux3 Off'
       LOG(ALLB_LOG, LOG_ERR, "Light Programming didn't receive OFF message\n");
   }
 
@@ -509,18 +509,18 @@ void *set_allbutton_light_colormode( void *ptr )
 
   do{
     LOG(ALLB_LOG, LOG_INFO,"Light program wait for message\n");
-    if ( !waitForMessage(threadCtrl->aq_data, "~*", waitCounter))
+    if ( !waitForMessage(threadCtrl->aqdata, "~*", waitCounter))
       LOG(ALLB_LOG, LOG_ERR, "Light Programming didn't receive color light mode message\n");
     
     // Wait for less messages after first try. We get a lot of repeat messages before the one we need.
     waitCounter = 3;
 
     if (use_current_mode) {
-      LOG(ALLB_LOG, LOG_INFO, "Light Programming using color mode %s\n",aq_data->last_message);
+      LOG(ALLB_LOG, LOG_INFO, "Light Programming using color mode %s\n",aqdata->last_message);
       send_cmd(KEY_ENTER);
       waitfor_queue2empty();
       break;
-    } else if (strncasecmp(aq_data->last_message, mode_name, strlen(mode_name)) == 0) {
+    } else if (strncasecmp(aqdata->last_message, mode_name, strlen(mode_name)) == 0) {
       LOG(ALLB_LOG, LOG_INFO, "Light Programming found color mode %s\n",mode_name);
       send_cmd(KEY_ENTER);
       waitfor_queue2empty();
@@ -531,7 +531,7 @@ void *set_allbutton_light_colormode( void *ptr )
     waitfor_queue2empty();
     // Just clear current message before waiting for next, since the test in the do can't distinguish
     // as both messages end in "~*"
-    waitForMessage(threadCtrl->aq_data, NULL, 1); 
+    waitForMessage(threadCtrl->aqdata, NULL, 1); 
 
     i++;
   } while (i <= LIGHT_COLOR_OPTIONS);
@@ -540,7 +540,7 @@ void *set_allbutton_light_colormode( void *ptr )
     LOG(ALLB_LOG, LOG_ERR, "Light Programming didn't receive color light mode message for '%s'\n",use_current_mode?"light program":mode_name);
   } else {
     // Set before we are called.
-    //updateButtonLightProgram(aq_data, val, btn);
+    //updateButtonLightProgram(aqdata, val, btn);
   }
 
   cleanAndTerminateThread(threadCtrl);
@@ -555,7 +555,7 @@ void *set_allbutton_light_programmode( void *ptr )
   int i;
   struct programmingThreadCtrl *threadCtrl;
   threadCtrl = (struct programmingThreadCtrl *) ptr;
-  struct aqualinkdata *aq_data = threadCtrl->aq_data;
+  struct aqualinkdata *aqdata = threadCtrl->aqdata;
   
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_LIGHTPROGRAM_MODE);
 
@@ -570,13 +570,13 @@ void *set_allbutton_light_programmode( void *ptr )
 
   bool useProgAdvance = _aqconfig_.light_programming_advance_mode;
 
-  if (btn < 0 || btn >= aq_data->total_buttons ) {
+  if (btn < 0 || btn >= aqdata->total_buttons ) {
     LOG(ALLB_LOG, LOG_ERR, "Can't program light mode on button %d\n", btn);
     cleanAndTerminateThread(threadCtrl);
     return ptr;
   }
 
-  aqkey *button = &aq_data->aqbuttons[btn];
+  aqkey *button = &aqdata->aqbuttons[btn];
   unsigned char code = button->code;
 
     // Simply turn the light off if value is 0
@@ -649,12 +649,12 @@ void *set_allbutton_light_programmode( void *ptr )
       waitfor_queue2empty();
       LOG(ALLB_LOG, LOG_INFO, "Light Programming button press number %d - %s of %d\n", i, "ON", val);
       send_cmd(code);
-      waitForButtonState(aq_data, button, ON, 2);
+      waitForButtonState(aqdata, button, ON, 2);
       delay(dt * seconds);
       waitfor_queue2empty();
       LOG(ALLB_LOG, LOG_INFO, "Light Programming button press number %d - %s of %d\n", i, "OFF", val);
       send_cmd(code);
-      waitForButtonState(aq_data, button, OFF, 2);
+      waitForButtonState(aqdata, button, OFF, 2);
       delay(dt * seconds);
     }
     LOG(ALLB_LOG, LOG_INFO, "Finished - Light Programming button press number %d - %s of %d\n", i, "ON", val);
@@ -662,13 +662,13 @@ void *set_allbutton_light_programmode( void *ptr )
     //waitfor_queue2empty();
     longwaitfor_queue2empty();
   }
-  //waitForButtonState(aq_data, &aq_data->aqbuttons[btn], ON, 2);
+  //waitForButtonState(aqdata, &aqdata->aqbuttons[btn], ON, 2);
 
   // set before we are called
-  //updateButtonLightProgram(aq_data, val, btn);
+  //updateButtonLightProgram(aqdata, val, btn);
 
   // Save value if needed
-  updateLightProgram(aq_data, final_mode, (clight_detail *)button->special_mask_ptr );
+  updateLightProgram(aqdata, final_mode, (clight_detail *)button->special_mask_ptr );
 
   cleanAndTerminateThread(threadCtrl);
   
@@ -681,7 +681,7 @@ void *set_allbutton_light_dimmer( void *ptr )
   int i;
   struct programmingThreadCtrl *threadCtrl;
   threadCtrl = (struct programmingThreadCtrl *) ptr;
-  struct aqualinkdata *aq_data = threadCtrl->aq_data;
+  struct aqualinkdata *aqdata = threadCtrl->aqdata;
   
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_LIGHTDIMMER);
 
@@ -693,13 +693,13 @@ void *set_allbutton_light_dimmer( void *ptr )
   int typ = atoi(&buf[10]);
   bool use_current_mode = false;
 
-  if (btn < 0 || btn >= aq_data->total_buttons ) {
+  if (btn < 0 || btn >= aqdata->total_buttons ) {
     LOG(ALLB_LOG, LOG_ERR, "Can't program light dimmer on button %d\n", btn);
     cleanAndTerminateThread(threadCtrl);
     return ptr;
   }
 
-  aqkey *button = &aq_data->aqbuttons[btn];
+  aqkey *button = &aqdata->aqbuttons[btn];
   unsigned char code = button->code;
   */
 
@@ -747,7 +747,7 @@ void *set_allbutton_light_dimmer( void *ptr )
     LOG(ALLB_LOG, LOG_INFO, "Light Programming Initial state on, turning off\n");
     send_cmd(button->code);
     waitfor_queue2empty();
-    if ( !waitForMessage(threadCtrl->aq_data, "OFF", 5)) // Message like 'Aux3 Off'
+    if ( !waitForMessage(threadCtrl->aqdata, "OFF", 5)) // Message like 'Aux3 Off'
       LOG(ALLB_LOG, LOG_ERR, "Light Programming didn't receive OFF message\n");
   }
 
@@ -760,7 +760,7 @@ void *set_allbutton_light_dimmer( void *ptr )
 
   do{
     LOG(ALLB_LOG, LOG_INFO,"Light program wait for message\n");
-    if ( !waitForMessage(threadCtrl->aq_data, "~*", waitCounter))
+    if ( !waitForMessage(threadCtrl->aqdata, "~*", waitCounter))
       LOG(ALLB_LOG, LOG_ERR, "Light Programming didn't receive light mode message\n");
     
     // Wait for less messages after first try. We get a lot of repeat messages before the one we need.
@@ -768,22 +768,22 @@ void *set_allbutton_light_dimmer( void *ptr )
     
     if (useDefaultIfValid) {
       // If 0 in last message then it's NOT valid and we will change to 100% (5 char =0, 6 char=%)
-      if (aq_data->last_message[0] == '0' && aq_data->last_message[1] == '%' ) {
+      if (aqdata->last_message[0] == '0' && aqdata->last_message[1] == '%' ) {
         //printf("******** Light stuck ************\n");
         LOG(ALLB_LOG, LOG_WARNING, "Light Programming detected Jandy panel light%% bug, re-setting to %d%%\n",val * 25);
         useDefaultIfValid=false;
       } else {
-        // printf("******** Light good ************ '%c' '%c'\n",aq_data->last_message[0],aq_data->last_message[1]);
+        // printf("******** Light good ************ '%c' '%c'\n",aqdata->last_message[0],aqdata->last_message[1]);
         send_cmd(KEY_ENTER);
         waitfor_queue2empty();
         break;
       }
     } else if (use_current_mode) {
-      LOG(ALLB_LOG, LOG_INFO, "Light Programming using mode %s\n",aq_data->last_message);
+      LOG(ALLB_LOG, LOG_INFO, "Light Programming using mode %s\n",aqdata->last_message);
       send_cmd(KEY_ENTER);
       waitfor_queue2empty();
       break;
-    } else if (strncasecmp(aq_data->last_message, mode_name, strlen(mode_name)) == 0) {
+    } else if (strncasecmp(aqdata->last_message, mode_name, strlen(mode_name)) == 0) {
       LOG(ALLB_LOG, LOG_INFO, "Light Programming found mode %s\n",mode_name);
       send_cmd(KEY_ENTER);
       waitfor_queue2empty();
@@ -794,7 +794,7 @@ void *set_allbutton_light_dimmer( void *ptr )
     waitfor_queue2empty();
     // Just clear current message before waiting for next, since the test in the do can't distinguish
     // as both messages end in "~*"
-    waitForMessage(threadCtrl->aq_data, NULL, 1); 
+    waitForMessage(threadCtrl->aqdata, NULL, 1); 
 
     i++;
   } while (i <= 8);
@@ -805,9 +805,9 @@ void *set_allbutton_light_dimmer( void *ptr )
     // update status before we are exit.
     if (light->lightType == LC_DIMMER2 ) {
       // value or Dimmer2 is the actual %, while Dimmer & colorlight is an index into an array
-      updateLightProgram(aq_data, val * 25, light);
+      updateLightProgram(aqdata, val * 25, light);
     } else {
-      updateLightProgram(aq_data, val, light);
+      updateLightProgram(aqdata, val, light);
     }
   }
 
@@ -826,7 +826,7 @@ void *set_allbutton_pool_heater_temps( void *ptr )
 {
   struct programmingThreadCtrl *threadCtrl;
   threadCtrl = (struct programmingThreadCtrl *) ptr;
-  struct aqualinkdata *aq_data = threadCtrl->aq_data;
+  struct aqualinkdata *aqdata = threadCtrl->aqdata;
   char *name;
   char *menu_name;
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_POOL_HEATER_TEMP);
@@ -842,7 +842,7 @@ void *set_allbutton_pool_heater_temps( void *ptr )
     val = MEATER_MIN;
   }
   */
-  val = setpoint_check(POOL_HTR_SETPOINT, val, aq_data);
+  val = setpoint_check(POOL_HTR_SETPOINT, val, aqdata);
 
   // NSF IF in TEMP1 / TEMP2 mode, we need C range of 1 to 40 is 2 to 40 for TEMP1, 1 to 39 TEMP2
   if (isSINGLE_DEV_PANEL){
@@ -854,20 +854,20 @@ void *set_allbutton_pool_heater_temps( void *ptr )
   }
 
   LOG(ALLB_LOG, LOG_DEBUG, "Setting pool heater setpoint to %d\n", val);
-  //setAqualinkTemp(aq_data, "SET TEMP", "SET POOL TEMP", NULL, "POOL", val);
+  //setAqualinkTemp(aqdata, "SET TEMP", "SET POOL TEMP", NULL, "POOL", val);
   
-  if ( select_menu_item(aq_data, "SET TEMP") != true ) {
+  if ( select_menu_item(aqdata, "SET TEMP") != true ) {
     LOG(ALLB_LOG, LOG_WARNING, "Could not select SET TEMP menu\n");
-    LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aq_data->active_thread.ptype ) );
+    LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aqdata->active_thread.ptype ) );
     cancel_menu();
     cleanAndTerminateThread(threadCtrl);
     return ptr;
   }     
            
-  //if (select_sub_menu_item(aq_data, "SET POOL TEMP") != true) {
-  if (select_sub_menu_item(aq_data, menu_name) != true) {
+  //if (select_sub_menu_item(aqdata, "SET POOL TEMP") != true) {
+  if (select_sub_menu_item(aqdata, menu_name) != true) {
     LOG(ALLB_LOG, LOG_WARNING, "Could not select SET POOL TEMP menu\n");
-    LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aq_data->active_thread.ptype ) );
+    LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aqdata->active_thread.ptype ) );
     cancel_menu();
     cleanAndTerminateThread(threadCtrl);
     return ptr;
@@ -877,18 +877,18 @@ void *set_allbutton_pool_heater_temps( void *ptr )
     // Need to get pass this message 'TEMP1 MUST BE SET HIGHER THAN TEMP2'
     // and get this message 'TEMP1 20�C ~*'
     // Before going to numeric field.
-    waitForMessage(threadCtrl->aq_data, "MUST BE SET", 5);
+    waitForMessage(threadCtrl->aqdata, "MUST BE SET", 5);
     send_cmd(KEY_LEFT);
-    while (stristr(aq_data->last_message, "MUST BE SET") != NULL) { 
+    while (stristr(aqdata->last_message, "MUST BE SET") != NULL) { 
       delay(500);
     }
   } 
 
-  //setAqualinkNumericField(aq_data, "POOL", val);
-  setAqualinkNumericField(aq_data, name, val);
+  //setAqualinkNumericField(aqdata, "POOL", val);
+  setAqualinkNumericField(aqdata, name, val);
   
   // usually miss this message, not sure why, but wait anyway to make sure programming has ended
-  waitForMessage(threadCtrl->aq_data, "POOL TEMP IS SET TO", 1); 
+  waitForMessage(threadCtrl->aqdata, "POOL TEMP IS SET TO", 1); 
   cleanAndTerminateThread(threadCtrl);
   
   // just stop compiler error, ptr is not valid as it's just been freed
@@ -898,7 +898,7 @@ void *set_allbutton_spa_heater_temps( void *ptr )
 {
   struct programmingThreadCtrl *threadCtrl;
   threadCtrl = (struct programmingThreadCtrl *) ptr;
-  struct aqualinkdata *aq_data = threadCtrl->aq_data;
+  struct aqualinkdata *aqdata = threadCtrl->aqdata;
   
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_SPA_HEATER_TEMP);
   
@@ -911,7 +911,7 @@ void *set_allbutton_spa_heater_temps( void *ptr )
   } else if ( val < MEATER_MIN) {
     val = MEATER_MIN;
   }*/
-  val = setpoint_check(SPA_HTR_SETPOINT, val, aq_data);
+  val = setpoint_check(SPA_HTR_SETPOINT, val, aqdata);
 
   // NSF IF in TEMP1 / TEMP2 mode, we need C range of 1 to 40 is 2 to 40 for TEMP1, 1 to 39 TEMP2
 
@@ -925,19 +925,19 @@ void *set_allbutton_spa_heater_temps( void *ptr )
 
   LOG(ALLB_LOG, LOG_DEBUG, "Setting spa heater setpoint to %d\n", val);
    
-  //setAqualinkTemp(aq_data, "SET TEMP", "SET SPA TEMP", NULL, "SPA", val);
-  if ( select_menu_item(aq_data, "SET TEMP") != true ) {
+  //setAqualinkTemp(aqdata, "SET TEMP", "SET SPA TEMP", NULL, "SPA", val);
+  if ( select_menu_item(aqdata, "SET TEMP") != true ) {
     LOG(ALLB_LOG, LOG_WARNING, "Could not select SET TEMP menu\n");
-    LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aq_data->active_thread.ptype ) );
+    LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aqdata->active_thread.ptype ) );
     cancel_menu();
     cleanAndTerminateThread(threadCtrl);
     return ptr;
   }     
            
-  //if (select_sub_menu_item(aq_data, "SET SPA TEMP") != true) {
-  if (select_sub_menu_item(aq_data, menu_name) != true) {
+  //if (select_sub_menu_item(aqdata, "SET SPA TEMP") != true) {
+  if (select_sub_menu_item(aqdata, menu_name) != true) {
     LOG(ALLB_LOG, LOG_WARNING, "Could not select SET SPA TEMP menu\n");
-    LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aq_data->active_thread.ptype ) );
+    LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aqdata->active_thread.ptype ) );
     cancel_menu();
     cleanAndTerminateThread(threadCtrl);
     return ptr;
@@ -947,18 +947,18 @@ void *set_allbutton_spa_heater_temps( void *ptr )
     // Need to get pass this message 'TEMP2 MUST BE SET LOWER THAN TEMP1'
     // and get this message 'TEMP2 20�C ~*'
     // Before going to numeric field.
-    waitForMessage(threadCtrl->aq_data, "MUST BE SET", 5);
+    waitForMessage(threadCtrl->aqdata, "MUST BE SET", 5);
     send_cmd(KEY_LEFT);
-    while (stristr(aq_data->last_message, "MUST BE SET") != NULL) { 
+    while (stristr(aqdata->last_message, "MUST BE SET") != NULL) { 
       delay(500);
     }
   } 
   
-  //setAqualinkNumericField(aq_data, "SPA", val);
-  setAqualinkNumericField(aq_data, name, val);
+  //setAqualinkNumericField(aqdata, "SPA", val);
+  setAqualinkNumericField(aqdata, name, val);
   
   // usually miss this message, not sure why, but wait anyway to make sure programming has ended
-  waitForMessage(threadCtrl->aq_data, "SPA TEMP IS SET TO", 1);
+  waitForMessage(threadCtrl->aqdata, "SPA TEMP IS SET TO", 1);
   cleanAndTerminateThread(threadCtrl);
   
   // just stop compiler error, ptr is not valid as it's just been freed
@@ -969,7 +969,7 @@ void *set_allbutton_freeze_heater_temps( void *ptr )
 {
   struct programmingThreadCtrl *threadCtrl;
   threadCtrl = (struct programmingThreadCtrl *) ptr;
-  struct aqualinkdata *aq_data = threadCtrl->aq_data;
+  struct aqualinkdata *aqdata = threadCtrl->aqdata;
   
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_FRZ_PROTECTION_TEMP);
   
@@ -981,38 +981,38 @@ void *set_allbutton_freeze_heater_temps( void *ptr )
     val = FREEZE_PT_MIN;
   }
   */
-  val = setpoint_check(FREEZE_SETPOINT, val, aq_data);
+  val = setpoint_check(FREEZE_SETPOINT, val, aqdata);
 
   LOG(ALLB_LOG, LOG_DEBUG, "Setting sfreeze protection to %d\n", val);
 
-  //setAqualinkTemp(aq_data, "SYSTEM SETUP", "FRZ PROTECT", "TEMP SETTING", "FRZ", val);
-  if ( select_menu_item(aq_data, "SYSTEM SETUP") != true ) {
+  //setAqualinkTemp(aqdata, "SYSTEM SETUP", "FRZ PROTECT", "TEMP SETTING", "FRZ", val);
+  if ( select_menu_item(aqdata, "SYSTEM SETUP") != true ) {
     LOG(ALLB_LOG, LOG_WARNING, "Could not select SYSTEM SETUP menu\n");
-    LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aq_data->active_thread.ptype ) );
+    LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aqdata->active_thread.ptype ) );
     cancel_menu();
     cleanAndTerminateThread(threadCtrl);
     return ptr;
   }     
            
-  if (select_sub_menu_item(aq_data, "FRZ PROTECT") != true) {
+  if (select_sub_menu_item(aqdata, "FRZ PROTECT") != true) {
     LOG(ALLB_LOG, LOG_WARNING, "Could not select FRZ PROTECT menu\n");
-    LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aq_data->active_thread.ptype ) );
+    LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aqdata->active_thread.ptype ) );
     cancel_menu();
     cleanAndTerminateThread(threadCtrl);
     return ptr;
   }
   
-  if (select_sub_menu_item(aq_data, "TEMP SETTING") != true) {
+  if (select_sub_menu_item(aqdata, "TEMP SETTING") != true) {
     LOG(ALLB_LOG, LOG_WARNING, "Could not select TEMP SETTING menu\n");
-    LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aq_data->active_thread.ptype ) );
+    LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aqdata->active_thread.ptype ) );
     cancel_menu();
     cleanAndTerminateThread(threadCtrl);
     return ptr; 
   }
   
-  setAqualinkNumericField(aq_data, "FRZ", val);
+  setAqualinkNumericField(aqdata, "FRZ", val);
   
-  waitForMessage(threadCtrl->aq_data, "FREEZE PROTECTION IS SET TO", 3);
+  waitForMessage(threadCtrl->aqdata, "FREEZE PROTECTION IS SET TO", 3);
   cleanAndTerminateThread(threadCtrl);
   
   // just stop compiler error, ptr is not valid as it's just been freed
@@ -1023,7 +1023,7 @@ void *set_allbutton_time( void *ptr )
 {
   struct programmingThreadCtrl *threadCtrl;
   threadCtrl = (struct programmingThreadCtrl *) ptr;
-  struct aqualinkdata *aq_data = threadCtrl->aq_data;
+  struct aqualinkdata *aqdata = threadCtrl->aqdata;
   
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_TIME);
   //LOG(ALLB_LOG, LOG_NOTICE, "Setting time on aqualink\n");
@@ -1050,20 +1050,20 @@ void *set_allbutton_time( void *ptr )
 
   LOG(ALLB_LOG, LOG_DEBUG, "Setting time to %d/%d/%d %d:%d\n", result->tm_mon + 1, result->tm_mday, result->tm_year + 1900, result->tm_hour + 1, result->tm_min);
 
-  if ( select_menu_item(aq_data, "SET TIME") != true ) {
+  if ( select_menu_item(aqdata, "SET TIME") != true ) {
     LOG(ALLB_LOG, LOG_WARNING, "Could not select SET TIME menu\n");
-    LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aq_data->active_thread.ptype ) );
+    LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aqdata->active_thread.ptype ) );
     cancel_menu();
     cleanAndTerminateThread(threadCtrl);
     return ptr;
   }
   
-  setAqualinkNumericField(aq_data, "YEAR", result->tm_year + 1900);
-  setAqualinkNumericField(aq_data, "MONTH", result->tm_mon + 1);
-  setAqualinkNumericField(aq_data, "DAY", result->tm_mday);
-  //setAqualinkNumericFieldExtra(aq_data, "HOUR", 11, "PM");
-  select_sub_menu_item(aq_data, hour); // This will keep looping until it finds the right message
-  setAqualinkNumericField(aq_data, "MINUTE", result->tm_min);
+  setAqualinkNumericField(aqdata, "YEAR", result->tm_year + 1900);
+  setAqualinkNumericField(aqdata, "MONTH", result->tm_mon + 1);
+  setAqualinkNumericField(aqdata, "DAY", result->tm_mday);
+  //setAqualinkNumericFieldExtra(aqdata, "HOUR", 11, "PM");
+  select_sub_menu_item(aqdata, hour); // This will keep looping until it finds the right message
+  setAqualinkNumericField(aqdata, "MINUTE", result->tm_min);
   
   send_cmd(KEY_ENTER);
 
@@ -1077,27 +1077,27 @@ void *get_allbutton_diag_model( void *ptr )
 {
   struct programmingThreadCtrl *threadCtrl;
   threadCtrl = (struct programmingThreadCtrl *) ptr;
-  struct aqualinkdata *aq_data = threadCtrl->aq_data;
+  struct aqualinkdata *aqdata = threadCtrl->aqdata;
   
   waitForSingleThreadOrTerminate(threadCtrl, AQ_GET_DIAGNOSTICS_MODEL);
   
-  if ( select_menu_item(aq_data, "SYSTEM SETUP") != true ) {
+  if ( select_menu_item(aqdata, "SYSTEM SETUP") != true ) {
     LOG(ALLB_LOG, LOG_WARNING, "Could not select HELP menu\n");
-    LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aq_data->active_thread.ptype ) );
+    LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aqdata->active_thread.ptype ) );
     cancel_menu();
     cleanAndTerminateThread(threadCtrl);
     return ptr;
   }     
            
-  if (select_sub_menu_item(aq_data, "DIAGNOSTICS") != true) {
+  if (select_sub_menu_item(aqdata, "DIAGNOSTICS") != true) {
     LOG(ALLB_LOG, LOG_WARNING, "Could not select DIAGNOSTICS menu\n");
-    LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aq_data->active_thread.ptype ) );
+    LOG(ALLB_LOG, LOG_ERR, "%s failed\n", ptypeName( aqdata->active_thread.ptype ) );
     cancel_menu();
     cleanAndTerminateThread(threadCtrl);
     return ptr;
   }
 
-  waitForMessage(aq_data, NULL, 8); // Receive 8 messages
+  waitForMessage(aqdata, NULL, 8); // Receive 8 messages
   //8157 REV MMM | BATTERY OK | Cal:  -27  0  6 | CONTROL PANEL #1 | CONTROL PANEL #3 | WATER SENSOR OK | AIR SENSOR OK | SOLAR SENSOR OPENED
   cleanAndTerminateThread(threadCtrl);
   
@@ -1110,12 +1110,12 @@ void *get_allbutton_pool_spa_heater_temps( void *ptr )
 //LOG(ALLB_LOG, LOG_DEBUG, "Could not select TEMP SET menu\n");
   struct programmingThreadCtrl *threadCtrl;
   threadCtrl = (struct programmingThreadCtrl *) ptr;
-  struct aqualinkdata *aq_data = threadCtrl->aq_data;
+  struct aqualinkdata *aqdata = threadCtrl->aqdata;
   
   waitForSingleThreadOrTerminate(threadCtrl, AQ_GET_POOL_SPA_HEATER_TEMPS);
   //LOG(ALLB_LOG, LOG_NOTICE, "Getting pool & spa heat setpoints from aqualink\n");
 
-  if ( select_menu_item(aq_data, "REVIEW") != true ) {
+  if ( select_menu_item(aqdata, "REVIEW") != true ) {
     LOG(ALLB_LOG, LOG_WARNING, "Could not select REVIEW menu\n");
     LOG(ALLB_LOG, LOG_ERR, "Can't get heater setpoints from Control Panel\n");
     cancel_menu();
@@ -1123,7 +1123,7 @@ void *get_allbutton_pool_spa_heater_temps( void *ptr )
     return ptr;
   }     
            
-  if (select_sub_menu_item(aq_data, "TEMP SET") != true) {
+  if (select_sub_menu_item(aqdata, "TEMP SET") != true) {
     LOG(ALLB_LOG, LOG_WARNING, "Could not select TEMP SET menu\n");
     LOG(ALLB_LOG, LOG_ERR, "Can't get heater setpoints from Control Panel\n");
     cancel_menu();
@@ -1133,9 +1133,9 @@ void *get_allbutton_pool_spa_heater_temps( void *ptr )
   
   // Should receive 'POOL TEMP IS SET TO xx' then 'SPA TEMP IS SET TO xx' then 'MAINTAIN TEMP IS (OFF|ON)'
   // wait for the last message
-  waitForMessage(threadCtrl->aq_data, "MAINTAIN TEMP IS", 5);
+  waitForMessage(threadCtrl->aqdata, "MAINTAIN TEMP IS", 5);
     
-  //cancel_menu(threadCtrl->aq_data);
+  //cancel_menu(threadCtrl->aqdata);
   cleanAndTerminateThread(threadCtrl);
   
   // just stop compiler error, ptr is not valid as it's just been freed
@@ -1146,12 +1146,12 @@ void *get_allbutton_freeze_protect_temp( void *ptr )
 {
   struct programmingThreadCtrl *threadCtrl;
   threadCtrl = (struct programmingThreadCtrl *) ptr;
-  struct aqualinkdata *aq_data = threadCtrl->aq_data;
+  struct aqualinkdata *aqdata = threadCtrl->aqdata;
   
   waitForSingleThreadOrTerminate(threadCtrl, AQ_GET_FREEZE_PROTECT_TEMP);
   //LOG(ALLB_LOG, LOG_NOTICE, "Getting freeze protection setpoints\n");
 
-  if ( select_menu_item(aq_data, "REVIEW") != true ) {
+  if ( select_menu_item(aqdata, "REVIEW") != true ) {
     LOG(ALLB_LOG, LOG_WARNING, "Could not select REVIEW menu\n");
     LOG(ALLB_LOG, LOG_ERR, "Can't get freeze setpoints from Control Panel\n");
     cancel_menu();
@@ -1159,7 +1159,7 @@ void *get_allbutton_freeze_protect_temp( void *ptr )
     return ptr;
   }     
            
-  if (select_sub_menu_item(aq_data, "FRZ PROTECT") != true) {
+  if (select_sub_menu_item(aqdata, "FRZ PROTECT") != true) {
     LOG(ALLB_LOG, LOG_WARNING, "Could not select FRZ PROTECT menu\n");
     LOG(ALLB_LOG, LOG_ERR, "Can't get freeze setpoints from Control Panel\n");
     cancel_menu();
@@ -1167,43 +1167,43 @@ void *get_allbutton_freeze_protect_temp( void *ptr )
     return ptr;
   }
   
-  waitForMessage(aq_data, "FREEZE PROTECTION IS SET TO", 6); // Changed from 3 to wait for multiple items to be listed
-  //cancel_menu(aq_data); 
+  waitForMessage(aqdata, "FREEZE PROTECTION IS SET TO", 6); // Changed from 3 to wait for multiple items to be listed
+  //cancel_menu(aqdata); 
   cleanAndTerminateThread(threadCtrl);
   
   // just stop compiler error, ptr is not valid as it's just been freed
   return ptr;
 }
 
-bool get_aqualink_program_for_button(struct aqualinkdata *aq_data, unsigned char cmd)
+bool get_aqualink_program_for_button(struct aqualinkdata *aqdata, unsigned char cmd)
 {
   int rtnStringsWait = 7;
   
-  if (! waitForMessage(aq_data, "SELECT DEVICE TO REVIEW or PRESS ENTER TO END", rtnStringsWait))
+  if (! waitForMessage(aqdata, "SELECT DEVICE TO REVIEW or PRESS ENTER TO END", rtnStringsWait))
     return false;
   
   LOG(ALLB_LOG, LOG_DEBUG, "Send key '%d'\n",cmd);
   send_cmd(cmd);
-  return waitForEitherMessage(aq_data, "NOT SET", "TURNS ON", rtnStringsWait);
+  return waitForEitherMessage(aqdata, "NOT SET", "TURNS ON", rtnStringsWait);
 }
 
 void *get_allbutton_programs( void *ptr )
 {
   struct programmingThreadCtrl *threadCtrl;
   threadCtrl = (struct programmingThreadCtrl *) ptr;
-  struct aqualinkdata *aq_data = threadCtrl->aq_data;
+  struct aqualinkdata *aqdata = threadCtrl->aqdata;
   char keys[10] = {KEY_PUMP, KEY_SPA, KEY_AUX1, KEY_AUX2, KEY_AUX3, KEY_AUX4, KEY_AUX5}; // KEY_AUX6 & KEY_AUX7 kill programming mode
   
   waitForSingleThreadOrTerminate(threadCtrl, AQ_GET_PROGRAMS);
 
-  if ( select_menu_item(aq_data, "REVIEW") != true ) {
+  if ( select_menu_item(aqdata, "REVIEW") != true ) {
     //LOG(ALLB_LOG, LOG_WARNING, "Could not select REVIEW menu\n");
     cancel_menu();
     cleanAndTerminateThread(threadCtrl);
     return ptr;
   }     
            
-  if (select_sub_menu_item(aq_data, "PROGRAMS") != true) {
+  if (select_sub_menu_item(aqdata, "PROGRAMS") != true) {
     //LOG(ALLB_LOG, LOG_WARNING, "Could not select PROGRAMS menu\n");
     cancel_menu();
     cleanAndTerminateThread(threadCtrl);
@@ -1214,9 +1214,9 @@ void *get_allbutton_programs( void *ptr )
   
   for (i=0; i < strlen(keys); i++) {
     //LOG(ALLB_LOG, LOG_DEBUG, "**** START program for key in loop %d\n",i);
-    if (! get_aqualink_program_for_button(aq_data, keys[i])) {
+    if (! get_aqualink_program_for_button(aqdata, keys[i])) {
       //LOG(ALLB_LOG, LOG_DEBUG, "**** Didn't find program for key in loop %d\n",i);
-      //cancel_menu(aq_data);
+      //cancel_menu(aqdata);
       cleanAndTerminateThread(threadCtrl);
       return ptr;
     }
@@ -1224,7 +1224,7 @@ void *get_allbutton_programs( void *ptr )
   }
   
   
-  if (waitForMessage(aq_data, "SELECT DEVICE TO REVIEW or PRESS ENTER TO END", 6)) {
+  if (waitForMessage(aqdata, "SELECT DEVICE TO REVIEW or PRESS ENTER TO END", 6)) {
     //LOG(ALLB_LOG, LOG_DEBUG, "Send key ENTER\n");
     send_cmd(KEY_ENTER);
   } else {
@@ -1232,7 +1232,7 @@ void *get_allbutton_programs( void *ptr )
     cancel_menu();
   }
   
-  //cancel_menu(aq_data); 
+  //cancel_menu(aqdata); 
   cleanAndTerminateThread(threadCtrl);
   
   // just stop compiler error, ptr is not valid as it's just been freed
@@ -1240,7 +1240,7 @@ void *get_allbutton_programs( void *ptr )
 }
 
 /*
-void send_cmd(unsigned char cmd, struct aqualinkdata *aq_data)
+void send_cmd(unsigned char cmd, struct aqualinkdata *aqdata)
 {
   push_aq_cmd(cmd);
   LOG(ALLB_LOG, LOG_INFO, "Queue send '0x%02hhx' to controller\n", cmd);
@@ -1309,12 +1309,12 @@ void cancel_menu()
 * added functionality, if start of string is ^ use that as must start with in comparison
 */
 
-bool waitForEitherMessage(struct aqualinkdata *aq_data, char* message1, char* message2, int numMessageReceived)
+bool waitForEitherMessage(struct aqualinkdata *aqdata, char* message1, char* message2, int numMessageReceived)
 {
   //LOG(ALLB_LOG, LOG_DEBUG, "waitForMessage %s %d %d\n",message,numMessageReceived,cmd);
   waitfor_queue2empty();  // MAke sure the last command was sent
   int i=0;
-  pthread_mutex_lock(&aq_data->active_thread.thread_mutex);
+  pthread_mutex_lock(&aqdata->active_thread.thread_mutex);
   char* msgS1 = "";
   char* msgS2 = "";
   char* ptr = NULL;
@@ -1335,56 +1335,56 @@ bool waitForEitherMessage(struct aqualinkdata *aq_data, char* message1, char* me
   
   while( ++i <= numMessageReceived)
   {
-    LOG(ALLB_LOG, LOG_DEBUG, "loop %d of %d looking for '%s' OR '%s' received message1 '%s'\n",i,numMessageReceived,message1,message2,aq_data->last_message);
+    LOG(ALLB_LOG, LOG_DEBUG, "loop %d of %d looking for '%s' OR '%s' received message1 '%s'\n",i,numMessageReceived,message1,message2,aqdata->last_message);
     
     if (message1 != NULL) {
-      ptr = stristr(aq_data->last_message, msgS1);
+      ptr = stristr(aqdata->last_message, msgS1);
       if (ptr != NULL) { // match
         LOG(ALLB_LOG, LOG_DEBUG, "String MATCH '%s'\n", msgS1);
         if (msgS1 == message1) // match & don't care if first char
           break;
-        else if (ptr == aq_data->last_message) // match & do care if first char
+        else if (ptr == aqdata->last_message) // match & do care if first char
           break;
       }
     }
     if (message2 != NULL) {
-      ptr = stristr(aq_data->last_message, msgS2);
+      ptr = stristr(aqdata->last_message, msgS2);
       if (ptr != NULL) { // match
         LOG(ALLB_LOG, LOG_DEBUG, "String MATCH '%s'\n", msgS2);
         if (msgS2 == message2) // match & don't care if first char
           break;
-        else if (ptr == aq_data->last_message) // match & do care if first char
+        else if (ptr == aqdata->last_message) // match & do care if first char
           break;
       }
     }
     
-    //LOG(ALLB_LOG, LOG_DEBUG, "looking for '%s' received message1 '%s'\n",message1,aq_data->last_message);
-    pthread_cond_wait(&aq_data->active_thread.thread_cond, &aq_data->active_thread.thread_mutex);
-    //LOG(ALLB_LOG, LOG_DEBUG, "loop %d of %d looking for '%s' received message1 '%s'\n",i,numMessageReceived,message1,aq_data->last_message);
+    //LOG(ALLB_LOG, LOG_DEBUG, "looking for '%s' received message1 '%s'\n",message1,aqdata->last_message);
+    pthread_cond_wait(&aqdata->active_thread.thread_cond, &aqdata->active_thread.thread_mutex);
+    //LOG(ALLB_LOG, LOG_DEBUG, "loop %d of %d looking for '%s' received message1 '%s'\n",i,numMessageReceived,message1,aqdata->last_message);
   }
   
-  pthread_mutex_unlock(&aq_data->active_thread.thread_mutex);
+  pthread_mutex_unlock(&aqdata->active_thread.thread_mutex);
   
   if (message1 != NULL && message2 != NULL && ptr == NULL) {
     //logmessage1(LOG_ERR, "Could not select MENU of Aqualink control panel\n");
     LOG(ALLB_LOG, LOG_ERR, "Did not find '%s'\n",message1);
     return false;
   }
-  LOG(ALLB_LOG, LOG_DEBUG, "Found message1 '%s' or '%s' in '%s'\n",message1,message2,aq_data->last_message);
+  LOG(ALLB_LOG, LOG_DEBUG, "Found message1 '%s' or '%s' in '%s'\n",message1,message2,aqdata->last_message);
   
   return true;
 }
 
 
 
-bool waitForMessage(struct aqualinkdata *aq_data, char* message, int numMessageReceived)
+bool waitForMessage(struct aqualinkdata *aqdata, char* message, int numMessageReceived)
 {
   LOG(ALLB_LOG, LOG_DEBUG, "waitForMessage %s %d\n",message,numMessageReceived);
   // NSF Need to come back to this, as it stops on test enviornment but not real panel, so must be speed related.
   //waitfor_queue2empty();  // MAke sure the last command was sent
 
   int i=0;
-  pthread_mutex_lock(&aq_data->active_thread.thread_mutex);
+  pthread_mutex_lock(&aqdata->active_thread.thread_mutex);
   char* msgS;
   char* ptr = NULL;
   
@@ -1398,43 +1398,43 @@ bool waitForMessage(struct aqualinkdata *aq_data, char* message, int numMessageR
   while( ++i <= numMessageReceived)
   {
     if (message != NULL)
-      LOG(ALLB_LOG, LOG_DEBUG, "loop %d of %d looking for '%s', last message received '%s'\n",i,numMessageReceived,message,aq_data->last_message);
+      LOG(ALLB_LOG, LOG_DEBUG, "loop %d of %d looking for '%s', last message received '%s'\n",i,numMessageReceived,message,aqdata->last_message);
     else
-      LOG(ALLB_LOG, LOG_DEBUG, "loop %d of %d waiting for next message, last message received '%s'\n",i,numMessageReceived,aq_data->last_message);
+      LOG(ALLB_LOG, LOG_DEBUG, "loop %d of %d waiting for next message, last message received '%s'\n",i,numMessageReceived,aqdata->last_message);
 
     if (message != NULL) {
-      ptr = stristr(aq_data->last_message, msgS);
+      ptr = stristr(aqdata->last_message, msgS);
       if (ptr != NULL) { // match
         LOG(ALLB_LOG, LOG_DEBUG, "String MATCH\n");
         if (msgS == message) // match & don't care if first char
           break;
-        else if (ptr == aq_data->last_message) // match & do care if first char
+        else if (ptr == aqdata->last_message) // match & do care if first char
           break;
       }
     }
     
-    //LOG(ALLB_LOG, LOG_DEBUG, "looking for '%s' received message '%s'\n",message,aq_data->last_message);
+    //LOG(ALLB_LOG, LOG_DEBUG, "looking for '%s' received message '%s'\n",message,aqdata->last_message);
     //LOG(ALLB_LOG, LOG_DEBUG, "*** pthread_cond_wait() sleep\n");
-    pthread_cond_wait(&aq_data->active_thread.thread_cond, &aq_data->active_thread.thread_mutex);
+    pthread_cond_wait(&aqdata->active_thread.thread_cond, &aqdata->active_thread.thread_mutex);
     //LOG(ALLB_LOG, LOG_DEBUG, "*** pthread_cond_wait() wake\n");
-    //LOG(ALLB_LOG, LOG_DEBUG, "loop %d of %d looking for '%s' received message '%s'\n",i,numMessageReceived,message,aq_data->last_message);
+    //LOG(ALLB_LOG, LOG_DEBUG, "loop %d of %d looking for '%s' received message '%s'\n",i,numMessageReceived,message,aqdata->last_message);
   }
   
-  pthread_mutex_unlock(&aq_data->active_thread.thread_mutex);
+  pthread_mutex_unlock(&aqdata->active_thread.thread_mutex);
   
   if (message != NULL && ptr == NULL) {
     //LOG(ALLB_LOG, LOG_ERR, "Could not select MENU of Aqualink control panel\n");
     LOG(ALLB_LOG, LOG_DEBUG, "did not find '%s'\n",message);
     return false;
   } else if (message != NULL)
-    LOG(ALLB_LOG, LOG_DEBUG, "found message '%s' in '%s'\n",message,aq_data->last_message);
+    LOG(ALLB_LOG, LOG_DEBUG, "found message '%s' in '%s'\n",message,aqdata->last_message);
   else
     LOG(ALLB_LOG, LOG_DEBUG, "waited for %d message(s)\n",numMessageReceived);
   
   return true;
 }
 
-bool select_menu_item(struct aqualinkdata *aq_data, char* item_string)
+bool select_menu_item(struct aqualinkdata *aqdata, char* item_string)
 {
   char* expectedMsg = "PRESS ENTER* TO SELECT";
   //char* expectedMsg = "PROGRAM";
@@ -1445,7 +1445,7 @@ bool select_menu_item(struct aqualinkdata *aq_data, char* item_string)
   
   while (found == false && tries <= 3) {
     send_cmd(KEY_MENU);
-    found = waitForMessage(aq_data, expectedMsg, wait_messages);
+    found = waitForMessage(aqdata, expectedMsg, wait_messages);
     tries++;
   }
 
@@ -1453,54 +1453,54 @@ bool select_menu_item(struct aqualinkdata *aq_data, char* item_string)
     return false;
 
   // NSF  This isn't needed and seems to cause issue on some controllers.
-  //send_cmd(KEY_ENTER, aq_data);
-  //waitForMessage(aq_data, NULL, 1);
+  //send_cmd(KEY_ENTER, aqdata);
+  //waitForMessage(aqdata, NULL, 1);
   
-  return select_sub_menu_item(aq_data, item_string);
+  return select_sub_menu_item(aqdata, item_string);
 }
 /*
-bool select_menu_item(struct aqualinkdata *aq_data, char* item_string)
+bool select_menu_item(struct aqualinkdata *aqdata, char* item_string)
 {
   char* expectedMsg = "PRESS ENTER* TO SELECT";
   int wait_messages = 6;
   //int i=0;
 
   // Select the MENU and wait to get the RS8 respond.
-  send_cmd(KEY_MENU, aq_data);
+  send_cmd(KEY_MENU, aqdata);
  
-  if (waitForMessage(aq_data, expectedMsg, wait_messages) == false)
+  if (waitForMessage(aqdata, expectedMsg, wait_messages) == false)
     return false;
 
-  send_cmd(KEY_ENTER, aq_data);
-  waitForMessage(aq_data, NULL, 1);
+  send_cmd(KEY_ENTER, aqdata);
+  waitForMessage(aqdata, NULL, 1);
   
   // Blindly wait for next message
-  //sendCmdWaitForReturn(aq_data, KEY_ENTER);
+  //sendCmdWaitForReturn(aqdata, KEY_ENTER);
   // Can't determin the first response 
   //delay(500);
   
-  return select_sub_menu_item(aq_data, item_string);
+  return select_sub_menu_item(aqdata, item_string);
 }
 */
 
-//bool select_sub_menu_item(char* item_string, struct aqualinkdata *aq_data)
-bool select_sub_menu_item(struct aqualinkdata *aq_data, char* item_string)
+//bool select_sub_menu_item(char* item_string, struct aqualinkdata *aqdata)
+bool select_sub_menu_item(struct aqualinkdata *aqdata, char* item_string)
 {
   int wait_messages = 28;
   int i=0;
  
   waitfor_queue2empty();
 
-  while( (stristr(aq_data->last_message, item_string) == NULL) && ( i++ < wait_messages) )
+  while( (stristr(aqdata->last_message, item_string) == NULL) && ( i++ < wait_messages) )
   {
-    LOG(ALLB_LOG, LOG_DEBUG, "Find item in Menu: loop %d of %d looking for '%s' received message '%s'\n",i,wait_messages,item_string,aq_data->last_message);
+    LOG(ALLB_LOG, LOG_DEBUG, "Find item in Menu: loop %d of %d looking for '%s' received message '%s'\n",i,wait_messages,item_string,aqdata->last_message);
     send_cmd(KEY_RIGHT);
     waitfor_queue2empty(); // ADDED BACK MAY 2023 setting time warked better
-    //waitForMessage(aq_data, NULL, 1);
-    waitForMessage(aq_data, item_string, 1);
+    //waitForMessage(aqdata, NULL, 1);
+    waitForMessage(aqdata, item_string, 1);
   }
 
-  if (stristr(aq_data->last_message, item_string) == NULL) {
+  if (stristr(aqdata->last_message, item_string) == NULL) {
     LOG(ALLB_LOG, LOG_ERR, "Could not find menu item '%s'\n",item_string);
     return false;
   }
@@ -1512,10 +1512,10 @@ bool select_sub_menu_item(struct aqualinkdata *aq_data, char* item_string)
   send_cmd(KEY_ENTER);
   
  
-  waitForMessage(aq_data, NULL, 1);
+  waitForMessage(aqdata, NULL, 1);
   
   
-   //sendCmdWaitForReturn(aq_data, KEY_ENTER);
+   //sendCmdWaitForReturn(aqdata, KEY_ENTER);
   
   return true;
  
@@ -1523,11 +1523,11 @@ bool select_sub_menu_item(struct aqualinkdata *aq_data, char* item_string)
 
 // NSF Need to test this, then use it for the color change mode. 
 
-bool waitForButtonState(struct aqualinkdata *aq_data, aqkey* button, aqledstate state, int numMessageReceived)
+bool waitForButtonState(struct aqualinkdata *aqdata, aqkey* button, aqledstate state, int numMessageReceived)
 {
   //LOG(ALLB_LOG, LOG_DEBUG, "waitForMessage %s %d %d\n",message,numMessageReceived,cmd);
   int i=0;
-  pthread_mutex_lock(&aq_data->active_thread.thread_mutex);
+  pthread_mutex_lock(&aqdata->active_thread.thread_mutex);
 
   while( ++i <= numMessageReceived)
   {
@@ -1538,12 +1538,12 @@ bool waitForButtonState(struct aqualinkdata *aq_data, aqkey* button, aqledstate 
         break;
     }
 
-    //LOG(ALLB_LOG, LOG_DEBUG, "looking for '%s' received message '%s'\n",message,aq_data->last_message);
-    pthread_cond_wait(&aq_data->active_thread.thread_cond, &aq_data->active_thread.thread_mutex);
-    //LOG(ALLB_LOG, LOG_DEBUG, "loop %d of %d looking for '%s' received message '%s'\n",i,numMessageReceived,message,aq_data->last_message);
+    //LOG(ALLB_LOG, LOG_DEBUG, "looking for '%s' received message '%s'\n",message,aqdata->last_message);
+    pthread_cond_wait(&aqdata->active_thread.thread_cond, &aqdata->active_thread.thread_mutex);
+    //LOG(ALLB_LOG, LOG_DEBUG, "loop %d of %d looking for '%s' received message '%s'\n",i,numMessageReceived,message,aqdata->last_message);
   }
 
-  pthread_mutex_unlock(&aq_data->active_thread.thread_mutex);
+  pthread_mutex_unlock(&aqdata->active_thread.thread_mutex);
 
   if (numMessageReceived >= i) {
     //LOG(ALLB_LOG, LOG_ERR, "Could not select MENU of Aqualink control panel\n");

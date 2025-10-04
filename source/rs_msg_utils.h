@@ -31,4 +31,6 @@ char *rsm_char_replace(char *replaced , char *search,  char *find,  char *replac
 char *rsm_nchar_replace(char *replaced, int replaced_len, char *search,  char *find,  char *replace);
 int rsm_HHMM2min(char *message);
 
+int rsm_countascii(const char *src);
+
 #endif //RS_MSG_UTILS_H_

@@ -17,7 +17,7 @@ struct timerthread {
   pthread_cond_t thread_cond;
   aqkey *button;
   int deviceIndex;
-  struct aqualinkdata *aq_data;
+  struct aqualinkdata *aqdata;
   int duration_min;
   struct timespec timeout;
   time_t started_at;
@@ -57,10 +57,10 @@ int get_timer_left(aqkey *button)
   return 0;
 }
 
-void clear_timer(struct aqualinkdata *aq_data, /*aqkey *button,*/ int deviceIndex)
+void clear_timer(struct aqualinkdata *aqdata, /*aqkey *button,*/ int deviceIndex)
 {
   //struct timerthread *t_ptr = find_timerthread(button);
-  struct timerthread *t_ptr = find_timerthread(&aq_data->aqbuttons[deviceIndex]);
+  struct timerthread *t_ptr = find_timerthread(&aqdata->aqbuttons[deviceIndex]);
 
   if (t_ptr != NULL) {
     LOG(TIMR_LOG, LOG_INFO, "Clearing timer for '%s'\n",t_ptr->button->name);
@@ -69,9 +69,9 @@ void clear_timer(struct aqualinkdata *aq_data, /*aqkey *button,*/ int deviceInde
   }
 }
 
-void start_timer(struct aqualinkdata *aq_data, /*aqkey *button,*/ int deviceIndex, int duration)
+void start_timer(struct aqualinkdata *aqdata, /*aqkey *button,*/ int deviceIndex, int duration)
 {
-  aqkey *button = &aq_data->aqbuttons[deviceIndex];
+  aqkey *button = &aqdata->aqbuttons[deviceIndex];
   struct timerthread *t_ptr = find_timerthread(button);
 
   if (t_ptr != NULL) {
@@ -82,7 +82,7 @@ void start_timer(struct aqualinkdata *aq_data, /*aqkey *button,*/ int deviceInde
   }
 
   struct timerthread *tmthread = calloc(1, sizeof(struct timerthread));
-  tmthread->aq_data = aq_data;
+  tmthread->aqdata = aqdata;
   tmthread->button = button;
   tmthread->deviceIndex = deviceIndex;
   tmthread->thread_id = 0;
@@ -137,11 +137,11 @@ void *timer_worker( void *ptr )
 
   // device should be on, but check, ignore for PDA as that may not have been turned on yet
   if (!isPDA_PANEL && tmthread->button->led->state == OFF) {
-    if ((tmthread->button->special_mask & PROGRAM_LIGHT) == PROGRAM_LIGHT && in_light_programming_mode(tmthread->aq_data)) {
+    if ((tmthread->button->special_mask & PROGRAM_LIGHT) == PROGRAM_LIGHT && in_light_programming_mode(tmthread->aqdata)) {
       LOG(TIMR_LOG, LOG_NOTICE, "Not turning on '%s' as programmer is\n",tmthread->button->name);
     } else {
       LOG(TIMR_LOG, LOG_NOTICE, "turning on '%s'\n",tmthread->button->name);
-      panel_device_request(tmthread->aq_data, ON_OFF, tmthread->deviceIndex, false, NET_TIMER);
+      panel_device_request(tmthread->aqdata, ON_OFF, tmthread->deviceIndex, false, NET_TIMER);
     }
   }
 */
@@ -151,7 +151,7 @@ void *timer_worker( void *ptr )
     delay(WAIT_TIME_BEFORE_ON_CHECK);
     if (cnt++ == 5 && !isPDA_PANEL) {
        LOG(TIMR_LOG, LOG_NOTICE, "turning on '%s'\n",tmthread->button->name);
-       panel_device_request(tmthread->aq_data, ON_OFF, tmthread->deviceIndex, true, NET_TIMER);
+       panel_device_request(tmthread->aqdata, ON_OFF, tmthread->deviceIndex, true, NET_TIMER);
     } else if (cnt == 10) {
        LOG(TIMR_LOG, LOG_ERR, "button state never turned on'%s'\n",tmthread->button->name);
        break;
@@ -189,7 +189,7 @@ void *timer_worker( void *ptr )
 
   if (tmthread->duration_min != 0 && tmthread->button->led->state != OFF) {
     LOG(TIMR_LOG, LOG_INFO, "Timer waking turning '%s' off\n",tmthread->button->name);
-    panel_device_request(tmthread->aq_data, ON_OFF, tmthread->deviceIndex, false, NET_TIMER);
+    panel_device_request(tmthread->aqdata, ON_OFF, tmthread->deviceIndex, false, NET_TIMER);
   } else if (tmthread->button->led->state == OFF) {
     LOG(TIMR_LOG, LOG_INFO, "Timer waking '%s' is already off\n",tmthread->button->name);
   }

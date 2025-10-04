@@ -39,7 +39,7 @@
 #include <sys/select.h>
 
 
-#define SERIAL_READ_TIMEOUT_SEC 1;
+#define SERIAL_READ_TIMEOUT_SEC 2;
 
 static int _RS485_fds = -1;
 

@@ -37,12 +37,12 @@ void temp_debugprintExtraInfo(unsigned char *pk, int length);
 
 #ifdef ATOUCH_TEST
 void set_iaq_cansend(bool yes) {}
-bool in_iaqt_programming_mode(struct aqualinkdata *aq_data) {return false;}
+bool in_iaqt_programming_mode(struct aqualinkdata *aqdata) {return false;}
 bool iaqt_queue_cmd(unsigned char cmd) {}
-bool in_programming_mode(struct aqualinkdata *aq_data){return false;}
-void queueGetProgramData(emulation_type source_type, struct aqualinkdata *aq_data){}
-void kick_aq_program_thread(struct aqualinkdata *aq_data, emulation_type source_type){}
-void aq_programmer(program_type type, char *args, struct aqualinkdata *aq_data){}
+bool in_programming_mode(struct aqualinkdata *aqdata){return false;}
+void queueGetProgramData(emulation_type source_type, struct aqualinkdata *aqdata){}
+void kick_aq_program_thread(struct aqualinkdata *aqdata, emulation_type source_type){}
+void aq_programmer(program_type type, char *args, struct aqualinkdata *aqdata){}
 #endif
 
 unsigned char _button_keys[] = { KEY_IAQTCH_KEY01,
@@ -308,68 +308,55 @@ int matchLabel2Button(const char* pageButtonName, aqkey *aqbutton, int ignorecha
 }
 
 //  aqualinkd button found and updated, AQstart & AQend are index of aqualinkd button array
-void updateAQButtonFromPageButton(struct aqualinkdata *aq_data, struct iaqt_page_button *pageButton, int AQstartIndex, int AQendIndex)
+void updateAQButtonFromPageButton(struct aqualinkdata *aqdata, struct iaqt_page_button *pageButton, int AQstartIndex, int AQendIndex)
 {
 
   for (int i = AQstartIndex; i < AQendIndex; i++)
   {
-    //LOG(IAQT_LOG,LOG_DEBUG, "Button compare '%s' to '%s'\n",pageButton->name, aq_data->aqbuttons[i].label);
+    //LOG(IAQT_LOG,LOG_DEBUG, "Button compare '%s' to '%s'\n",pageButton->name, aqdata->aqbuttons[i].label);
 
     int rtn = -1;
     // If we are loading HOME page then simply button name is the label ie "Aux3"
     // If loading DEVICES? page then button name + status is "Aux3 OFF "
     /*
     if (_currentPageLoading == IAQ_PAGE_HOME) {
-      rtn = rsm_strmatch((const char *)pageButton->name, aq_data->aqbuttons[i].label);
-      if (rtn != 0 && isVBUTTON_ALTLABEL(aq_data->aqbuttons) ) {
-        rtn = rsm_strmatch((const char *)pageButton->name, ((vbutton_detail *)aq_data->aqbuttons[i].special_mask_ptr)->altlabel );
+      rtn = rsm_strmatch((const char *)pageButton->name, aqdata->aqbuttons[i].label);
+      if (rtn != 0 && isVBUTTON_ALTLABEL(aqdata->aqbuttons) ) {
+        rtn = rsm_strmatch((const char *)pageButton->name, ((vbutton_detail *)aqdata->aqbuttons[i].special_mask_ptr)->altlabel );
         if (rtn = 0 ) {
-          ((vbutton_detail *)aq_data->aqbuttons[i].special_mask_ptr)->in_alt_mode = true;
+          ((vbutton_detail *)aqdata->aqbuttons[i].special_mask_ptr)->in_alt_mode = true;
         }
       }
     } else {
-      rtn = rsm_strmatch_ignore((const char *)pageButton->name, aq_data->aqbuttons[i].label, 5); // 5 = 3 chars and 2 spaces ' OFF '
+      rtn = rsm_strmatch_ignore((const char *)pageButton->name, aqdata->aqbuttons[i].label, 5); // 5 = 3 chars and 2 spaces ' OFF '
     }*/
     if (_currentPageLoading == IAQ_PAGE_HOME) {
-      rtn = matchLabel2Button((const char *)pageButton->name, &aq_data->aqbuttons[i], 0);
+      rtn = matchLabel2Button((const char *)pageButton->name, &aqdata->aqbuttons[i], 0);
     } else {
-      rtn = matchLabel2Button((const char *)pageButton->name, &aq_data->aqbuttons[i], 5); // 5 = 3 chars and 2 spaces ' OFF '
+      rtn = matchLabel2Button((const char *)pageButton->name, &aqdata->aqbuttons[i], 5); // 5 = 3 chars and 2 spaces ' OFF '
     }
 
       if (rtn == 0)
       {
-        LOG(IAQT_LOG,LOG_DEBUG, "Found Status for %s state 0x%02hhx\n", aq_data->aqbuttons[i].label, pageButton->state);
+        LOG(IAQT_LOG,LOG_DEBUG, "Found Status for %s state 0x%02hhx\n", aqdata->aqbuttons[i].label, pageButton->state);
         switch(pageButton->state) {
           case 0x00:
-            if (aq_data->aqbuttons[i].led->state != OFF) {
-              aq_data->aqbuttons[i].led->state = OFF;
-              aq_data->updated = true;
-            }
+              SET_IF_CHANGED(aqdata->aqbuttons[i].led->state, OFF, aqdata->is_dirty);
           break;
           case 0x01:
-            if (aq_data->aqbuttons[i].led->state != ON) {
-              aq_data->aqbuttons[i].led->state = ON;
-              aq_data->updated = true;
-            }
+              SET_IF_CHANGED(aqdata->aqbuttons[i].led->state, ON, aqdata->is_dirty);
           break;
           case 0x02:
-            if (aq_data->aqbuttons[i].led->state != FLASH) {
-              aq_data->aqbuttons[i].led->state = FLASH;
-              aq_data->updated = true;
-            }
+              SET_IF_CHANGED(aqdata->aqbuttons[i].led->state, FLASH, aqdata->is_dirty);
           break;
           case 0x03:
-            if (aq_data->aqbuttons[i].led->state != ENABLE) {
-              aq_data->aqbuttons[i].led->state = ENABLE;
-              aq_data->updated = true;
-            }
+              SET_IF_CHANGED(aqdata->aqbuttons[i].led->state, ENABLE, aqdata->is_dirty);
           break;
           default:
             // Dimmer light will have the % as the state. so 0x32=50% 0x4B=75%
             // So anything greater than 0 use as on
             if (pageButton->state > 0x00) {
-              aq_data->aqbuttons[i].led->state = ON;
-              aq_data->updated = true;
+              SET_IF_CHANGED(aqdata->aqbuttons[i].led->state, ON, aqdata->is_dirty);
             }
             //LOG(IAQT_LOG,LOG_NOTICE, "Unknown state 0x%02hhx for button %s\n",pageButton->state,pageButton->name);
           break;
@@ -377,45 +364,9 @@ void updateAQButtonFromPageButton(struct aqualinkdata *aq_data, struct iaqt_page
       
     }
   }
-
-  // Quick and dirty check for heat pump/chiller
-  // if we see Heat Pump then chiller is not enabled.
-  // if we see chiller then it is enabled.
-  // Not sure why button name changes from "Heat Pump" to "Chiller", need to figure this out. (might be pump)
-  // THIS NEEDS TO BE DELETED AND MAKE A HEAT_PUMP / CHILLER BUTTON
-  /*
-  int ignore = 5;
-  if (_currentPageLoading == IAQ_PAGE_HOME) 
-    ignore = 0;
-
-  if ( rsm_strmatch_ignore((const char *)pageButton->name, "Heat Pump", ignore) == 0 ) {
-    aq_data->chiller_state = OFF;
-    aq_data->chiller_mode = MD_HEATPUMP;
-    aq_data->updated = true;
-    //printf("********* Disable Chiller \n");
-  } else if (rsm_strmatch_ignore((const char *)pageButton->name, "Chiller", ignore) == 0) {
-    switch(pageButton->state) {
-      case 0x00:
-        aq_data->chiller_state = OFF;
-      break;
-      case 0x01:
-        aq_data->chiller_state = ON;
-      break;
-      case 0x02:
-        aq_data->chiller_state = FLASH;
-      break;
-      case 0x03:
-        aq_data->chiller_state = ENABLE;
-      break;
-    }
-    aq_data->chiller_mode = MD_CHILLER;
-    aq_data->updated = true;
-    LOG(IAQT_LOG,LOG_DEBUG, "*** Found Status for %s state 0x%02hhx\n", "Chiller", pageButton->state);
-  }*/
-
 }
 
-void processPageButton(unsigned char *message, int length, struct aqualinkdata *aq_data)
+void processPageButton(unsigned char *message, int length, struct aqualinkdata *aqdata)
 {
   struct iaqt_page_button *button;
   int index = (int)message[PKT_IAQT_BUTINDX];
@@ -460,108 +411,20 @@ void processPageButton(unsigned char *message, int length, struct aqualinkdata *
   // This get's called or every device state change in PDA mode, since we page over all the devices.
   // So capture and update the device state
   if (isPDA_PANEL) {
-    updateAQButtonFromPageButton(aq_data,button,0,aq_data->total_buttons);
+    updateAQButtonFromPageButton(aqdata,button,0,aqdata->total_buttons);
   } else {
     if ( PANEL_SIZE() >= 16) {
-      updateAQButtonFromPageButton(aq_data,button,aq_data->rs16_vbutton_start,aq_data->rs16_vbutton_end + 1);
+      updateAQButtonFromPageButton(aqdata,button,aqdata->rs16_vbutton_start,aqdata->rs16_vbutton_end + 1);
     }
     if ( isVirtualButtonEnabled() ) {
-      updateAQButtonFromPageButton(aq_data,button,aq_data->virtual_button_start,aq_data->total_buttons);
+      updateAQButtonFromPageButton(aqdata,button,aqdata->virtual_button_start,aqdata->total_buttons);
     }
   }
-
-/*
-  // NSF Add virtual button support below. ( || aq_data->virtual_button_start > 0 )
-  if (isPDA_PANEL || PANEL_SIZE() >= 16) {
-    int start = 0;
-    int end = aq_data->total_buttons;
-
-#ifdef AQ_RS16
-    if (PANEL_SIZE() >= 16) {
-      start = aq_data->rs16_vbutton_start;
-      end = aq_data->rs16_vbutton_end + 1; // Using < in comparison and not <=, so +1
-//printf("************ CHECK RS16 BUTTONS ************\n");
-    }
-#endif
-    
-    for (int i = start; i < end; i++)
-    {
-
-      int rtn=-1;
-      //LOG(IAQT_LOG,LOG_DEBUG, "Button compare '%s' to '%s'\n",button->name, aq_data->aqbuttons[i].label);
-      // If we are loading HOME page then simply button name is the label ie "Aux3"
-      // If loading DEVICES? page then button name + status is "Aux3 OFF "
-
-      if (_currentPageLoading == IAQ_PAGE_HOME)
-        rtn = rsm_strmatch((const char *)button->name, aq_data->aqbuttons[i].label);
-      else
-        rtn = rsm_strmatch_ignore((const char *)button->name, aq_data->aqbuttons[i].label,5);  // 5 = 3 chars and 2 spaces ' OFF '
-
-      if (rtn == 0)
-      {
-        LOG(IAQT_LOG,LOG_DEBUG, "*** Found Status for %s state 0x%02hhx\n", aq_data->aqbuttons[i].label, button->state);
-        switch(button->state) {
-          case 0x00:
-            if (aq_data->aqbuttons[i].led->state != OFF) {
-              aq_data->aqbuttons[i].led->state = OFF;
-              aq_data->updated = true;
-            }
-          break;
-          case 0x01:
-            if (aq_data->aqbuttons[i].led->state != ON) {
-              aq_data->aqbuttons[i].led->state = ON;
-              aq_data->updated = true;
-            }
-          break;
-          case 0x02:
-            if (aq_data->aqbuttons[i].led->state != FLASH) {
-              aq_data->aqbuttons[i].led->state = FLASH;
-              aq_data->updated = true;
-            }
-          break;
-          case 0x03:
-            if (aq_data->aqbuttons[i].led->state != ENABLE) {
-              aq_data->aqbuttons[i].led->state = ENABLE;
-              aq_data->updated = true;
-            }
-          break;
-          default:
-            LOG(IAQT_LOG,LOG_NOTICE, "Unknown state 0x%02hhx for button %s\n",button->state,button->name); 
-          break;
-        }
-      }
-    }
-  } */
 }
 
-/*  No need as we can see this in buttons
-typedef enum iaqt_devices{
-  DEVICE_RESET       = (1 << 0),
-  DEVICE_CHILLER     = (1 << 1)
-}iaqt_devices;
-
-void iaqt_device_update(struct aqualinkdata *aq_data, iaqt_devices mask) {
-
-  static uint8_t device_bitmask;
-
-  if (mask == DEVICE_RESET) {
-    if ( (device_bitmask & DEVICE_CHILLER) == DEVICE_CHILLER ) {
-      aq_data->chiller_state = ON;
-      LOG(IAQT_LOG,LOG_INFO, "Saw Chiller in device status\n");
-    } else {
-      aq_data->chiller_state = OFF;
-    }
-
-    device_bitmask = 0;
-    return;
-  }
-   
-  device_bitmask |= mask;
-}
-*/
 
 // Log if we saw a pump in a device page cycle.
-void iaqt_pump_update(struct aqualinkdata *aq_data, int updated) {
+void iaqt_pump_update(struct aqualinkdata *aqdata, int updated) {
   const int bitmask[MAX_PUMPS] = {1,2,4,8};
   static unsigned char updates = '\0';
   //int i;
@@ -569,26 +432,25 @@ void iaqt_pump_update(struct aqualinkdata *aq_data, int updated) {
   if (updated == -1) {
     for(int i=0; i < MAX_PUMPS; i++) {
       if ((updates & bitmask[i]) != bitmask[i]) {
-        aq_data->pumps[i].rpm = PUMP_OFF_RPM;
-        aq_data->pumps[i].gpm = PUMP_OFF_GPM;
-        aq_data->pumps[i].watts = PUMP_OFF_WAT;
-        aq_data->pumps[i].pStatus = PS_OFF;
+        SET_IF_CHANGED(aqdata->pumps[i].rpm, PUMP_OFF_RPM, aqdata->is_dirty);
+        SET_IF_CHANGED(aqdata->pumps[i].gpm, PUMP_OFF_GPM, aqdata->is_dirty);
+        SET_IF_CHANGED(aqdata->pumps[i].watts, PUMP_OFF_WAT, aqdata->is_dirty);
+        SET_IF_CHANGED(aqdata->pumps[i].pStatus, PS_OFF, aqdata->is_dirty);
         // If Virtual pump, turn it off as well.
-        if (i < aq_data->num_pumps && isVBUTTON(aq_data->pumps[i].button->special_mask) && aq_data->pumps[i].button->led->state == ON ) {
-          LOG(IAQT_LOG,LOG_DEBUG, "Turning off virtual button pump %d - \n",aq_data->pumps[i].pumpIndex,aq_data->pumps[i].button->label);
-          aq_data->pumps[i].button->led->state = OFF;
+        if (i < aqdata->num_pumps && isVBUTTON(aqdata->pumps[i].button->special_mask) && aqdata->pumps[i].button->led->state == ON ) {
+          LOG(IAQT_LOG,LOG_DEBUG, "Turning off virtual button pump %d - \n",aqdata->pumps[i].pumpIndex,aqdata->pumps[i].button->label);
+          SET_IF_CHANGED(aqdata->pumps[i].button->led->state, OFF, aqdata->is_dirty);
         }
         LOG(IAQT_LOG,LOG_DEBUG, "Clearing pump %d\n",i);
-        aq_data->updated  =true;
       }
     }
     updates = '\0';
   } else if (updated >=0 && updated < MAX_PUMPS) {
     updates |= bitmask[updated];
     LOG(IAQT_LOG,LOG_DEBUG, "Got pump update message for pump %d\n",updated);
-        if (updated < aq_data->num_pumps && isVBUTTON(aq_data->pumps[updated].button->special_mask) && aq_data->pumps[updated].button->led->state == OFF) {
-          LOG(IAQT_LOG,LOG_DEBUG, "Turning on virtual button pump %d - %s\n",aq_data->pumps[updated].pumpIndex,aq_data->pumps[updated].button->label);
-          aq_data->pumps[updated].button->led->state = ON;
+        if (updated < aqdata->num_pumps && isVBUTTON(aqdata->pumps[updated].button->special_mask) && aqdata->pumps[updated].button->led->state == OFF) {
+          LOG(IAQT_LOG,LOG_DEBUG, "Turning on virtual button pump %d - %s\n",aqdata->pumps[updated].pumpIndex,aqdata->pumps[updated].button->label);
+          SET_IF_CHANGED(aqdata->pumps[updated].button->led->state, ON, aqdata->is_dirty);
         }
   }
 }
@@ -608,7 +470,7 @@ Info:    iAQ Touch: Status page 06| #1 AquaPure\
 
 */
 
-pump_detail *matchPump(const logmask_t from, struct aqualinkdata *aq_data, char *name, int *pump_index)
+pump_detail *matchPump(const logmask_t from, struct aqualinkdata *aqdata, char *name, int *pump_index)
 {
   int i;
   pump_detail *pump = NULL;
@@ -627,13 +489,13 @@ pump_detail *matchPump(const logmask_t from, struct aqualinkdata *aq_data, char 
   }
 
   // Now loop over all the VSP pumps and check the name.
-  for (i = 0; i < aq_data->num_pumps; i++)
+  for (i = 0; i < aqdata->num_pumps; i++)
   {
-    if ((pi > 0 && aq_data->pumps[i].pumpIndex == pi) ||
-        (rsm_strcmp(name, aq_data->pumps[i].pumpName) == 0))
+    if ((pi > 0 && aqdata->pumps[i].pumpIndex == pi) ||
+        (rsm_strcmp(name, aqdata->pumps[i].pumpName) == 0))
     {
       *pump_index = i;
-      pump = &aq_data->pumps[i];
+      pump = &aqdata->pumps[i];
     }
   }
 
@@ -647,12 +509,12 @@ pump_detail *matchPump(const logmask_t from, struct aqualinkdata *aq_data, char 
     else if (pump->pumpType == PT_UNKNOWN)
     {
       if (rsm_strcmp(name, "Intelliflo VS") == 0)
-        pump->pumpType = VSPUMP;
+        SET_IF_CHANGED(pump->pumpType, VSPUMP, aqdata->is_dirty);
       else if (rsm_strcmp(name, "Intelliflo VF") == 0)
-        pump->pumpType = VFPUMP;
+        SET_IF_CHANGED(pump->pumpType, VFPUMP, aqdata->is_dirty);
       else if (rsm_strcmp(name, "Jandy ePUMP") == 0 ||
                rsm_strcmp(name, "ePump AC") == 0)
-        pump->pumpType = EPUMP;
+        SET_IF_CHANGED(pump->pumpType, EPUMP, aqdata->is_dirty);
     }
   }
 
@@ -664,7 +526,7 @@ pump_detail *matchPump(const logmask_t from, struct aqualinkdata *aq_data, char 
   return pump;
 }
 
-void passDeviceStatusPage(struct aqualinkdata *aq_data)
+void passDeviceStatusPage(struct aqualinkdata *aqdata)
 {
   int i;
   int pi = -2;
@@ -673,92 +535,50 @@ void passDeviceStatusPage(struct aqualinkdata *aq_data)
   //int pump_index = 0;
 
   for (i=0; i <IAQ_STATUS_PAGE_LINES; i++ ) {
-    /*
-    //LOG(IAQT_LOG,LOG_NOTICE, "Passing message %.2d| %s\n",i,_deviceStatus[i]);
-    if (rsm_strcmp(_deviceStatus[i],"Intelliflo VS") == 0 ||
-        rsm_strcmp(_deviceStatus[i],"Intelliflo VF") == 0 ||
-        rsm_strcmp(_deviceStatus[i],"Jandy ePUMP") == 0 ||
-        rsm_strcmp(_deviceStatus[i],"ePump AC") == 0)
-    {
-      int pump_index = rsm_atoi(&_deviceStatus[i][14]);
-      if (pump_index <= 0)
-        pump_index = rsm_atoi(&_deviceStatus[i][10]);  // ePump AC seems to display index in different position 
-      for (pi=0; pi < aq_data->num_pumps; pi++) {
-        if (aq_data->pumps[pi].pumpIndex == pump_index) {
-          iaqt_pump_update(aq_data, pi); // Log that we saw a pump
-          pump = &aq_data->pumps[pi];
-          aq_data->updated  =true;
-          if (pump->pumpType == PT_UNKNOWN){
-            if (rsm_strcmp(_deviceStatus[i],"Intelliflo VS") == 0)
-              pump->pumpType = VSPUMP;
-            else if (rsm_strcmp(_deviceStatus[i],"Intelliflo VF") == 0)
-              pump->pumpType = VFPUMP;
-            else if (rsm_strcmp(_deviceStatus[i],"Jandy ePUMP") == 0 ||
-                     rsm_strcmp(_deviceStatus[i],"ePump AC") == 0)
-              pump->pumpType = EPUMP;
-
-            LOG(IAQT_LOG,LOG_DEBUG, "Pump %d set to type %s\n",pump->pumpIndex, (pump->pumpType==EPUMP?"Jandy ePUMP":(pump->pumpType==VFPUMP?"Intelliflo VF":"Intelliflo VS")) );
-          }
-        }
-      }
-      if (pump == NULL)
-        LOG(IAQT_LOG,LOG_WARNING, "Got pump message '%s' but can't find pump at index %d\n",_deviceStatus[i],pump_index);
-        
-      continue;
-
-    } else*/ if (rsm_strcmp(_deviceStatus[i],"RPM:") == 0) {
-      pump = matchPump(IAQT_LOG, aq_data, _deviceStatus[i-1], &pi);
+    if (rsm_strcmp(_deviceStatus[i],"RPM:") == 0) {
+      pump = matchPump(IAQT_LOG, aqdata, _deviceStatus[i-1], &pi);
       if (pump != NULL) {
-        iaqt_pump_update(aq_data, pi); // Log that we saw a pump
-        pump->rpm = rsm_atoi(&_deviceStatus[i][9]);
-        pump->pStatus = PS_OK;
-        aq_data->updated = true;
+        iaqt_pump_update(aqdata, pi); // Log that we saw a pump
+        SET_IF_CHANGED(pump->rpm, rsm_atoi(&_deviceStatus[i][9]), aqdata->is_dirty);
+        SET_IF_CHANGED(pump->pStatus, PS_OK, aqdata->is_dirty);
       } else
         LOG(IAQT_LOG,LOG_INFO, "Got pump message '%s' but can't find pump\n",_deviceStatus[i]);
       continue;
     } else if (rsm_strcmp(_deviceStatus[i],"GPM:") == 0) {
       if (pump != NULL) {
-        pump->gpm = rsm_atoi(&_deviceStatus[i][9]);
-        pump->pStatus = PS_OK;
-        aq_data->updated = true;
+        SET_IF_CHANGED(pump->gpm, rsm_atoi(&_deviceStatus[i][9]), aqdata->is_dirty);
+        SET_IF_CHANGED(pump->pStatus, PS_OK, aqdata->is_dirty);
       } else
         LOG(IAQT_LOG,LOG_INFO, "Got pump message '%s' but can't find pump\n",_deviceStatus[i]);
       continue;
     } else if (rsm_strcmp(_deviceStatus[i],"Watts:") == 0) {
       if (pump != NULL) {
-        pump->watts = rsm_atoi(&_deviceStatus[i][9]);
+        SET_IF_CHANGED(pump->watts, rsm_atoi(&_deviceStatus[i][9]), aqdata->is_dirty);
         //pump->ppStatus = DON"T SET, WE GET WATTS IN PRIMING
-        aq_data->updated = true;
       } else
         LOG(IAQT_LOG,LOG_INFO, "Got pump message '%s' but can't find pump\n",_deviceStatus[i]);
       continue;
     } else if (rsm_strcmp(_deviceStatus[i],"*** Priming ***") == 0) {
-      pump = matchPump(IAQT_LOG, aq_data, _deviceStatus[i-1], &pi);
+      pump = matchPump(IAQT_LOG, aqdata, _deviceStatus[i-1], &pi);
       if (pump != NULL) {
-        iaqt_pump_update(aq_data, pi); // Log that we saw a pump
-        //pump->rpm = PUMP_PRIMING;   // NSF need to remove future
-        pump->pStatus = PS_PRIMING;
-        aq_data->updated = true;
+        iaqt_pump_update(aqdata, pi); // Log that we saw a pump
+        SET_IF_CHANGED(pump->pStatus, PS_PRIMING, aqdata->is_dirty);
       } else
         LOG(IAQT_LOG,LOG_INFO, "Got pump message '%s' but can't find pump\n",_deviceStatus[i]);
       continue;
     } else if (rsm_strcmp(_deviceStatus[i],"(Offline)") == 0) {
-      pump = matchPump(IAQT_LOG, aq_data, _deviceStatus[i-1], &pi);
+      pump = matchPump(IAQT_LOG, aqdata, _deviceStatus[i-1], &pi);
       if (pump != NULL) {
-        iaqt_pump_update(aq_data, pi); // Log that we saw a pump
-        //pump->rpm = PUMP_OFFLINE;    // NSF need to remove future
-        pump->pStatus = PS_OFFLINE;
-        aq_data->updated = true;
+        iaqt_pump_update(aqdata, pi); // Log that we saw a pump
+        SET_IF_CHANGED(pump->pStatus, PS_OFFLINE, aqdata->is_dirty);
       } else
         LOG(IAQT_LOG,LOG_INFO, "Got pump message '%s' but can't find pump\n",_deviceStatus[i]);
       continue;
     } else if (rsm_strcmp(_deviceStatus[i],"(Priming Error)") == 0) {
-      pump = matchPump(IAQT_LOG, aq_data, _deviceStatus[i-1], &pi);
+      pump = matchPump(IAQT_LOG, aqdata, _deviceStatus[i-1], &pi);
       if (pump != NULL) {
-        iaqt_pump_update(aq_data, pi); // Log that we saw a pump
-        //pump->rpm = PUMP_ERROR;  // NSF need to remove future
-        pump->pStatus = PS_ERROR;
-        aq_data->updated = true;
+        iaqt_pump_update(aqdata, pi); // Log that we saw a pump
+        SET_IF_CHANGED(pump->pStatus, PS_ERROR, aqdata->is_dirty);
       } else
         LOG(IAQT_LOG,LOG_INFO, "Got pump message '%s' but can't find pump\n",_deviceStatus[i]);
       continue;
@@ -774,18 +594,6 @@ void passDeviceStatusPage(struct aqualinkdata *aq_data)
            Info:  =  ORP 750/PH 7.0  */
       // Use logic under TrueSense below to get ORP & PH
       i++;
-      /*
-      if (rsm_strcmp(_deviceStatus[i],"ORP") == 0) {
-        int orp = rsm_atoi(&_deviceStatus[i][4]);
-        char *indx = strchr(_deviceStatus[i], '/');
-        float ph = rsm_atof(indx+3);
-        if (aq_data->ph != ph || aq_data->orp != orp) {
-          aq_data->ph = ph;
-          aq_data->orp = orp;
-        }
-        aq_data->updated = true;
-        LOG(IAQT_LOG,LOG_INFO, "Set Cemlink ORP = %d PH = %f from message '%s'\n",orp,ph,_deviceStatus[i]);
-      }*/
     }
 
     /* TruSense is different format to chemlink above
@@ -800,11 +608,10 @@ void passDeviceStatusPage(struct aqualinkdata *aq_data)
         int orp = rsm_atoi(oi+4);
         float ph = rsm_atof(pi+3);
         if (orp > 0 && ph > 0) {
-          if (aq_data->ph != ph || aq_data->orp != orp) {
-            aq_data->ph = ph;
-            aq_data->orp = orp;
+          if (aqdata->ph != ph || aqdata->orp != orp) {
+            SET_IF_CHANGED(aqdata->ph, ph, aqdata->is_dirty);
+            SET_IF_CHANGED(aqdata->orp, orp, aqdata->is_dirty);
           }
-          aq_data->updated = true;
           LOG(IAQT_LOG,LOG_INFO, "Set Cem ORP = %d PH = %f from message '%s'\n",orp,ph,_deviceStatus[i]);
         } else {
           // Didn't understand message, not
@@ -814,22 +621,20 @@ void passDeviceStatusPage(struct aqualinkdata *aq_data)
     }
     
     if (ENABLE_CHILLER && (rsm_strcmp(_deviceStatus[i],"Chiller") == 0 || rsm_strcmp(_deviceStatus[i],"Heat Pump") == 0 )) {
-      processHeatPumpDisplayMessage(_deviceStatus[i], aq_data);
+      processHeatPumpDisplayMessage(_deviceStatus[i], aqdata);
     }   
     
 //#ifdef READ_SWG_FROM_EXTENDED_ID
     else if (isPDA_PANEL) {
      if (rsm_strcmp(_deviceStatus[i],"AQUAPURE") == 0) {
-      //aq_data->swg_percent = rsm_atoi(&_deviceStatus[i][9]);
-      if (changeSWGpercent(aq_data, rsm_atoi(&_deviceStatus[i][9])))
-        LOG(IAQT_LOG,LOG_DEBUG, "Set swg %% to %d from message'%s'\n",aq_data->swg_percent,_deviceStatus[i]);
+      //aqdata->swg_percent = rsm_atoi(&_deviceStatus[i][9]);
+      if (changeSWGpercent(aqdata, rsm_atoi(&_deviceStatus[i][9])))
+        LOG(IAQT_LOG,LOG_DEBUG, "Set swg %% to %d from message'%s'\n",aqdata->swg_percent,_deviceStatus[i]);
      } else if (rsm_strcmp(_deviceStatus[i],"salt") == 0) {
-      aq_data->swg_ppm = rsm_atoi(&_deviceStatus[i][5]);
-      aq_data->updated = true;
-      LOG(IAQT_LOG,LOG_DEBUG, "Set swg PPM to %d from message'%s'\n",aq_data->swg_ppm,_deviceStatus[i]);
+      SET_IF_CHANGED(aqdata->swg_ppm, rsm_atoi(&_deviceStatus[i][5]), aqdata->is_dirty);
+      LOG(IAQT_LOG,LOG_DEBUG, "Set swg PPM to %d from message'%s'\n",aqdata->swg_ppm,_deviceStatus[i]);
      } else if (rsm_strcmp(_deviceStatus[i],"Boost Pool") == 0) {
-      aq_data->boost = true;
-      aq_data->updated = true;
+      SET_IF_CHANGED(aqdata->boost, true, aqdata->is_dirty);
       // Let RS pickup time remaing message.
      }
     }
@@ -849,7 +654,7 @@ void debugPrintButtons(struct iaqt_page_button buttons[])
 
 //#define member_size(type, member) (sizeof( ((type*)0)->member ))
 
-void processPage(struct aqualinkdata *aq_data)
+void processPage(struct aqualinkdata *aqdata)
 {
   //static int _home_cnt = 0;
   int i;
@@ -866,14 +671,14 @@ void processPage(struct aqualinkdata *aq_data)
           LOG(IAQT_LOG,LOG_INFO, "Status page %.2d| %s\n",i,_deviceStatus[i]);
       
       debugPrintButtons(_pageButtons);
-      passDeviceStatusPage(aq_data);
+      passDeviceStatusPage(aqdata);
       // If button 1 is type 0x02 then there is a next page.  Since status page isn't used for programming, hit the next page button.
       if (_pageButtons[1].type == 0x02) {
         iaqt_queue_cmd(KEY_IAQTCH_KEY02);
       } else {
-        iaqt_pump_update(aq_data, -1); // Reset pumps.
-        //iaqt_device_update(aq_data,DEVICE_RESET); // Reset any devices we monitor.
-        if ( (isPDA_PANEL || PANEL_SIZE() >= 16) && !in_iaqt_programming_mode(aq_data) ) {
+        iaqt_pump_update(aqdata, -1); // Reset pumps.
+        //iaqt_device_update(aqdata,DEVICE_RESET); // Reset any devices we monitor.
+        if ( (isPDA_PANEL || PANEL_SIZE() >= 16) && !in_iaqt_programming_mode(aqdata) ) {
           iaqt_queue_cmd(KEY_IAQTCH_HOME);
         } 
       }
@@ -895,7 +700,7 @@ void processPage(struct aqualinkdata *aq_data)
 #ifndef NEW_POLL_CYCLE
       // If Button 15 has type 0x02 then we have previous, if 0x00 nothing (previous send code KEY_IAQTCH_PREV_PAGE)
       // If Button 16 has type 0x03 then we have next, if 0x00 nothing (next send code KEY_IAQTCH_NEXT_PAGE)
-      if ( (isPDA_PANEL || isVirtualButtonEnabled() || PANEL_SIZE() >= 16) && !in_iaqt_programming_mode(aq_data) ) {
+      if ( (isPDA_PANEL || isVirtualButtonEnabled() || PANEL_SIZE() >= 16) && !in_iaqt_programming_mode(aqdata) ) {
         if (_devicePageButtons[dp][16].type == 0x03) {
           iaqt_queue_cmd(KEY_IAQTCH_NEXT_PAGE);
         } else {
@@ -933,22 +738,19 @@ void processPage(struct aqualinkdata *aq_data)
 
       if (isPDA_PANEL) { // Set temp if PDA panel
        if (rsm_strcmp(_homeStatus[5],"Air Temp") == 0) {
-        aq_data->air_temp = atoi(_homeStatus[1]);
-        LOG(IAQT_LOG,LOG_DEBUG, "Air Temp set to %d\n",aq_data->air_temp);
-        aq_data->updated = true;
+        SET_IF_CHANGED(aqdata->air_temp, atoi(_homeStatus[1]), aqdata->is_dirty);
+        LOG(IAQT_LOG,LOG_DEBUG, "Air Temp set to %d\n",aqdata->air_temp);
        }
        if (rsm_strcmp(_homeStatus[4],"Pool Temp") == 0) {
-        aq_data->pool_temp = atoi(_homeStatus[0]);
-        LOG(IAQT_LOG,LOG_DEBUG, "Pool Temp set to %d\n",aq_data->air_temp);
-        aq_data->updated = true;
+        SET_IF_CHANGED(aqdata->pool_temp, atoi(_homeStatus[0]), aqdata->is_dirty);
+        LOG(IAQT_LOG,LOG_DEBUG, "Pool Temp set to %d\n",aqdata->air_temp);
        } else if (rsm_strcmp(_homeStatus[4],"Spa Temp") == 0) {
-        aq_data->spa_temp = atoi(_homeStatus[0]);
-        LOG(IAQT_LOG,LOG_DEBUG, "Spa Temp set to %d\n",aq_data->spa_temp);
-        aq_data->updated = true;
+        SET_IF_CHANGED(aqdata->spa_temp, atoi(_homeStatus[0]), aqdata->is_dirty);
+        LOG(IAQT_LOG,LOG_DEBUG, "Spa Temp set to %d\n",aqdata->spa_temp);
        }
       }
 
-      //passHomePage(aq_data);
+      //passHomePage(aqdata);
       debugPrintButtons(_homeButtons);    
     break;
     case IAQ_PAGE_SYSTEM_SETUP:
@@ -975,17 +777,17 @@ void processPage(struct aqualinkdata *aq_data)
     Info:    iAQ Touch: Table Messages 05| TL Rev:   
     */
       
-      setPanelInformationFromPanelMsg(aq_data, (char *)_tableInformation[2], PANEL_STRING, IAQTOUCH);
-      setPanelInformationFromPanelMsg(aq_data, (char *)_tableInformation[3], PANEL_REV, IAQTOUCH);
-      setPanelInformationFromPanelMsg(aq_data, (char *)_tableInformation[4], PANEL_CPU, IAQTOUCH);
+      setPanelInformationFromPanelMsg(aqdata, (char *)_tableInformation[2], PANEL_STRING, IAQTOUCH);
+      setPanelInformationFromPanelMsg(aqdata, (char *)_tableInformation[3], PANEL_REV, IAQTOUCH);
+      setPanelInformationFromPanelMsg(aqdata, (char *)_tableInformation[4], PANEL_CPU, IAQTOUCH);
 
       if (isPDA_PANEL && ((char *)_tableInformation[03]) > 0) {
-        if ( rsm_get_revision(aq_data->revision,(char *)_tableInformation[3], sizeof(aq_data->revision) ) == TRUE) {
-          int len = rsm_get_boardcpu(aq_data->version, sizeof(aq_data->version), (char *)_tableInformation[4], IAQT_TABLE_MSGLEN );
-          sprintf(aq_data->version+len, " REV %s",aq_data->revision);
-          LOG(IAQT_LOG,LOG_NOTICE, "Control Panel revision %s\n",  aq_data->revision);
-          LOG(IAQT_LOG,LOG_NOTICE, "Control Panel version %s\n",  aq_data->version);
-          aq_data->updated = true;
+        if ( rsm_get_revision(aqdata->revision,(char *)_tableInformation[3], sizeof(aqdata->revision) ) == TRUE) {
+          int len = rsm_get_boardcpu(aqdata->version, sizeof(aqdata->version), (char *)_tableInformation[4], IAQT_TABLE_MSGLEN );
+          sprintf(aqdata->version+len, " REV %s",aqdata->revision);
+          LOG(IAQT_LOG,LOG_NOTICE, "Control Panel revision %s\n",  aqdata->revision);
+          LOG(IAQT_LOG,LOG_NOTICE, "Control Panel version %s\n",  aqdata->version);
+          SET_DIRTY(aqdata->is_dirty);
         }
       }
 
@@ -1023,7 +825,7 @@ void reset_iaqTouchPollCounter()
   _pollCnt = 0;
 }
 
-bool process_iaqtouch_packet(unsigned char *packet, int length, struct aqualinkdata *aq_data)
+bool process_iaqtouch_packet(unsigned char *packet, int length, struct aqualinkdata *aqdata)
 {
   static bool gotInit = false; 
   //static int _pollCnt = 0;
@@ -1060,12 +862,12 @@ bool process_iaqtouch_packet(unsigned char *packet, int length, struct aqualinkd
       }
     
       LOG(IAQT_LOG,LOG_NOTICE, "Pump %s, Spa %s, SWG %d, PumpRPM %d, PoolSP=%d, SpaSP=%d\n",
-                              aq_data->aqbuttons[0].led->state==OFF?"Off":"On ",
-                              aq_data->aqbuttons[1].led->state==OFF?"Off":"On ",
-                              aq_data->swg_percent,
-                              aq_data->pumps[0].rpm,
-                              aq_data->pool_htr_set_point,
-                              aq_data->spa_htr_set_point);
+                              aqdata->aqbuttons[0].led->state==OFF?"Off":"On ",
+                              aqdata->aqbuttons[1].led->state==OFF?"Off":"On ",
+                              aqdata->swg_percent,
+                              aqdata->pumps[0].rpm,
+                              aqdata->pool_htr_set_point,
+                              aqdata->spa_htr_set_point);
     } else if (packet[PKT_CMD] == 0x70){
       debuglogPacket(IAQT_LOG, packet, length, true, true);
     } else if (packet[PKT_CMD] == 0x71){ 
@@ -1075,14 +877,15 @@ bool process_iaqtouch_packet(unsigned char *packet, int length, struct aqualinkd
   if (packet[PKT_CMD] == CMD_IAQ_MAIN_STATUS ||
       packet[PKT_CMD] == CMD_IAQ_1TOUCH_STATUS ||
       packet[PKT_CMD] == CMD_IAQ_AUX_STATUS) {
-    process_iaqualink_packet(packet, length, aq_data);
+    process_iaqualink_packet(packet, length, aqdata);
   } 
   else if (packet[PKT_CMD] == CMD_IAQ_PAGE_START) 
   {
     // Reset and messages on new page
-    aq_data->last_display_message[0] = ' ';
-    aq_data->last_display_message[1] = '\0';
-    aq_data->is_display_message_programming = false;
+    //aqdata->last_display_message[0] = ' ';
+    //aqdata->last_display_message[1] = '\0';
+    SET_IF_CHANGED_STRCPY( aqdata->last_display_message, "", aqdata->is_dirty);
+    SET_IF_CHANGED(aqdata->is_display_message_programming, false, aqdata->is_dirty);
     LOG(IAQT_LOG,LOG_DEBUG, "Turning IAQ SEND off\n");
     set_iaq_cansend(false);
     _currentPageLoading = packet[PKT_IAQT_PAGTYPE];
@@ -1113,21 +916,21 @@ bool process_iaqtouch_packet(unsigned char *packet, int length, struct aqualinkd
       //Hex   |0x10|0x02|0x33|0x28|0x01|0x12|0x0b|0x0d|0x2a|0xc2|0x10|0x03|
       //Dec   |  16|   2|  51|  40|   1|  18|  11|  13|  42| 194|  16|   3
       //Ascii |    |    |   3|   (|    |    |    |    |   *|    |    |    
-      snprintf(aq_data->date, sizeof(aq_data->date), "%02d/%02d/%02d", packet[4],packet[5],packet[6]);
+      snprintf(aqdata->date, sizeof(aqdata->date), "%02d/%02d/%02d", packet[4],packet[5],packet[6]);
       if (packet[7] <= 12)
-        snprintf(aq_data->time, sizeof(aq_data->date), "%d:%02d am", packet[7],packet[8]);
+        snprintf(aqdata->time, sizeof(aqdata->date), "%d:%02d am", packet[7],packet[8]);
       else
-        snprintf(aq_data->time, sizeof(aq_data->date), "%d:%02d pm", (packet[7] - 12),packet[8]);
+        snprintf(aqdata->time, sizeof(aqdata->date), "%d:%02d pm", (packet[7] - 12),packet[8]);
     }
 
-    processPage(aq_data);
+    processPage(aqdata);
     
   } else if (packet[PKT_CMD] == CMD_IAQ_TABLE_MSG) {
     processTableMessage(packet, length);
   } else if (packet[PKT_CMD] == CMD_IAQ_PAGE_MSG) {
     processPageMessage(packet, length);
   } else if (packet[PKT_CMD] == CMD_IAQ_PAGE_BUTTON) {
-    processPageButton(packet, length, aq_data);
+    processPageButton(packet, length, aqdata);
     // Second page on status doesn't send start & end, but button is message, so use that to kick off next page. 
     if (_currentPage == IAQ_PAGE_STATUS) {
       /* Notice: Added Button 1 
@@ -1137,7 +940,7 @@ bool process_iaqtouch_packet(unsigned char *packet, int length, struct aqualinkd
        *   SHOULD PROBABLY USE ABOVE TO CHECK.
        */
       //if (packet[PKT_IAQT_BUTTYPE] == 0x02 )
-       processPage(aq_data);
+       processPage(aqdata);
     }
     
     // if we get a button with 0x00 state on Light Page, that's the end of page.
@@ -1147,7 +950,7 @@ bool process_iaqtouch_packet(unsigned char *packet, int length, struct aqualinkd
         LOG(IAQT_LOG,LOG_DEBUG, "MANUAL PAGE END\n");
         _currentPage = _currentPageLoading;
         //_currentPageLoading = NUL;
-        processPage(aq_data);
+        processPage(aqdata);
         set_iaq_cansend(true);
         // For programming mode 
         fake_pageend = true;
@@ -1168,12 +971,12 @@ bool process_iaqtouch_packet(unsigned char *packet, int length, struct aqualinkd
        *sp = '\0';
      }
 
-    strcpy(aq_data->last_display_message, message); // Also display the message on web UI
+    SET_IF_CHANGED_STRCPY(aqdata->last_display_message, message, aqdata->is_dirty); // Also display the message on web UI
    
-    if (in_programming_mode(aq_data)) {
-      aq_data->is_display_message_programming = true;
+    if (in_programming_mode(aqdata)) {
+      SET_IF_CHANGED(aqdata->is_display_message_programming, true, aqdata->is_dirty);
     } else {
-      aq_data->is_display_message_programming = false;
+      SET_IF_CHANGED(aqdata->is_display_message_programming, false, aqdata->is_dirty);
     }
     /*
     for(int i=0; i<length; i++) {
@@ -1203,11 +1006,11 @@ bool process_iaqtouch_packet(unsigned char *packet, int length, struct aqualinkd
       //iaqt_queue_cmd(KEY_IAQTCH_HELP);
       //iaqt_queue_cmd(KEY_IAQTCH_HOME);
       
-      queueGetProgramData(IAQTOUCH, aq_data);
+      queueGetProgramData(IAQTOUCH, aqdata);
       gotInit = true;
     }
 
-    //aq_programmer(AQ_SET_IAQTOUCH_SET_TIME, NULL, aq_data);
+    //aq_programmer(AQ_SET_IAQTOUCH_SET_TIME, NULL, aqdata);
   }
   /*
   NEED TO ALTERNATE SEND KEY_IAQTCH_HOMEP_KEY08 KEY and KEY_IAQTCH_STATUS BELOW FOR PDA
@@ -1244,7 +1047,7 @@ if not programming && poll packet {
   So why did I update this to sit on devices page???????????
   RS16 should also probably sit on devices page.
 }*/
-    if (in_programming_mode(aq_data) == false) {
+    if (in_programming_mode(aqdata) == false) {
       //LOG(IAQT_LOG,LOG_DEBUG, "Poll counter = %d\n",_pollCnt);
 
       if (_currentPage == IAQ_PAGE_HOME) {
@@ -1252,7 +1055,7 @@ if not programming && poll packet {
         _pollCnt = 0;
       }
 
-      //if ( (isPDA_PANEL || isVirtualButtonEnabled() || PANEL_SIZE() >= 16) && !in_iaqt_programming_mode(aq_data) ) {
+      //if ( (isPDA_PANEL || isVirtualButtonEnabled() || PANEL_SIZE() >= 16) && !in_iaqt_programming_mode(aqdata) ) {
       // Just sent Status Page request if none of the above are active
       //}
       // After we send devices page in above if statment, kick us through a loop of
@@ -1290,7 +1093,7 @@ if not programming && poll packet {
                   (_currentPage == IAQ_PAGE_DEVICES || _currentPage == IAQ_PAGE_DEVICES_REV_Yg) ) {
         iaqt_queue_cmd(KEY_IAQTCH_STATUS); // This will force us to go to status, then it'll jump back to devices, then force status again
       }
-    } else if (in_programming_mode(aq_data) == true) {
+    } else if (in_programming_mode(aqdata) == true) {
       // Set count to something close to max, so we will pull latest info once programming has finished.
       // This is good for VSP GPM programming as it takes number of seconds to register once finished programming.
       // -5 seems to be too quick for VSP/GPM so using 10
@@ -1300,14 +1103,14 @@ if not programming && poll packet {
 #else
     //LOG(IAQT_LOG,LOG_DEBUG, "poll count %d\n",_pollCnt);
     // Load status page every 50 messages
-    if (_pollCnt++ > FULL_STATUS_POLL_COUNT && in_programming_mode(aq_data) == false ) {
+    if (_pollCnt++ > FULL_STATUS_POLL_COUNT && in_programming_mode(aqdata) == false ) {
       if (isPDA_PANEL || PANEL_SIZE() >= 16) {
         iaqt_queue_cmd(KEY_IAQTCH_HOMEP_KEY08);
       } else {
         iaqt_queue_cmd(KEY_IAQTCH_STATUS);
       }
       gotStatus = false; // Reset if we got status page, for fix panel bug.
-      //aq_programmer(AQ_GET_IAQTOUCH_VSP_ASSIGNMENT, NULL, aq_data);
+      //aq_programmer(AQ_GET_IAQTOUCH_VSP_ASSIGNMENT, NULL, aqdata);
       _pollCnt = 0;
     } else if (gotStatus == false && _pollCnt > 3) {
       // Fix bug with control panel where after a few hours status page disapears and you need to hit menu.
@@ -1323,7 +1126,7 @@ if not programming && poll packet {
      */
 
 
-    } else if (in_programming_mode(aq_data) == true) {
+    } else if (in_programming_mode(aqdata) == true) {
       // Set count to something close to max, so we will pull latest info once programming has finished.
       // This is good for VSP GPM programming as it takes number of seconds to register once finished programming.
       // -5 seems to be too quick for VSP/GPM so using 10
@@ -1349,7 +1152,7 @@ if not programming && poll packet {
 
   //temp_debugprintExtraInfo(packet, length);
 
-  kick_aq_program_thread(aq_data, IAQTOUCH);
+  kick_aq_program_thread(aqdata, IAQTOUCH);
 
   return true;
 }

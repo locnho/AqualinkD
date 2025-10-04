@@ -140,6 +140,7 @@ NEED TO FIX FOR THIS RELEASE.
 * Serial optimization for AqualinkD HAT.
 * upgraded network library ( HTTP(S), MQTT(S), WS )
 * Added support for HTTPS and MQTTS
+* Optimized updates to MQTT and WebUI (only update when absolutely necessary)
 * Added options to force upgrades in aqmanager. (add ?upgrade or ?devupgrade to url to enable upgrade button)
 * MQTT Discovery for all supporting hubs (HomeAssistant Domoticz Hubitat OpenHAB etc)
 * Moved Domoticz support over to MQTT autodiscovery.
@@ -149,17 +150,17 @@ NEED TO FIX FOR THIS RELEASE.
 * UI code cleanup.
 * Included program advance to AqualinkD programmable light mode. (lot quicker for lights that remember state)
 * Changed caching of HTTP server. (Better for UI config updates)
+* Autoconfigure will now get panel size/type for panels that support PC-Dock interface.
+* Autoconfigure will *try* to work for PDA panels.
+* Added example script to generate HTTPS certificates. (./extras/generate-certs.sh)
+* Cleaned up exit & errors when running as daemon and docker.
 
 * Need to finish off :-
   * HAT serial optimizations broke some USB serial adapters
-  * Reading TruSense. (Jandy protocols working, need to finish off read_RS485_TruSense support) 
   * Finish off assigning light mode & functionality to a vbutton (for Jandy Infinite water color support )
   * cleanup rs_msg_utils.c
-  *  -D AQ_MANAGER.  reset default to on, not off
-  * With aqmanager is packet_logger still valid? (maybe for raw, but it's not been used in years)
-  * Get panel size and clean up the ap_panel code around config size/type and reported size/type
   * WebUI Config in aqmanager.
-
+  * Move all programming threads over to using struct programmerArgs.
   
 # Updates in 2.6.11 (Sept 14 2025)
 * Cleaned up exit codes.

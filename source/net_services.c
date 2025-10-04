@@ -451,15 +451,6 @@ void _broadcast_aqualinkstate(struct mg_connection *nc)
 
   build_aqualink_status_JSON(_aqualink_data, data, JSON_STATUS_SIZE);
   
-  #ifdef AQ_MEMCMP
-    if ( memcmp(_aqualink_data, &_last_mqtt_aqualinkdata, sizeof(struct aqualinkdata) ) == 0) {
-      LOG(NET_LOG,LOG_NOTICE, "**********Structure buffs the same, ignoring request************\n");
-      DEBUG_TIMER_CLEAR(&tid);
-      return;
-    }
-  #endif
-
-
   if (_mqtt_exit_flag == true) {
     mqtt_count++;
     if (mqtt_count >= 10) {
@@ -467,7 +458,6 @@ void _broadcast_aqualinkstate(struct mg_connection *nc)
       mqtt_count = 0;
     }
   }
-
 
   for (c = mg_next(nc->mgr, NULL); c != NULL; c = mg_next(nc->mgr, c)) {
     //if (is_websocket(c) && !is_websocket_simulator(c)) // No need to broadcast status messages to simulator.
@@ -477,10 +467,6 @@ void _broadcast_aqualinkstate(struct mg_connection *nc)
       mqtt_broadcast_aqualinkstate(c);
 
   }
-
-  #ifdef AQ_MEMCMP
-    memcpy(&_last_mqtt_aqualinkdata, _aqualink_data, sizeof(struct aqualinkdata));
-  #endif
 
   DEBUG_TIMER_STOP(tid, NET_LOG, "broadcast_aqualinkstate() completed, took ");
 
@@ -2123,10 +2109,6 @@ void start_mqtt(struct mg_mgr *mgr) {
     LOG(NET_LOG,LOG_ERR, "Failed to create MQTT listener to %s\n", _aqconfig_.mqtt_server);
   } else {
     set_mqttconnecting(nc);
-    //int i;
-#ifdef AQ_MEMCMP
-    memset(&_last_mqtt_aqualinkdata, 0, sizeof (struct aqualinkdata));
-#endif
     reset_last_mqtt_status();
     _mqtt_exit_flag = false; // set here to stop multiple connects, if it fails truley fails it will get set to false.
   }
@@ -2214,7 +2196,9 @@ void *net_services_thread( void *ptr )
 {
   struct aqualinkdata *aqdata = (struct aqualinkdata *) ptr;
   int journald_fail = 0;
-  //struct mg_mgr mgr;
+#ifdef DEBUG_SET_IF_CHANGED
+  uint noupdate=0;
+#endif
 
   if (!_start_net_services(&_mgr, aqdata)) {
     //LOG(NET_LOG,LOG_ERR, "Failed to start network services\n");
@@ -2227,15 +2211,16 @@ void *net_services_thread( void *ptr )
 
   while (_keepNetServicesRunning == true)
   {
-    //poll_net_services(&_mgr, 10);
-    // Shorten poll cycle when in simulator mode
     mg_mgr_poll(&_mgr, (_aqualink_data->simulator_active != SIM_NONE)?10:100);
-    //mg_mgr_poll(&_mgr, 100);
 
-    if (aqdata->updated == true /*|| _broadcast == true*/) {
-      //LOG(NET_LOG,LOG_DEBUG, "********** Broadcast ************\n");
+    if (aqdata->is_dirty == true /*|| _broadcast == true*/) {
       _broadcast_aqualinkstate(_mgr.conns);
-      aqdata->updated = false;
+      CLEAR_DIRTY(aqdata->is_dirty);
+#ifdef DEBUG_SET_IF_CHANGED
+      printf("NO updates for %d loops\n",noupdate), noupdate=0;
+    } else {
+      noupdate += (noupdate < UINT_MAX);
+#endif
     }
 #ifdef AQ_MANAGER
 // NSF, need to stop and disable after 5 tries, this just keeps looping. 
@@ -2273,9 +2258,11 @@ f_end:
   pthread_exit(0);
 }
 
+/*
 void broadcast_aqualinkstate() {
   _aqualink_data->updated = true;
 }
+*/
 void broadcast_aqualinkstate_error(const char *msg) {
   _broadcast_aqualinkstate_error(_mgr.conns, msg);
 }

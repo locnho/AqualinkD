@@ -58,6 +58,7 @@
 #include "aq_scheduler.h"
 #include "json_messages.h"
 #include "aq_systemutils.h"
+#include "auto_configure.h"
 
 #ifdef AQ_MANAGER
 #include "serial_logger.h"
@@ -94,6 +95,13 @@ bool _cmdln_nostartupcheck = false;
 
 #define AddAQDstatusMask(mask) (_aqualink_data.status_mask |= mask)
 #define RemoveAQDstatusMask(mask) (_aqualink_data.status_mask &= ~mask)
+
+// Keep running on all errors (we can) if we are in a container or demonized
+#if defined(AQ_CONTAINER)
+  #define SHOULD_KEEP_RUNNING()  (true)
+#else
+  #define SHOULD_KEEP_RUNNING()  (_aqconfig_.deamonize)
+#endif
 
 
 void main_loop();
@@ -415,12 +423,6 @@ int main(int argc, char *argv[])
 #endif
   char defaultCfg[] = "./aqualinkd.conf";
   char *cfgFile;
-  
-//printf ("TIMER = %d\n",TIMR_LOG);
-
-#ifdef AQ_MEMCMP
-  memset(&_aqualink_data, 0, sizeof (struct aqualinkdata));
-#endif
 
   _aqualink_data.num_pumps = 0;
   _aqualink_data.num_lights = 0;
@@ -542,7 +544,8 @@ int startup(char *self, char *cfgFile)
 
   AddAQDstatusMask(CHECKING_CONFIG);
   AddAQDstatusMask(NOT_CONNECTED);
-  _aqualink_data.updated = true;
+  
+  SET_DIRTY(_aqualink_data.is_dirty);
   //_aqualink_data.chiller_button == NULL; // HATE having this here, but needs to be null before config.
 
   //sd_journal_print(LOG_NOTICE, "Starting %s v%s !\n", AQUALINKD_NAME, AQUALINKD_VERSION);
@@ -594,7 +597,7 @@ int startup(char *self, char *cfgFile)
       //return EXIT_FAILURE;
     }
   } else if (isPDA_PANEL) {
-    if ( (_aqconfig_.device_id >= 0x60 && _aqconfig_.device_id <= 0x63) || _aqconfig_.device_id == 0x33 ) {
+    if ( (_aqconfig_.device_id >= 0x60 && _aqconfig_.device_id <= 0x63) || _aqconfig_.device_id == 0x33 ||  _aqconfig_.device_id == 0xFF) {
       if ( _aqconfig_.device_id == 0x33 ) {
         LOG(AQUA_LOG,LOG_NOTICE, "Enabeling iAqualink protocol.\n");
         _aqconfig_.enable_iaqualink = true;
@@ -602,11 +605,11 @@ int startup(char *self, char *cfgFile)
       // We are good
     } else {
       LOG(AQUA_LOG,LOG_ERR, "Device ID 0x%02hhx does not match PDA panel, please check config!\n", _aqconfig_.device_id);
-      return EXIT_FAILURE;
+      if ( !SHOULD_KEEP_RUNNING() ) {return EXIT_FAILURE;}
     }
   } else {
     LOG(AQUA_LOG,LOG_ERR, "Error unknown panel type, please check config!\n");
-    return EXIT_FAILURE;
+    if (!SHOULD_KEEP_RUNNING()) {return EXIT_FAILURE;}
   }
 
   if (_aqconfig_.rssa_device_id != 0x00) {
@@ -614,7 +617,7 @@ int startup(char *self, char *cfgFile)
       // We are good
     } else {
       LOG(AQUA_LOG,LOG_ERR, "RSSA Device ID 0x%02hhx does not match RS panel, please check config!\n", _aqconfig_.rssa_device_id);
-      return EXIT_FAILURE;
+      if (!SHOULD_KEEP_RUNNING()) {return EXIT_FAILURE;}
     }
   }
 
@@ -626,7 +629,7 @@ int startup(char *self, char *cfgFile)
       // We are good
     } else {
       LOG(AQUA_LOG,LOG_ERR, "Extended Device ID 0x%02hhx does not match OneTouch or AqualinkTouch ID, please check config!\n", _aqconfig_.extended_device_id);
-      return EXIT_FAILURE;
+      if (!SHOULD_KEEP_RUNNING()) {return EXIT_FAILURE;}
     }
   }
 
@@ -728,185 +731,8 @@ void caculate_ack_packet(int rs_fd, unsigned char *packet_buffer, emulation_type
       //DEBUG_TIMER_STOP(_rs_packet_timer,AQUA_LOG,"Unknown Emulation type Processed packet in");
     break;
   }
-
-/*
-#ifdef AQ_TM_DEBUG
-  static struct timespec now;
-  static struct timespec elapsed;
-  clock_gettime(CLOCK_REALTIME, &now);
-  timespec_subtract(&elapsed, &now, &_rs_packet_readitme);
-  LOG(AQUA_LOG,LOG_NOTICE, "Emulation type %d. Processed packet in %d.%02ld sec (%08ld ns)\n",source, elapsed.tv_sec, elapsed.tv_nsec / 1000000L, elapsed.tv_nsec);
-#endif
-*/
-
 }
 
-#define MAX_AUTO_PACKETS 1200
-
-bool auto_configure(unsigned char* packet, int rs_fd) {
-  // Loop over PROBE packets and store any we can use,
-  // once we see the 2nd probe of any ID we fave stored, then the loop is complete, 
-  // set ID's and exit true, exit falce to get called again.
-/*
-  unsigned char _goodID[] = {0x0a, 0x0b, 0x08, 0x09};
-  unsigned char _goodPDAID[] = {0x60, 0x61, 0x62, 0x63}; // PDA Panel only supports one PDA.
-  unsigned char _goodONETID[] = {0x40, 0x41, 0x42, 0x43};
-  unsigned char _goodIAQTID[] = {0x30, 0x31, 0x32, 0x33};
-  unsigned char _goodRSSAID[] = {0x48, 0x49};  // Know there are only 2 good RS SA id's, guess 0x49 is the second.
-*/
-
-  static unsigned char firstprobe = 0x00;
-  static unsigned char lastID = 0x00;
-  static bool seen_iAqualink2 = false;
-  static bool ignore_AqualinkTouch = false;
-  static bool ignore_OneTouch = false;
-  static int foundIDs = 0;
-  static int packetsReceived=0;
-
-  static bool gotRev = false;
-  static unsigned char gettingRevID = 0xFF;
-
-  static int loopsCompleted=0;
-  //static char message[AQ_MSGLONGLEN + 1];
-
-  if (++packetsReceived >= MAX_AUTO_PACKETS ) {
-    LOG(AQUA_LOG,LOG_ERR, "Received %d packets, and didn't get a full probe cycle, stoping Auto Configure!\n",packetsReceived);
-    return true;
-  }
-
-  if ( packet[PKT_CMD] == CMD_PROBE ) {
-    LOG(AQUA_LOG,LOG_INFO, "Got Probe on ID 0x%02hhx\n",packet[PKT_DEST]);
-    //printf(" *** Got Probe on ID 0x%02hhx\n",packet[PKT_DEST]);
-    if ( packet[PKT_DEST] >= 0x08 && packet[PKT_DEST] <= 0x0B && gotRev == false && gettingRevID == 0xFF) {
-        // Try replying to get panel rev
-        gettingRevID = packet[PKT_DEST];
-        caculate_ack_packet(rs_fd, packet, ALLBUTTON);
-        return false; // We don't want to store this ID since we use it for getting REV and is won't go back to probe when AqualinkD starts
-    }
-  } else if (packet[PKT_DEST] == gettingRevID) {
-    if ( packet[PKT_CMD] == CMD_MSG ) {
-      if ( rsm_strnstr((char *)&packet[5], " REV", AQ_MSGLEN) != NULL ) {
-        // We need to get the rev to cater for panel rev I & k (maybe others) that send AqualinkTouch probe messages
-        // then they don't support that protocol.
-        LOG(AQUA_LOG,LOG_DEBUG, "Got %15s    from ID 0x%02hhx\n",(char *)&packet[5],packet[PKT_DEST]);
-        gotRev = true;
-        gettingRevID = 0xFF;
-        setPanelInformationFromPanelMsg(&_aqualink_data, (char *)&packet[5], PANEL_CPU | PANEL_REV, SIM_NONE);
-        if ( !isMASKSET(_aqualink_data.panel_support_options, RSP_SUP_AQLT)) {
-          LOG(AQUA_LOG,LOG_NOTICE, "Ignoring AqualinkTouch probes due to panel rev\n");
-          ignore_AqualinkTouch = true;
-          if ( _aqconfig_.extended_device_id >= 0x30 && _aqconfig_.extended_device_id <= 0x33 ) {
-             _aqconfig_.extended_device_id = 0x00;
-             _aqconfig_.enable_iaqualink = false;
-             _aqconfig_.read_RS485_devmask &= ~ READ_RS485_IAQUALNK;
-             //firstprobe = 0x00;
-             foundIDs--;
-          }
-        }
-        if ( !isMASKSET(_aqualink_data.panel_support_options, RSP_SUP_ONET)) {
-          LOG(AQUA_LOG,LOG_NOTICE, "Ignoring OneTouch probes due to panel rev\n");
-          ignore_OneTouch = true;
-          if ( _aqconfig_.extended_device_id >= 0x40 && _aqconfig_.extended_device_id <= 0x43 ) {
-             _aqconfig_.extended_device_id = 0x00;
-             //_aqconfig_.enable_iaqualink = false;
-             //_aqconfig_.read_RS485_devmask &= ~ READ_RS485_IAQUALNK;
-             //firstprobe = 0x00;
-             foundIDs--;
-          }
-        }
-      }
-    }
-    caculate_ack_packet(rs_fd, packet, ALLBUTTON);
-  }
-
-  if (lastID != 0x00 && packet[PKT_DEST] == DEV_MASTER ) { // Can't use got a reply to the late probe.
-    lastID = 0x00; 
-  } else if (lastID != 0x00 && packet[PKT_DEST] != DEV_MASTER) {
-    // We can use last ID.
-    // Save the first good ID.
-    if (firstprobe == 0x00 && lastID != 0x60) {
-      // NOTE IF can't use 0x60 (or PDA ID's) for probe, as they are way too often.
-      //printf("*** First Probe 0x%02hhx\n",lastID);
-      firstprobe = lastID;
-      _aqconfig_.device_id = 0x00;
-      _aqconfig_.rssa_device_id = 0x00;
-      _aqconfig_.extended_device_id = 0x00;
-      _aqconfig_.extended_device_id_programming = false;
-      AddAQDstatusMask(AUTOCONFIGURE_ID);
-      _aqualink_data.updated = true;
-      //AddAQDstatusMask(AUTOCONFIGURE_PANEL); // Not implimented yet.
-    }
-
-
-    if ( (lastID >= 0x08 && lastID <= 0x0B) && 
-         (_aqconfig_.device_id == 0x00 || _aqconfig_.device_id == 0xFF) ) {
-      _aqconfig_.device_id = lastID;
-      LOG(AQUA_LOG,LOG_NOTICE, "Found valid unused device ID 0x%02hhx\n",lastID);
-      foundIDs++;
-    } else if ( (lastID >= 0x48 && lastID <= 0x49) && 
-                (_aqconfig_.rssa_device_id == 0x00 || _aqconfig_.rssa_device_id == 0xFF) ) {
-      _aqconfig_.rssa_device_id = lastID;
-      LOG(AQUA_LOG,LOG_NOTICE, "Found valid unused RSSA ID 0x%02hhx\n",lastID);
-      foundIDs++;
-    } else if ( (lastID >= 0x40 && lastID <= 0x43) && ignore_OneTouch == false &&
-                (_aqconfig_.extended_device_id == 0x00 || _aqconfig_.extended_device_id == 0xFF) ) {
-      _aqconfig_.extended_device_id = lastID;
-      _aqconfig_.extended_device_id_programming = true;
-      // Don't increase  foundIDs as we prefer not to use this one.
-      LOG(AQUA_LOG,LOG_NOTICE, "Found valid unused extended ID 0x%02hhx\n",lastID);
-    } else if ( (lastID >= 0x30 && lastID <= 0x33) && ignore_AqualinkTouch == false && 
-                  (_aqconfig_.extended_device_id < 0x30 || _aqconfig_.extended_device_id > 0x33)) { //Overide if it's been set to Touch or not set.
-      _aqconfig_.extended_device_id = lastID;
-      _aqconfig_.extended_device_id_programming = true;
-      if (!seen_iAqualink2) {
-        _aqconfig_.enable_iaqualink = true;
-        _aqconfig_.read_RS485_devmask &= ~ READ_RS485_IAQUALNK; // Remove this mask, as no need since we enabled iaqualink 
-      }
-      LOG(AQUA_LOG,LOG_NOTICE, "Found valid unused extended ID 0x%02hhx\n",lastID);
-      foundIDs++;
-    }
-    // Now reset ID
-    lastID = 0x00;
-
-    return false;
-  }
-
-  if (packet[PKT_DEST] == firstprobe && packet[PKT_CMD] == CMD_PROBE) {
-    loopsCompleted++;
-    //LOG(AQUA_LOG,LOG_DEBUG, "***** Loop %d *****\n",loopsCompleted);
-  }
-
-  //if ( foundIDs >= 3 || (packet[PKT_DEST] == firstprobe && packet[PKT_CMD] == CMD_PROBE) ) {
-  if ( (foundIDs >= 3 && gotRev) || loopsCompleted == 2 ) {
-    // We should have seen one complete probe cycle my now.
-    LOG(AQUA_LOG,LOG_NOTICE, "Finished Autoconfigure using device_id=0x%02hhx rssa_device_id=0x%02hhx extended_device_id=0x%02hhx (%s iAqualink2/3)\n",
-                              _aqconfig_.device_id,_aqconfig_.rssa_device_id,_aqconfig_.extended_device_id,  _aqconfig_.enable_iaqualink?"Enable":"Disable");
-    RemoveAQDstatusMask(AUTOCONFIGURE_ID);
-    _aqualink_data.updated = true;
-    return true;  // we can exit finally.
-  }
-
-  if ( (packet[PKT_CMD] == CMD_PROBE) && (
-       (packet[PKT_DEST] >= 0x08 && packet[PKT_DEST] <= 0x0B) ||
-       //(packet[PKT_DEST] >= 0x60 && packet[PKT_DEST] <= 0x63) ||
-       (packet[PKT_DEST] >= 0x40 && packet[PKT_DEST] <= 0x43) ||
-       (packet[PKT_DEST] >= 0x30 && packet[PKT_DEST] <= 0x33) ||
-       (packet[PKT_DEST] >= 0x48 && packet[PKT_DEST] <= 0x49) ))
-  {
-    lastID = packet[PKT_DEST]; // Store the valid ID.
-  } else if (lastID != 0x00 && packet[PKT_CMD] != CMD_PROBE &&
-            (packet[PKT_DEST] >= 0xA0 && packet[PKT_DEST] <= 0xA3) ) // we get a packet to iAqualink2/3 make sure to turn off
-  { // Saw a iAqualink2/3 device, so can't use ID, but set to read device info.
-    // LOG Nessage as such
-    _aqconfig_.extended_device_id2 = 0x00;
-    _aqconfig_.enable_iaqualink = false;
-    _aqconfig_.read_RS485_devmask |= READ_RS485_IAQUALNK;
-    seen_iAqualink2 = true;
-    LOG(AQUA_LOG,LOG_NOTICE, "Saw inuse iAqualink2/3 ID 0x%02hhx, turning off AqualinkD on that ID\n",lastID);
-  }
-  
-  return false;
-}
 
 unsigned char find_unused_address(unsigned char* packet) {
   static int ID[4] = {0,0,0,0};  // 0=0x08, 1=0x09, 2=0x0A, 3=0x0B
@@ -953,7 +779,7 @@ void main_loop()
   //_aqualink_data.panel_rev = NULL;
   //_aqualink_data.panel_cpu = NULL;
   //_aqualink_data.panel_string = NULL;
-  _aqualink_data.updated = true;
+  SET_DIRTY(_aqualink_data.is_dirty);
   sprintf(_aqualink_data.last_display_message, "%s", "Connecting to Control Panel");
   _aqualink_data.is_display_message_programming = false;
   //_aqualink_data.simulate_panel = false;
@@ -1056,7 +882,7 @@ void main_loop()
     LOG(AQUA_LOG,LOG_ERR, "Bad serial port: %s\n", _aqconfig_.serial_port);
     AddAQDstatusMask(ERROR_SERIAL);
   }
-
+/*
 #ifdef AQ_PDA
   if (isPDA_PANEL) {
     init_pda(&_aqualink_data);
@@ -1068,11 +894,11 @@ void main_loop()
     }
   }
 #endif
-
+*/
   // Set probes to true for any device we are not searching for.
    
   RemoveAQDstatusMask(CHECKING_CONFIG);
-  _aqualink_data.updated = true;
+  SET_DIRTY(_aqualink_data.is_dirty);
   
   if (_aqconfig_.rssa_device_id == 0x00)
     got_probe_rssa = true;
@@ -1090,12 +916,12 @@ void main_loop()
     auto_config_complete = false;
     //_aqualink_data.panelstatus = LOOKING_IDS;
     AddAQDstatusMask(AUTOCONFIGURE_ID);
-    _aqualink_data.updated = true;
+    SET_DIRTY(_aqualink_data.is_dirty);
   } else {
     LOG(AQUA_LOG,LOG_NOTICE, "Waiting for Control Panel probe\n");
     //_aqualink_data.panelstatus = CONECTING;
     AddAQDstatusMask(CONNECTING);
-    _aqualink_data.updated = true;
+    SET_DIRTY(_aqualink_data.is_dirty);
   }
   i=0;
 
@@ -1104,23 +930,25 @@ void main_loop()
   {
     if (blank_read == blank_read_reconnect / 2) {
       LOG(AQUA_LOG,LOG_ERR, "Nothing read on '%s', are you sure that's right?\n",_aqconfig_.serial_port);
-//#ifdef AQ_CONTAINER
         // Reset blank reads here, we want to ignore TTY errors in container to keep it running
         blank_read = 1;
-//#endif
       if (_aqconfig_.device_id == 0x00) {
         blank_read = 1; // if device id=0x00 it's code for don't exit
       }
-      _aqualink_data.updated = true; // Make sure to show erros if ui is up
+      SET_DIRTY(_aqualink_data.is_dirty); // Make sure to show erros if ui is up
     } else if (blank_read == blank_read_reconnect*2 ) {
-      LOG(AQUA_LOG,LOG_ERR, "I'm done, exiting, please check '%s'\n",_aqconfig_.serial_port);
-      stopPacketLogger();
-      close_serial_port(rs_fd);
-      stop_net_services();
-      stop_sensors_thread();
-      exit_code=EXIT_FAILURE;
-      _keepRunning=false;
-      return;
+      if (SHOULD_KEEP_RUNNING()){
+        LOG(AQUA_LOG,LOG_ERR, "You are wasting my time, please check '%s'\n",_aqconfig_.serial_port);
+      } else {
+        LOG(AQUA_LOG,LOG_ERR, "I'm done, exiting, please check '%s'\n",_aqconfig_.serial_port);
+        stopPacketLogger();
+        close_serial_port(rs_fd);
+        stop_net_services();
+        stop_sensors_thread();
+        exit_code=EXIT_FAILURE;
+        _keepRunning=false;
+        return;
+      }
     }
 /*
     if (_aqconfig_.log_raw_RS_bytes)
@@ -1132,9 +960,9 @@ void main_loop()
 
     if (packet_length > 0 && auto_config_complete == false) {
       blank_read = 0;
-      auto_config_complete = auto_configure(packet_buffer, rs_fd);
+      auto_config_complete = auto_configure(&_aqualink_data, packet_buffer, packet_length, rs_fd);
       AddAQDstatusMask(AUTOCONFIGURE_ID);
-      _aqualink_data.updated = true;
+      SET_DIRTY(_aqualink_data.is_dirty);
       if (auto_config_complete) {
         //if (_aqconfig_.device_id != 0x00)
           got_probe = true;
@@ -1148,7 +976,7 @@ void main_loop()
     if (packet_length > 0 && _aqconfig_.device_id == 0x00) {
       blank_read = 0;
       AddAQDstatusMask(AUTOCONFIGURE_ID);
-      _aqualink_data.updated = true;
+      SET_DIRTY(_aqualink_data.is_dirty);
       _aqconfig_.device_id = find_unused_address(packet_buffer);
       continue;
     }
@@ -1204,12 +1032,16 @@ void main_loop()
             LOG(AQUA_LOG,LOG_ERR, "No probe on device_id '0x%02hhx', Can't start! (please check config)\n",_aqconfig_.device_id);
             i=0;
           } else {
-            LOG(AQUA_LOG,LOG_ERR, "No probe on device_id '0x%02hhx', giving up! (please check config)\n",_aqconfig_.device_id);
-            stopPacketLogger();
-            close_serial_port(rs_fd);
-            stop_net_services();
-            stop_sensors_thread();
-            return;
+            if (SHOULD_KEEP_RUNNING()){
+              LOG(AQUA_LOG,LOG_ERR, "You are wasting my time, please check config line 'device_id = 0x%02hhx'\n",_aqconfig_.device_id);
+            } else {
+              LOG(AQUA_LOG,LOG_ERR, "No probe on device_id '0x%02hhx', giving up! (please check config)\n",_aqconfig_.device_id);
+              stopPacketLogger();
+              close_serial_port(rs_fd);
+              stop_net_services();
+              stop_sensors_thread();
+              return;
+            }
           }  
         }
         if(!got_probe_rssa) {
@@ -1231,7 +1063,7 @@ void main_loop()
   RemoveAQDstatusMask(AUTOCONFIGURE_ID);
   RemoveAQDstatusMask(NOT_CONNECTED);
   AddAQDstatusMask(CONNECTING);
-  _aqualink_data.updated = true;
+  SET_DIRTY(_aqualink_data.is_dirty);
 
   //At this point we should have correct ID and seen probes on those ID's.
   // Setup the panel
@@ -1240,8 +1072,20 @@ void main_loop()
     //_aqualink_data.panelstatus = NO_IDS_ERROR;
     RemoveAQDstatusMask(CONNECTING); // Not sure if we should remove this
     AddAQDstatusMask(ERROR_NO_DEVICE_ID);
-    _aqualink_data.updated = true;
+    SET_DIRTY(_aqualink_data.is_dirty);
   }
+
+#ifdef AQ_PDA
+  if (isPDA_PANEL) {
+    init_pda(&_aqualink_data);
+    if (_aqconfig_.extended_device_id != 0x00)
+    {
+      LOG(AQUA_LOG,LOG_ERR, "Aqualink daemon can't use extended_device_id in PDA mode, ignoring value '0x%02hhx' from cfg\n",_aqconfig_.extended_device_id);
+      _aqconfig_.extended_device_id = 0x00;
+      _aqconfig_.extended_device_id_programming = false;
+    }
+  }
+#endif
 
   if (_aqconfig_.rssa_device_id >= 0x48 && _aqconfig_.rssa_device_id <= 0x49) {
     addPanelRSserialAdapterInterface();
@@ -1256,7 +1100,7 @@ void main_loop()
   // We can only get panel size info from extended ID
   if (_aqconfig_.extended_device_id != 0x00) {
     RemoveAQDstatusMask(AUTOCONFIGURE_PANEL);
-    _aqualink_data.updated = true;
+    SET_DIRTY(_aqualink_data.is_dirty);
   }
 
   if (_aqconfig_.extended_device_id_programming == true && (isONET_ENABLED || isIAQT_ENABLED) )
@@ -1301,7 +1145,7 @@ void main_loop()
         LOG(AQUA_LOG,LOG_ERR, "Bad serial port '%s', are you sure that's right?\n",_aqconfig_.serial_port);   
         sprintf(_aqualink_data.last_display_message, CONNECTION_ERROR);
         //LOG(AQUA_LOG,LOG_ERR, "Serial port error, Aqualink daemon waiting to connect to master device...\n");    
-        _aqualink_data.updated = true;
+        SET_DIRTY(_aqualink_data.is_dirty);
         AddAQDstatusMask(ERROR_SERIAL);
         //broadcast_aqualinkstate_error(CONNECTION_ERROR);
         broadcast_aqualinkstate_error(getAqualinkDStatusMessage(&_aqualink_data));
@@ -1312,7 +1156,7 @@ void main_loop()
       {
         sprintf(_aqualink_data.last_display_message, CONNECTION_ERROR);
         LOG(AQUA_LOG,LOG_ERR, "Aqualink daemon looks like serial error, resetting.\n");
-        _aqualink_data.updated = true;
+        SET_DIRTY(_aqualink_data.is_dirty);
         AddAQDstatusMask(ERROR_SERIAL);
         //broadcast_aqualinkstate_error(CONNECTION_ERROR);
         broadcast_aqualinkstate_error(getAqualinkDStatusMessage(&_aqualink_data));
@@ -1370,7 +1214,7 @@ void main_loop()
       RemoveAQDstatusMask(ERROR_SERIAL);
       RemoveAQDstatusMask(CONNECTING);
       AddAQDstatusMask(CONNECTED);
-      _aqualink_data.updated = true;
+      //_aqualink_data.is_dirty = true;
       DEBUG_TIMER_START(&_rs_packet_timer);
 
       blank_read = 0;
@@ -1414,27 +1258,27 @@ void main_loop()
         AddAQDstatusMask(CONNECTED);
         switch(getJandyDeviceType(packet_buffer[PKT_DEST])){
           case ALLBUTTON:
-            _aqualink_data.updated = process_allbutton_packet(packet_buffer, packet_length, &_aqualink_data);
+            process_allbutton_packet(packet_buffer, packet_length, &_aqualink_data);
             caculate_ack_packet(rs_fd, packet_buffer, ALLBUTTON);
           break;
           case RSSADAPTER:
-            _aqualink_data.updated = process_rssadapter_packet(packet_buffer, packet_length, &_aqualink_data);
+            process_rssadapter_packet(packet_buffer, packet_length, &_aqualink_data);
             caculate_ack_packet(rs_fd, packet_buffer, RSSADAPTER);    
           break;
           case IAQTOUCH:
-            _aqualink_data.updated = process_iaqtouch_packet(packet_buffer, packet_length, &_aqualink_data);
+            process_iaqtouch_packet(packet_buffer, packet_length, &_aqualink_data);
             caculate_ack_packet(rs_fd, packet_buffer, IAQTOUCH);
           break;
           case ONETOUCH:
-            _aqualink_data.updated = process_onetouch_packet(packet_buffer, packet_length, &_aqualink_data);
+            process_onetouch_packet(packet_buffer, packet_length, &_aqualink_data);
             caculate_ack_packet(rs_fd, packet_buffer, ONETOUCH);
           break;
           case AQUAPDA:
-            _aqualink_data.updated = process_pda_packet(packet_buffer, packet_length);
+            process_pda_packet(packet_buffer, packet_length);
             caculate_ack_packet(rs_fd, packet_buffer, AQUAPDA);
           break;
           case IAQUALNK:
-            _aqualink_data.updated = process_iaqualink_packet(packet_buffer, packet_length, &_aqualink_data);
+            process_iaqualink_packet(packet_buffer, packet_length, &_aqualink_data);
             caculate_ack_packet(rs_fd, packet_buffer, IAQUALNK);
           break;
           default:
@@ -1451,11 +1295,11 @@ void main_loop()
       {
         if (getProtocolType(packet_buffer) == JANDY)
         {
-          _aqualink_data.updated = processJandyPacket(packet_buffer, packet_length, &_aqualink_data);
+          processJandyPacket(packet_buffer, packet_length, &_aqualink_data);
         }
         // Process Pentair Device Packed (pentair have to & from in message, so no need to)
         else if (getProtocolType(packet_buffer) == PENTAIR && READ_RSDEV_vsfPUMP) {
-          _aqualink_data.updated = processPentairPacket(packet_buffer, packet_length, &_aqualink_data);
+          processPentairPacket(packet_buffer, packet_length, &_aqualink_data);
           // In the future probably add code to catch device offline (ie missing reply message)
         }
         DEBUG_TIMER_STOP(_rs_packet_timer,AQUA_LOG,"Processed (readonly) packet in");
@@ -1475,17 +1319,7 @@ void main_loop()
       }
     }
 
-    /*
-    if ( _aqualink_data.num_sensors > 0 && ++loopnum >= 200 ) {
-      loopnum=0;
-      for (int i=0; i < _aqualink_data.num_sensors; i++) {
-        if (read_sensor(&_aqualink_data.sensors[i]) ) {
-          _aqualink_data.updated = true;
-        }
-      }
-    }
-      */  
-
+    
     //tcdrain(rs_fd); // Make sure buffer has been sent.
     //delay(10);
   }
@@ -1506,21 +1340,7 @@ void main_loop()
   close_serial_port(rs_fd);
   // Clear webbrowser
   //mg_mgr_free(&mgr);
-/*
-  if (! _restart) {
-  // NSF need to run through config memory and clean up.
-    LOG(AQUA_LOG,LOG_NOTICE, "Exit!\n");
-    //exit(EXIT_FAILURE);
-    exit(exit_code);
-  } else {
-    LOG(AQUA_LOG,LOG_WARNING, "Waiting for process to fininish!\n");
-    delay(5 * 1000);
-    LOG(AQUA_LOG,LOG_WARNING, "Restarting!\n");
-    _keepRunning = true;
-    _restart = false;
-    startup(_self, _cfgFile);
-  }
-*/
+
   #ifdef SELF_RESTART
    if (! _restart) {
     LOG(AQUA_LOG,LOG_WARNING, "Waiting for process to fininish!\n");

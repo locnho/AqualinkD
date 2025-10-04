@@ -1286,7 +1286,7 @@ const char *pumpType2String(pump_type ptype) {
 }
 */
 
-int build_aqualink_config_JSON(char* buffer, int size, struct aqualinkdata *aq_data)
+int build_aqualink_config_JSON(char* buffer, int size, struct aqualinkdata *aqdata)
 {
   memset(&buffer[0], 0, size);
   int length = 0;
@@ -1312,7 +1312,7 @@ int build_aqualink_config_JSON(char* buffer, int size, struct aqualinkdata *aq_d
   }
 */
   if ((result = snprintf(buffer+length, size-length, ",\"max_pumps\": \"%d\",\"max_lights\": \"%d\",\"max_sensors\": \"%d\",\"max_light_programs\": \"%d\",\"max_vbuttons\": \"%d\"",
-                         MAX_PUMPS,MAX_LIGHTS,MAX_SENSORS,LIGHT_COLOR_OPTIONS-1, (TOTAL_BUTTONS - aq_data->virtual_button_start) )) < 0 || result >= size-length) {
+                         MAX_PUMPS,MAX_LIGHTS,MAX_SENSORS,LIGHT_COLOR_OPTIONS-1, (TOTAL_BUTTONS - aqdata->virtual_button_start) )) < 0 || result >= size-length) {
     length += snprintf(buffer+length, size-length, "}");
     return length;
   } else {
@@ -1340,7 +1340,7 @@ int build_aqualink_config_JSON(char* buffer, int size, struct aqualinkdata *aq_d
     }
   }
 
-  for (i = 1; i <= aq_data->num_sensors; i++)
+  for (i = 1; i <= aqdata->num_sensors; i++)
   {
     length += sprintf(buffer+length, ",\"sensor_%.2d\":{ \"advanced\":\"yes\",",i );
     // The next json_cfg_element() call will add a , at the beginning, so save the next char index so we can delete it later.
@@ -1350,36 +1350,36 @@ int build_aqualink_config_JSON(char* buffer, int size, struct aqualinkdata *aq_d
     //fprintf(fp,"sensor_%.2d_label=%s\n",i+1,aqdata->sensors->label);
     //fprintf(fp,"sensor_%.2d_factor=%f\n",i+1,aqdata->sensors->factor);
     sprintf(buf,"sensor_%.2d_path", i);
-    if ((result = json_cfg_element(buffer+length, size-length, buf, &aq_data->sensors[i-1].path, CFG_STRING, 0, NULL, CFG_GRP_ADVANCED)) <= 0)
+    if ((result = json_cfg_element(buffer+length, size-length, buf, &aqdata->sensors[i-1].path, CFG_STRING, 0, NULL, CFG_GRP_ADVANCED)) <= 0)
       return length;
     else
       length += result;
   
     sprintf(buf,"sensor_%.2d_label", i);
-    if ((result = json_cfg_element(buffer+length, size-length, buf, &aq_data->sensors[i-1].label, CFG_STRING, 0, NULL, CFG_GRP_ADVANCED)) <= 0)
+    if ((result = json_cfg_element(buffer+length, size-length, buf, &aqdata->sensors[i-1].label, CFG_STRING, 0, NULL, CFG_GRP_ADVANCED)) <= 0)
       return length;
     else
       length += result;
 
     sprintf(buf,"sensor_%.2d_factor", i);
-    if ((result = json_cfg_element(buffer+length, size-length, buf, &aq_data->sensors[i-1].factor, CFG_FLOAT, 0, NULL, CFG_GRP_ADVANCED)) <= 0)
+    if ((result = json_cfg_element(buffer+length, size-length, buf, &aqdata->sensors[i-1].factor, CFG_FLOAT, 0, NULL, CFG_GRP_ADVANCED)) <= 0)
       return length;
     else
       length += result;
 
     sprintf(buf,"sensor_%.2d_uom", i);
-    if ((result = json_cfg_element(buffer+length, size-length, buf, &aq_data->sensors[i-1].uom, CFG_STRING, 0, NULL, CFG_GRP_ADVANCED)) <= 0)
+    if ((result = json_cfg_element(buffer+length, size-length, buf, &aqdata->sensors[i-1].uom, CFG_STRING, 0, NULL, CFG_GRP_ADVANCED)) <= 0)
       return length;
     else
       length += result;
-      //(&aq_data->sensors[i-1].uom==NULL ? "" : &aq_data->sensors[i-1].uom)
+      //(&aqdata->sensors[i-1].uom==NULL ? "" : &aqdata->sensors[i-1].uom)
 
     /*
     // Need to escape / with /// for this to work, and fix the disply that will show // for ////
     // Don;t forget config.c, Line 2096, search comment // NSF When fixed the JSON & config editor, put these lines back.
-    if (&aq_data->sensors[i-1].regex != NULL) {
+    if (&aqdata->sensors[i-1].regex != NULL) {
       sprintf(buf,"sensor_%.2d_regex", i);
-      if ((result = json_cfg_element(buffer+length, size-length, buf, &aq_data->sensors[i-1].regex, CFG_STRING, 0, NULL, CFG_GRP_ADVANCED)) <= 0)
+      if ((result = json_cfg_element(buffer+length, size-length, buf, &aqdata->sensors[i-1].regex, CFG_STRING, 0, NULL, CFG_GRP_ADVANCED)) <= 0)
         return length;
       else
         length += result;
@@ -1415,50 +1415,50 @@ int build_aqualink_config_JSON(char* buffer, int size, struct aqualinkdata *aq_d
   
   // All buttons
 
-  for (i = 0; i < aq_data->total_buttons; i++)
+  for (i = 0; i < aqdata->total_buttons; i++)
   {
     char prefix[30];
-    if (isVBUTTON(aq_data->aqbuttons[i].special_mask)) {
-      sprintf(prefix,"virtual_button_%.2d",(i+1)-aq_data->virtual_button_start);
+    if (isVBUTTON(aqdata->aqbuttons[i].special_mask)) {
+      sprintf(prefix,"virtual_button_%.2d",(i+1)-aqdata->virtual_button_start);
     } else {
       sprintf(prefix,"button_%.2d",i+1);
     }
 
     //length += sprintf(buffer+length, ",\"%s\":{",prefix );
-    length += sprintf(buffer+length, ",\"%s\":{ \"default\":\"%s\", ",prefix, aq_data->aqbuttons[i].name );
+    length += sprintf(buffer+length, ",\"%s\":{ \"default\":\"%s\", ",prefix, aqdata->aqbuttons[i].name );
     // The next json_cfg_element() call will add a , at the beginning, so save the next char index so we can delete it later.
     delectCharAt = length;
     
     sprintf(buf,"%s_label", prefix);
-    if ((result = json_cfg_element(buffer+length, size-length, buf, &aq_data->aqbuttons[i].label, CFG_STRING, 0, NULL, 0)) <= 0) {
+    if ((result = json_cfg_element(buffer+length, size-length, buf, &aqdata->aqbuttons[i].label, CFG_STRING, 0, NULL, 0)) <= 0) {
       LOG(NET_LOG,LOG_ERR, "Config json buffer full in, result truncated! size=%d curently used=%d\n",size,length);
       return length;
     } else
       length += result;
 
-    if (isVS_PUMP(aq_data->aqbuttons[i].special_mask)) 
+    if (isVS_PUMP(aqdata->aqbuttons[i].special_mask)) 
     {
-      if (((pump_detail *)aq_data->aqbuttons[i].special_mask_ptr)->pumpIndex > 0) {
+      if (((pump_detail *)aqdata->aqbuttons[i].special_mask_ptr)->pumpIndex > 0) {
         sprintf(buf,"%s_pumpIndex", prefix);
-        if ((result = json_cfg_element(buffer+length, size-length, buf, &((pump_detail *)aq_data->aqbuttons[i].special_mask_ptr)->pumpIndex, CFG_INT, 0, NULL, 0)) <= 0) {
+        if ((result = json_cfg_element(buffer+length, size-length, buf, &((pump_detail *)aqdata->aqbuttons[i].special_mask_ptr)->pumpIndex, CFG_INT, 0, NULL, 0)) <= 0) {
           LOG(NET_LOG,LOG_ERR, "Config json buffer full in, result truncated! size=%d curently used=%d\n",size,length);
           return length;
         } else
           length += result;
       }
       
-      if (((pump_detail *)aq_data->aqbuttons[i].special_mask_ptr)->pumpID != NUL) {
+      if (((pump_detail *)aqdata->aqbuttons[i].special_mask_ptr)->pumpID != NUL) {
         sprintf(buf,"%s_pumpID", prefix);
-        if ((result = json_cfg_element(buffer+length, size-length, buf, &((pump_detail *)aq_data->aqbuttons[i].special_mask_ptr)->pumpID, CFG_HEX, 0, NULL, 0)) <= 0) {
+        if ((result = json_cfg_element(buffer+length, size-length, buf, &((pump_detail *)aqdata->aqbuttons[i].special_mask_ptr)->pumpID, CFG_HEX, 0, NULL, 0)) <= 0) {
           LOG(NET_LOG,LOG_ERR, "Config json buffer full in, result truncated! size=%d curently used=%d\n",size,length);
           return length;
         } else
           length += result;
       }
 
-      if (((pump_detail *)aq_data->aqbuttons[i].special_mask_ptr)->pumpName[0] != '\0') {
+      if (((pump_detail *)aqdata->aqbuttons[i].special_mask_ptr)->pumpName[0] != '\0') {
         sprintf(buf,"%s_pumpName", prefix);
-        stringptr = ((pump_detail *)aq_data->aqbuttons[i].special_mask_ptr)->pumpName;
+        stringptr = ((pump_detail *)aqdata->aqbuttons[i].special_mask_ptr)->pumpName;
         if ((result = json_cfg_element(buffer+length, size-length, buf, &stringptr, CFG_STRING, 0, NULL, 0)) <= 0) {
           LOG(NET_LOG,LOG_ERR, "Config json buffer full in, result truncated! size=%d curently used=%d\n",size,length);
           return length;
@@ -1466,9 +1466,9 @@ int build_aqualink_config_JSON(char* buffer, int size, struct aqualinkdata *aq_d
           length += result;
       }
 
-      if (((pump_detail *)aq_data->aqbuttons[i].special_mask_ptr)->pumpType != PT_UNKNOWN) {
+      if (((pump_detail *)aqdata->aqbuttons[i].special_mask_ptr)->pumpType != PT_UNKNOWN) {
         sprintf(buf,"%s_pumpType", prefix);
-        stringptr = pumpType2String(((pump_detail *)aq_data->aqbuttons[i].special_mask_ptr)->pumpType);
+        stringptr = pumpType2String(((pump_detail *)aqdata->aqbuttons[i].special_mask_ptr)->pumpType);
         if ((result = json_cfg_element(buffer+length, size-length, buf, &stringptr, CFG_STRING, 0, "[\"\", \"JANDY ePUMP\",\"Pentair VS\",\"Pentair VF\"]", 0) ) <= 0) {
           LOG(NET_LOG,LOG_ERR, "Config json buffer full in, result truncated! size=%d curently used=%d\n",size,length);
           return length;
@@ -1476,24 +1476,24 @@ int build_aqualink_config_JSON(char* buffer, int size, struct aqualinkdata *aq_d
           length += result;
       }
 
-      if (((pump_detail *)aq_data->aqbuttons[i].special_mask_ptr)->minSpeed != PT_UNKNOWN &&
-          ((pump_detail *)aq_data->aqbuttons[i].special_mask_ptr)->minSpeed != getPumpDefaultSpeed((pump_detail *)aq_data->aqbuttons[i].special_mask_ptr, false) ) 
+      if (((pump_detail *)aqdata->aqbuttons[i].special_mask_ptr)->minSpeed != PT_UNKNOWN &&
+          ((pump_detail *)aqdata->aqbuttons[i].special_mask_ptr)->minSpeed != getPumpDefaultSpeed((pump_detail *)aqdata->aqbuttons[i].special_mask_ptr, false) ) 
       {
         sprintf(buf,"%s_pumpMinSpeed", prefix);
-        stringptr = pumpType2String(((pump_detail *)aq_data->aqbuttons[i].special_mask_ptr)->pumpType);
-        if ((result = json_cfg_element(buffer+length, size-length, buf, &((pump_detail *)aq_data->aqbuttons[i].special_mask_ptr)->minSpeed, CFG_INT, 0, NULL, 0) ) <= 0) {
+        stringptr = pumpType2String(((pump_detail *)aqdata->aqbuttons[i].special_mask_ptr)->pumpType);
+        if ((result = json_cfg_element(buffer+length, size-length, buf, &((pump_detail *)aqdata->aqbuttons[i].special_mask_ptr)->minSpeed, CFG_INT, 0, NULL, 0) ) <= 0) {
           LOG(NET_LOG,LOG_ERR, "Config json buffer full in, result truncated! size=%d curently used=%d\n",size,length);
           return length;
         } else
           length += result;
       }
 
-      if (((pump_detail *)aq_data->aqbuttons[i].special_mask_ptr)->maxSpeed != PT_UNKNOWN &&
-          ((pump_detail *)aq_data->aqbuttons[i].special_mask_ptr)->maxSpeed != getPumpDefaultSpeed((pump_detail *)aq_data->aqbuttons[i].special_mask_ptr, true) ) 
+      if (((pump_detail *)aqdata->aqbuttons[i].special_mask_ptr)->maxSpeed != PT_UNKNOWN &&
+          ((pump_detail *)aqdata->aqbuttons[i].special_mask_ptr)->maxSpeed != getPumpDefaultSpeed((pump_detail *)aqdata->aqbuttons[i].special_mask_ptr, true) ) 
       {
         sprintf(buf,"%s_pumpMaxSpeed", prefix);
-        stringptr = pumpType2String(((pump_detail *)aq_data->aqbuttons[i].special_mask_ptr)->pumpType);
-        if ((result = json_cfg_element(buffer+length, size-length, buf, &((pump_detail *)aq_data->aqbuttons[i].special_mask_ptr)->maxSpeed, CFG_INT, 0, NULL, 0) ) <= 0) {
+        stringptr = pumpType2String(((pump_detail *)aqdata->aqbuttons[i].special_mask_ptr)->pumpType);
+        if ((result = json_cfg_element(buffer+length, size-length, buf, &((pump_detail *)aqdata->aqbuttons[i].special_mask_ptr)->maxSpeed, CFG_INT, 0, NULL, 0) ) <= 0) {
           LOG(NET_LOG,LOG_ERR, "Config json buffer full in, result truncated! size=%d curently used=%d\n",size,length);
           return length;
         } else
@@ -1502,26 +1502,26 @@ int build_aqualink_config_JSON(char* buffer, int size, struct aqualinkdata *aq_d
 
 
 
-    } else if (isPLIGHT(aq_data->aqbuttons[i].special_mask)) {
-      if (((clight_detail *)aq_data->aqbuttons[i].special_mask_ptr)->lightType >= 0) {
+    } else if (isPLIGHT(aqdata->aqbuttons[i].special_mask)) {
+      if (((clight_detail *)aqdata->aqbuttons[i].special_mask_ptr)->lightType >= 0) {
         sprintf(buf,"%s_lightMode", prefix);
-        if ((result = json_cfg_element(buffer+length, size-length, buf, &((clight_detail *)aq_data->aqbuttons[i].special_mask_ptr)->lightType, CFG_INT, 0, NULL, 0)) <= 0) {
+        if ((result = json_cfg_element(buffer+length, size-length, buf, &((clight_detail *)aqdata->aqbuttons[i].special_mask_ptr)->lightType, CFG_INT, 0, NULL, 0)) <= 0) {
           LOG(NET_LOG,LOG_ERR, "Config json buffer full in, result truncated! size=%d curently used=%d\n",size,length);
           return length;
         } else
           length += result;
       }
-    } else if ( (isVBUTTON(aq_data->aqbuttons[i].special_mask) && aq_data->aqbuttons[i].rssd_code >= IAQ_ONETOUCH_1 && aq_data->aqbuttons[i].rssd_code <= IAQ_ONETOUCH_6 ) ) {
+    } else if ( (isVBUTTON(aqdata->aqbuttons[i].special_mask) && aqdata->aqbuttons[i].rssd_code >= IAQ_ONETOUCH_1 && aqdata->aqbuttons[i].rssd_code <= IAQ_ONETOUCH_6 ) ) {
         sprintf(buf,"%s_onetouchID", prefix);
-        int oID = (aq_data->aqbuttons[i].rssd_code - 15);
+        int oID = (aqdata->aqbuttons[i].rssd_code - 15);
         if ((result = json_cfg_element(buffer+length, size-length, buf, &oID, CFG_INT, 0, "[\"\", \"1\",\"2\",\"3\",\"4\",\"5\",\"6\"]", 0)) <= 0) {
           LOG(NET_LOG,LOG_ERR, "Config json buffer full in, result truncated! size=%d curently used=%d\n",size,length);
           return length;
         } else
           length += result;
-    } else if ( isVBUTTON_ALTLABEL(aq_data->aqbuttons[i].special_mask)) {
+    } else if ( isVBUTTON_ALTLABEL(aqdata->aqbuttons[i].special_mask)) {
       sprintf(buf,"%s_altlabel", prefix);
-      if ((result = json_cfg_element(buffer+length, size-length, buf, &((altlabel_detail *)aq_data->aqbuttons[i].special_mask_ptr)->altlabel, CFG_STRING, 0, NULL, 0)) <= 0) {
+      if ((result = json_cfg_element(buffer+length, size-length, buf, &((altlabel_detail *)aqdata->aqbuttons[i].special_mask_ptr)->altlabel, CFG_STRING, 0, NULL, 0)) <= 0) {
         LOG(NET_LOG,LOG_ERR, "Config json buffer full in, result truncated! size=%d curently used=%d\n",size,length);
         return length;
       } else

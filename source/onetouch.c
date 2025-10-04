@@ -44,11 +44,11 @@ bool _panel_version_P2 = false; // Older panels REV 0.1 and 0.2
 
 
 void set_macro_status();
-void pump_update(struct aqualinkdata *aq_data, int updated);
-bool log_heater_setpoints(struct aqualinkdata *aq_data);
+void pump_update(struct aqualinkdata *aqdata, int updated);
+bool log_heater_setpoints(struct aqualinkdata *aqdata);
 
 
-void rs16led_update(struct aqualinkdata *aq_data, int updated);
+void rs16led_update(struct aqualinkdata *aqdata, int updated);
 
 
 void print_onetouch_menu()
@@ -118,19 +118,19 @@ int onetouch_menu_find_index(char *text)
 One Touch: OneTouch Menu Line 3 = Set Pool to: 20%
 One Touch: OneTouch Menu Line 4 =  Set Spa to:100%
 */
-void log_programming_information(struct aqualinkdata *aq_data)
+void log_programming_information(struct aqualinkdata *aqdata)
 {
   switch(get_onetouch_menu_type()){
     case OTM_SET_AQUAPURE:
-      if (isCOMBO_PANEL && aq_data->aqbuttons[SPA_INDEX].led->state == ON)
-        setSWGpercent(aq_data, rsm_atoi(&_menu[4][13])); // use spa
+      if (isCOMBO_PANEL && aqdata->aqbuttons[SPA_INDEX].led->state == ON)
+        setSWGpercent(aqdata, rsm_atoi(&_menu[4][13])); // use spa
       else
-        setSWGpercent(aq_data, rsm_atoi(&_menu[3][13])); // use pool
+        setSWGpercent(aqdata, rsm_atoi(&_menu[3][13])); // use pool
 
-      LOG(ONET_LOG,LOG_INFO, "SWG Set to %d\n",aq_data->swg_percent);
+      LOG(ONET_LOG,LOG_INFO, "SWG Set to %d\n",aqdata->swg_percent);
     break;
     case OTM_SET_TEMP:
-      log_heater_setpoints(aq_data);
+      log_heater_setpoints(aqdata);
     break;
     default:
       // No need to do anything yet
@@ -138,7 +138,7 @@ void log_programming_information(struct aqualinkdata *aq_data)
   }
 }
 
-bool process_onetouch_menu_packet(struct aqualinkdata *aq_data, unsigned char* packet, int length)
+bool process_onetouch_menu_packet(struct aqualinkdata *aqdata, unsigned char* packet, int length)
 {
   bool rtn = true;
   signed char first_line;
@@ -148,7 +148,7 @@ bool process_onetouch_menu_packet(struct aqualinkdata *aq_data, unsigned char* p
 
   switch (packet[PKT_CMD]) {
     case CMD_PDA_CLEAR:
-      log_programming_information(aq_data);
+      log_programming_information(aqdata);
       _ot_hlightindex = -1;
       _ot_hlightcharindexstart = -1;
       _ot_hlightcharindexstart = -1;
@@ -228,32 +228,32 @@ bool process_onetouch_menu_packet(struct aqualinkdata *aq_data, unsigned char* p
 }
 
 
-void setUnits_ot(char *str, struct aqualinkdata *aq_data)
+void setUnits_ot(char *str, struct aqualinkdata *aqdata)
 {
   // NSF This needs to use setUnits from aqualinkd.c
-  if (aq_data->temp_units == UNKNOWN) {
+  if (aqdata->temp_units == UNKNOWN) {
     if (str[15] == 'F')
-      aq_data->temp_units = FAHRENHEIT;
+      SET_IF_CHANGED(aqdata->temp_units, FAHRENHEIT, aqdata->is_dirty);
     else if (str[15] == 'C')
-      aq_data->temp_units = CELSIUS;
+      SET_IF_CHANGED(aqdata->temp_units, CELSIUS, aqdata->is_dirty);
     else
-      aq_data->temp_units = UNKNOWN;
+      SET_IF_CHANGED(aqdata->temp_units, UNKNOWN, aqdata->is_dirty);
 
-    LOG(ONET_LOG,LOG_INFO, "Temp Units set to %d (F=0, C=1, Unknown=2)\n", aq_data->temp_units);
+    LOG(ONET_LOG,LOG_INFO, "Temp Units set to %d (F=0, C=1, Unknown=2)\n", aqdata->temp_units);
   }
 }
 
-bool log_heater_setpoints(struct aqualinkdata *aq_data)
+bool log_heater_setpoints(struct aqualinkdata *aqdata)
 {
   bool rtn = false;
 
   if (rsm_strcmp(_menu[2], "Pool Heat") == 0)
-    aq_data->pool_htr_set_point = rsm_atoi(&_menu[2][10]);
+    SET_IF_CHANGED(aqdata->pool_htr_set_point, rsm_atoi(&_menu[2][10]), aqdata->is_dirty);
   if (rsm_strcmp(_menu[3], "Spa Heat") == 0 )
-    aq_data->spa_htr_set_point = rsm_atoi(&_menu[3][9]);
+    SET_IF_CHANGED(aqdata->spa_htr_set_point, rsm_atoi(&_menu[3][9]), aqdata->is_dirty);
   else {
     if (rsm_strcmp(_menu[2], "Temp1") == 0) {
-      aq_data->pool_htr_set_point = rsm_atoi(&_menu[2][10]);
+      SET_IF_CHANGED(aqdata->pool_htr_set_point, rsm_atoi(&_menu[2][10]), aqdata->is_dirty);
       if (isSINGLE_DEV_PANEL != true)
       {
         changePanelToMode_Only();
@@ -261,14 +261,14 @@ bool log_heater_setpoints(struct aqualinkdata *aq_data)
       }
     }
     if (rsm_strcmp(_menu[3], "Temp2") == 0 )
-      aq_data->spa_htr_set_point = rsm_atoi(&_menu[3][9]);
+      SET_IF_CHANGED(aqdata->spa_htr_set_point, rsm_atoi(&_menu[3][9]), aqdata->is_dirty);
   }
   
-  setUnits_ot(_menu[2], aq_data);
+  setUnits_ot(_menu[2], aqdata);
   
-  LOG(ONET_LOG,LOG_INFO, "POOL HEATER SETPOINT %d\n",aq_data->pool_htr_set_point);
-  LOG(ONET_LOG,LOG_INFO, "SPA HEATER SETPOINT %d\n",aq_data->spa_htr_set_point);
-  aq_data->updated = true;
+  LOG(ONET_LOG,LOG_INFO, "POOL HEATER SETPOINT %d\n",aqdata->pool_htr_set_point);
+  LOG(ONET_LOG,LOG_INFO, "SPA HEATER SETPOINT %d\n",aqdata->spa_htr_set_point);
+  //aqdata->is_dirty = true;
 
   return rtn;
 }
@@ -287,45 +287,45 @@ One Touch: OneTouch Menu Line 9 =
 One Touch: OneTouch Menu Line 10 = 
 One Touch: OneTouch Menu Line 11 =
 */
-bool log_panelversion(struct aqualinkdata *aq_data)
+bool log_panelversion(struct aqualinkdata *aqdata)
 {
   char *end;
   static bool revTest=false;
 
-  setPanelInformationFromPanelMsg(aq_data, _menu[4], PANEL_CPU, ONETOUCH);
-  setPanelInformationFromPanelMsg(aq_data, _menu[5], PANEL_STRING, ONETOUCH);
-  setPanelInformationFromPanelMsg(aq_data, _menu[7], PANEL_REV, ONETOUCH);
+  setPanelInformationFromPanelMsg(aqdata, _menu[4], PANEL_CPU, ONETOUCH);
+  setPanelInformationFromPanelMsg(aqdata, _menu[5], PANEL_STRING, ONETOUCH);
+  setPanelInformationFromPanelMsg(aqdata, _menu[7], PANEL_REV, ONETOUCH);
 
   // It's already been set
-  if (strlen(aq_data->version) > 0) {
+  if (strlen(aqdata->version) > 0) {
     // If another protocol set the version, we need to check the rev.
     if (!revTest){
-      //LOG(ONET_LOG,LOG_NOTICE, "Control Panel revision %s\n", aq_data->revision);
-      if ( strcmp(aq_data->revision, "O.1") == 0 || strcmp(aq_data->revision, "O.2") == 0 ) {
+      //LOG(ONET_LOG,LOG_NOTICE, "Control Panel revision %s\n", aqdata->revision);
+      if ( strcmp(aqdata->revision, "O.1") == 0 || strcmp(aqdata->revision, "O.2") == 0 ) {
         LOG(ONET_LOG,LOG_NOTICE, "Setting early version for OneTouch\n");
         _panel_version_P2 = true;
         revTest = true;
       }
-      //LOG(ONET_LOG,LOG_NOTICE, "Control Panel revision %s\n", aq_data->revision);
+      //LOG(ONET_LOG,LOG_NOTICE, "Control Panel revision %s\n", aqdata->revision);
     }
     return false;
   }
 
-  strcpy(aq_data->version, trimwhitespace(_menu[4]));
+  strcpy(aqdata->version, trimwhitespace(_menu[4]));
   // Trim trailing space
-  end = aq_data->version + strlen(aq_data->version) - 1;
-  while(end > aq_data->version && isspace(*end)) end--;
+  end = aqdata->version + strlen(aqdata->version) - 1;
+  while(end > aqdata->version && isspace(*end)) end--;
 
   strcpy(end+2, trimwhitespace(_menu[7]));
   // Trim trailing space
-  end = aq_data->version + strlen(aq_data->version) - 1;
-  while(end > aq_data->version && isspace(*end)) end--;
+  end = aqdata->version + strlen(aqdata->version) - 1;
+  while(end > aqdata->version && isspace(*end)) end--;
 
-  rsm_get_revision(aq_data->revision, _menu[7], AQ_MSGLEN);
-  LOG(ONET_LOG,LOG_NOTICE, "Control Panel version %s\n", aq_data->version);
-  LOG(ONET_LOG,LOG_NOTICE, "Control Panel revision %s\n", aq_data->revision);
+  rsm_get_revision(aqdata->revision, _menu[7], AQ_MSGLEN);
+  LOG(ONET_LOG,LOG_NOTICE, "Control Panel version %s\n", aqdata->version);
+  LOG(ONET_LOG,LOG_NOTICE, "Control Panel revision %s\n", aqdata->revision);
 
-  if ( strcmp(aq_data->revision, "O.1") == 0 || strcmp(aq_data->revision, "O.2") == 0 ) {
+  if ( strcmp(aqdata->revision, "O.1") == 0 || strcmp(aqdata->revision, "O.2") == 0 ) {
     LOG(ONET_LOG,LOG_NOTICE, "Setting early version for OneTouch\n");
     _panel_version_P2 = true;
   }
@@ -335,28 +335,28 @@ bool log_panelversion(struct aqualinkdata *aq_data)
   // Write new null terminator
   *(end+1) = 0;
 
-  LOG(ONET_LOG,LOG_DEBUG, "**** '%s' ****\n",aq_data->version);
+  LOG(ONET_LOG,LOG_DEBUG, "**** '%s' ****\n",aqdata->version);
 
   return true;
 }
 
 //Info:   OneTouch Menu Line 3 = Temp        38`F
-bool log_freeze_setpoints(struct aqualinkdata *aq_data)
+bool log_freeze_setpoints(struct aqualinkdata *aqdata)
 {
   bool rtn = false;
 
   if (rsm_strcmp(_menu[3], "Temp") == 0)
-    aq_data->frz_protect_set_point = rsm_atoi(&_menu[3][11]);
+    aqdata->frz_protect_set_point = rsm_atoi(&_menu[3][11]);
 
-  setUnits_ot(_menu[3], aq_data);
+  setUnits_ot(_menu[3], aqdata);
 
-  LOG(ONET_LOG,LOG_INFO, "FREEZE PROTECT SETPOINT %d\n",aq_data->frz_protect_set_point);
+  LOG(ONET_LOG,LOG_INFO, "FREEZE PROTECT SETPOINT %d\n",aqdata->frz_protect_set_point);
 
   return rtn;
 }
 
 /*
-bool get_pumpinfo_from_menu_OLD(struct aqualinkdata *aq_data, int menuLineIdx)
+bool get_pumpinfo_from_menu_OLD(struct aqualinkdata *aqdata, int menuLineIdx)
 {
   int rpm = 0;
   int watts = 0;
@@ -392,30 +392,30 @@ bool get_pumpinfo_from_menu_OLD(struct aqualinkdata *aq_data, int menuLineIdx)
 
   LOG(ONET_LOG, LOG_DEBUG, "Found Pump '%s', Index %d, RPM %d, Watts %d, GPM %d\n", _menu[menuLineIdx], pump_index, rpm, watts, gpm);
 
-  for (int i = 0; i < aq_data->num_pumps; i++)
+  for (int i = 0; i < aqdata->num_pumps; i++)
   {
-    if (aq_data->pumps[i].pumpIndex == pump_index)
+    if (aqdata->pumps[i].pumpIndex == pump_index)
     {
       // printf("**** FOUND PUMP %d at index %d *****\n",pump_index,i);
-      // aq_data->pumps[i].updated = true;
-      pump_update(aq_data, i);
-      aq_data->pumps[i].rpm = rpm;
-      aq_data->pumps[i].watts = watts;
-      aq_data->pumps[i].gpm = gpm;
-      aq_data->pumps[i].pStatus = panelStatus;
+      // aqdata->pumps[i].updated = true;
+      pump_update(aqdata, i);
+      aqdata->pumps[i].rpm = rpm;
+      aqdata->pumps[i].watts = watts;
+      aqdata->pumps[i].gpm = gpm;
+      aqdata->pumps[i].pStatus = panelStatus;
       // LOG(ONET_LOG,LOG_INFO, "Matched OneTouch Pump to Index %d, RPM %d, Watts %d, GPM %d\n",i,rpm,watts,gpm);
-      LOG(ONET_LOG, LOG_INFO, "Matched Pump to '%s', Index %d, RPM %d, Watts %d, GPM %d\n", aq_data->pumps[i].button->name, i, rpm, watts, gpm);
-      if (aq_data->pumps[i].pumpType == PT_UNKNOWN)
+      LOG(ONET_LOG, LOG_INFO, "Matched Pump to '%s', Index %d, RPM %d, Watts %d, GPM %d\n", aqdata->pumps[i].button->name, i, rpm, watts, gpm);
+      if (aqdata->pumps[i].pumpType == PT_UNKNOWN)
       {
         if (rsm_strcmp(_menu[2], "Intelliflo VS") == 0)
-          aq_data->pumps[i].pumpType = VSPUMP;
+          aqdata->pumps[i].pumpType = VSPUMP;
         else if (rsm_strcmp(_menu[2], "Intelliflo VF") == 0)
-          aq_data->pumps[i].pumpType = VFPUMP;
+          aqdata->pumps[i].pumpType = VFPUMP;
         else if (rsm_strcmp(_menu[2], "Jandy ePUMP") == 0 ||
                  rsm_strcmp(_menu[2], "ePump AC") == 0)
-          aq_data->pumps[i].pumpType = EPUMP;
+          aqdata->pumps[i].pumpType = EPUMP;
 
-        LOG(ONET_LOG, LOG_INFO, "Pump index %d set PumpType to %d\n", i, aq_data->pumps[i].pumpType);
+        LOG(ONET_LOG, LOG_INFO, "Pump index %d set PumpType to %d\n", i, aqdata->pumps[i].pumpType);
       }
       return true;
     }
@@ -425,7 +425,7 @@ bool get_pumpinfo_from_menu_OLD(struct aqualinkdata *aq_data, int menuLineIdx)
 }
 */
 
-bool get_pumpinfo_from_menu(struct aqualinkdata *aq_data, int menuLineIdx, int pump_number)
+bool get_pumpinfo_from_menu(struct aqualinkdata *aqdata, int menuLineIdx, int pump_number)
 {
   int rpm = 0;
   int watts = 0;
@@ -466,26 +466,26 @@ bool get_pumpinfo_from_menu(struct aqualinkdata *aq_data, int menuLineIdx, int p
 
   LOG(ONET_LOG, LOG_DEBUG, "Found Pump information '%s', RPM %d, Watts %d, GPM %d\n", _menu[menuLineIdx], rpm, watts, gpm);
 
-  for (int i=0; i < aq_data->num_pumps; i++) {
-    if (aq_data->pumps[i].pumpIndex == pump_number) {
-      LOG(ONET_LOG,LOG_INFO, "Pump label: %s Index: %d, Number: %d, RPM: %d, Watts: %d, GPM: %d\n",aq_data->pumps[i].button->name, i ,pump_number,rpm,watts,gpm);
-      pump_update(aq_data, i);
-      aq_data->pumps[i].rpm = rpm;
-      aq_data->pumps[i].watts = watts;
-      aq_data->pumps[i].gpm = gpm;
-      aq_data->pumps[i].pStatus = pStatus;
-      if (aq_data->pumps[i].pumpType == PT_UNKNOWN){
+  for (int i=0; i < aqdata->num_pumps; i++) {
+    if (aqdata->pumps[i].pumpIndex == pump_number) {
+      LOG(ONET_LOG,LOG_INFO, "Pump label: %s Index: %d, Number: %d, RPM: %d, Watts: %d, GPM: %d\n",aqdata->pumps[i].button->name, i ,pump_number,rpm,watts,gpm);
+      pump_update(aqdata, i);
+      SET_IF_CHANGED(aqdata->pumps[i].rpm, rpm, aqdata->is_dirty);
+      SET_IF_CHANGED(aqdata->pumps[i].watts, watts, aqdata->is_dirty);
+      SET_IF_CHANGED(aqdata->pumps[i].gpm, gpm, aqdata->is_dirty);
+      SET_IF_CHANGED(aqdata->pumps[i].pStatus, pStatus, aqdata->is_dirty);
+      if (aqdata->pumps[i].pumpType == PT_UNKNOWN){
         if (rsm_strcmp(_menu[menuLineIdx],"Intelliflo VS") == 0)
-          aq_data->pumps[i].pumpType = VSPUMP;
+          SET_IF_CHANGED(aqdata->pumps[i].pumpType, VSPUMP, aqdata->is_dirty);
         else if (rsm_strcmp(_menu[menuLineIdx],"Intelliflo VF") == 0)
-          aq_data->pumps[i].pumpType = VFPUMP;
+          SET_IF_CHANGED(aqdata->pumps[i].pumpType, VFPUMP, aqdata->is_dirty);
         else if (rsm_strcmp(_menu[menuLineIdx],"Jandy ePUMP") == 0 ||
                  rsm_strcmp(_menu[menuLineIdx],"ePump AC") == 0)
-          aq_data->pumps[i].pumpType = EPUMP;
+          SET_IF_CHANGED(aqdata->pumps[i].pumpType, EPUMP, aqdata->is_dirty);
 
-        LOG(ONET_LOG, LOG_INFO, "Pump index %d set PumpType to %d\n", i, aq_data->pumps[i].pumpType);
+        LOG(ONET_LOG, LOG_INFO, "Pump index %d set PumpType to %d\n", i, aqdata->pumps[i].pumpType);
       }
-      return true;
+      return aqdata->is_dirty;
     }
   }
   LOG(ONET_LOG,LOG_WARNING, "Could not find config for Pump %s, Number %d, RPM %d, Watts %d, GPM %d\n",_menu[menuLineIdx],pump_number,rpm,watts,gpm);
@@ -498,7 +498,7 @@ bool get_pumpinfo_from_menu(struct aqualinkdata *aq_data, int menuLineIdx, int p
          Info:   OneTouch Menu Line 2 =    Chemlink 1   
          Info:   OneTouch Menu Line 3 =  ORP 750/PH 7.0  
 */
-bool get_chemlinkinfo_from_menu(struct aqualinkdata *aq_data, int menuLineIdx)
+bool get_chemlinkinfo_from_menu(struct aqualinkdata *aqdata, int menuLineIdx)
 {
   if (rsm_strcmp(_menu[menuLineIdx + 1], "ORP") == 0)
   {
@@ -506,11 +506,10 @@ bool get_chemlinkinfo_from_menu(struct aqualinkdata *aq_data, int menuLineIdx)
     char *indx = strchr(_menu[menuLineIdx + 1], '/');
     float ph = atof(indx + 3);
     LOG(ONET_LOG, LOG_INFO, "Cemlink ORP = %d PH = %f\n", orp, ph);
-    if (aq_data->ph != ph || aq_data->orp != orp)
+    if (aqdata->ph != ph || aqdata->orp != orp)
     {
-      aq_data->ph = ph;
-      aq_data->orp = orp;
-      aq_data->updated = true;
+      SET_IF_CHANGED(aqdata->ph, ph, aqdata->is_dirty);
+      SET_IF_CHANGED(aqdata->orp, orp, aqdata->is_dirty);
       return true;
     }
     return false;
@@ -522,7 +521,7 @@ bool get_chemlinkinfo_from_menu(struct aqualinkdata *aq_data, int menuLineIdx)
 /* Get ORP and Ph from either chemlink or truesense
    ORP 750/PH 7.0
 */
-bool get_chemsensors_from_menu(struct aqualinkdata *aq_data, int menuLineIdx)
+bool get_chemsensors_from_menu(struct aqualinkdata *aqdata, int menuLineIdx)
 {
   char *oi = rsm_strncasestr(_menu[menuLineIdx], "ORP", AQ_MSGLEN);
   char *pi = rsm_strncasestr(_menu[menuLineIdx], "PH", AQ_MSGLEN);
@@ -530,13 +529,12 @@ bool get_chemsensors_from_menu(struct aqualinkdata *aq_data, int menuLineIdx)
     int orp = rsm_atoi(oi+4);
     float ph = rsm_atof(pi+3);
     if (orp > 0 && ph > 0) {
-      if (aq_data->ph != ph || aq_data->orp != orp) {
-        aq_data->ph = ph;
-        aq_data->orp = orp;
+      if (aqdata->ph != ph || aqdata->orp != orp) {
+        SET_IF_CHANGED(aqdata->ph, ph, aqdata->is_dirty);
+        SET_IF_CHANGED(aqdata->orp, orp, aqdata->is_dirty);
+        LOG(ONET_LOG,LOG_INFO, "Set Cem ORP = %d PH = %f from message '%s'\n",orp,ph,_menu[menuLineIdx]);
+        return true;
       }
-      aq_data->updated = true;
-      LOG(ONET_LOG,LOG_INFO, "Set Cem ORP = %d PH = %f from message '%s'\n",orp,ph,_menu[menuLineIdx]);
-      return true;
     } else {
           // Didn't understand message, not
       LOG(ONET_LOG,LOG_DEBUG, "Could not extract ORP & PH from message '%s'\n",_menu[menuLineIdx]);
@@ -550,25 +548,25 @@ bool get_chemsensors_from_menu(struct aqualinkdata *aq_data, int menuLineIdx)
     /* 
        Info:   OneTouch Menu Line 2 =   AQUAPURE 60%  
        Info:   OneTouch Menu Line 3 =  Salt 7600 PPM  */
-bool get_aquapureinfo_from_menu(struct aqualinkdata *aq_data, int menuLineIdx)
+bool get_aquapureinfo_from_menu(struct aqualinkdata *aqdata, int menuLineIdx)
 {
   bool rtn = false;
 
 #ifdef READ_SWG_FROM_EXTENDED_ID
 
   int swgp = atoi(&_menu[menuLineIdx][10]);
-  if (aq_data->swg_percent != swgp)
+  if (aqdata->swg_percent != swgp)
   {
-    changeSWGpercent(aq_data, swgp);
+    changeSWGpercent(aqdata, swgp);
     rtn = true;
   }
 
   if (rsm_strcmp(_menu[menuLineIdx+1], "Salt") == 0)
   {
     int ppm = atoi(&_menu[menuLineIdx+1][6]);
-    if (aq_data->swg_ppm != ppm)
+    if (aqdata->swg_ppm != ppm)
     {
-      aq_data->swg_ppm = ppm;
+      aqdata->swg_ppm = ppm;
       rtn = true;
     }
     LOG(ONET_LOG, LOG_INFO, "Aquapure SWG %d%, %d PPM\n", swgp, ppm);
@@ -580,16 +578,16 @@ bool get_aquapureinfo_from_menu(struct aqualinkdata *aq_data, int menuLineIdx)
 }
 
 
-bool get_RS16buttoninfo_from_menu(struct aqualinkdata *aq_data, int menuLineIdx)
+bool get_RS16buttoninfo_from_menu(struct aqualinkdata *aqdata, int menuLineIdx)
 {
-  for (int i = aq_data->rs16_vbutton_start; i <= aq_data->rs16_vbutton_end; i++)
+  for (int i = aqdata->rs16_vbutton_start; i <= aqdata->rs16_vbutton_end; i++)
   {
-    if (rsm_strcmp(_menu[menuLineIdx], aq_data->aqbuttons[i].label) == 0)
+    if (rsm_strcmp(_menu[menuLineIdx], aqdata->aqbuttons[i].label) == 0)
     {
       // Matched must be on.
-      LOG(ONET_LOG, LOG_INFO, "RS16 equiptment status '%s' matched '%s'\n", _menu[menuLineIdx], aq_data->aqbuttons[i].label);
-      rs16led_update(aq_data, i);
-      aq_data->aqbuttons[i].led->state = ON;
+      LOG(ONET_LOG, LOG_INFO, "RS16 equiptment status '%s' matched '%s'\n", _menu[menuLineIdx], aqdata->aqbuttons[i].label);
+      rs16led_update(aqdata, i);
+      SET_IF_CHANGED(aqdata->aqbuttons[i].led->state, ON, aqdata->is_dirty);
       return true;
     }
   }
@@ -613,7 +611,7 @@ bool get_RS16buttoninfo_from_menu(struct aqualinkdata *aq_data, int menuLineIdx)
  OneTouch Menu Line 10 = 
  OneTouch Menu Line 11 = 
 */
-bool log_qeuiptment_status_VP2(struct aqualinkdata *aq_data)
+bool log_qeuiptment_status_VP2(struct aqualinkdata *aqdata)
 {
   bool rtn = false;
   char *cidx = NULL;
@@ -627,24 +625,24 @@ bool log_qeuiptment_status_VP2(struct aqualinkdata *aq_data)
         rsm_strcmp(_menu[i], "Jandy ePUMP") == 0 ||
         rsm_strcmp(_menu[i], "ePump AC") == 0)
     {
-      rtn = get_pumpinfo_from_menu(aq_data, i);
+      rtn = get_pumpinfo_from_menu(aqdata, i);
     }*/
     if ( (cidx = rsm_charafterstr(_menu[i], "Intelliflo VS", AQ_MSGLEN)) != NULL ||
          (cidx = rsm_charafterstr(_menu[i], "Intelliflo VF", AQ_MSGLEN)) != NULL ||
          (cidx = rsm_charafterstr(_menu[i], "Jandy ePUMP", AQ_MSGLEN)) != NULL ||
          (cidx = rsm_charafterstr(_menu[i], "ePump AC", AQ_MSGLEN)) != NULL)
     {
-      rtn = get_pumpinfo_from_menu(aq_data, i, rsm_atoi(cidx));
+      rtn = get_pumpinfo_from_menu(aqdata, i, rsm_atoi(cidx));
     } else if (rsm_strcmp(_menu[2],"AQUAPURE") == 0) {
-      rtn = get_aquapureinfo_from_menu(aq_data, i);
+      rtn = get_aquapureinfo_from_menu(aqdata, i);
     } else if (rsm_strcmp(_menu[i],"Chemlink") == 0) {
-      rtn = get_chemlinkinfo_from_menu(aq_data, i);
+      rtn = get_chemlinkinfo_from_menu(aqdata, i);
     } else if (rsm_strcmp(_menu[i],"ORP") == 0) {
       // On iaqtouch TruSence does not state "Chemlink", simply OR / PH values in different format.
-      rtn = get_chemsensors_from_menu(aq_data, i);
+      rtn = get_chemsensors_from_menu(aqdata, i);
     } else if (PANEL_SIZE() >= 16 ) {
       // Loop over RS 16 buttons.
-      get_RS16buttoninfo_from_menu(aq_data, i);
+      get_RS16buttoninfo_from_menu(aqdata, i);
     }
 
   }
@@ -654,10 +652,10 @@ bool log_qeuiptment_status_VP2(struct aqualinkdata *aq_data)
 /*
 Newer panels have a page per device and specific lines with information
 */
-bool log_qeuiptment_status(struct aqualinkdata *aq_data)
+bool log_qeuiptment_status(struct aqualinkdata *aqdata)
 {
   if (_panel_version_P2)
-    return log_qeuiptment_status_VP2(aq_data);
+    return log_qeuiptment_status_VP2(aqdata);
 
   bool rtn = false;
   char *cidx = NULL;
@@ -666,25 +664,25 @@ bool log_qeuiptment_status(struct aqualinkdata *aq_data)
       rsm_strcmp(_menu[2],"Intelliflo VF") == 0 ||
       rsm_strcmp(_menu[2],"Jandy ePUMP") == 0 ||
       rsm_strcmp(_menu[2],"ePump AC") == 0) {
-    rtn = get_pumpinfo_from_menu(aq_data, 2);
+    rtn = get_pumpinfo_from_menu(aqdata, 2);
   } */
   if ( (cidx = rsm_charafterstr(_menu[2], "Intelliflo VS", AQ_MSGLEN)) != NULL ||
          (cidx = rsm_charafterstr(_menu[2], "Intelliflo VF", AQ_MSGLEN)) != NULL ||
          (cidx = rsm_charafterstr(_menu[2], "Jandy ePUMP", AQ_MSGLEN)) != NULL ||
          (cidx = rsm_charafterstr(_menu[2], "ePump AC", AQ_MSGLEN)) != NULL)
   {
-    rtn = get_pumpinfo_from_menu(aq_data, 2, rsm_atoi(cidx));
+    rtn = get_pumpinfo_from_menu(aqdata, 2, rsm_atoi(cidx));
   } else if (rsm_strcmp(_menu[2],"AQUAPURE") == 0) {
-    rtn = get_aquapureinfo_from_menu(aq_data, 2);
+    rtn = get_aquapureinfo_from_menu(aqdata, 2);
   } else if (rsm_strcmp(_menu[2],"Chemlink") == 0) {
-    rtn = get_chemlinkinfo_from_menu(aq_data, 2);
+    rtn = get_chemlinkinfo_from_menu(aqdata, 2);
   }
 
   else if (PANEL_SIZE() >= 16 ) { // This fails on RS4, comeback and find out why. // Run over devices that have no status LED's on RS12&16 panels.
   //else if ( 16 <= (int)PANEL_SIZE  ) {
     int i;
     for (i=2; i <= ONETOUCH_LINES; i++) {
-      get_RS16buttoninfo_from_menu(aq_data, i);
+      get_RS16buttoninfo_from_menu(aqdata, i);
     }
   }
 
@@ -724,7 +722,7 @@ ot_menu_type get_onetouch_menu_type()
   return OTM_UNKNOWN;
 }
 
-void pump_update(struct aqualinkdata *aq_data, int updated) {
+void pump_update(struct aqualinkdata *aqdata, int updated) {
   const int bitmask[MAX_PUMPS] = {1,2,4,8};
   static unsigned char updates = '\0';
   int i;
@@ -732,10 +730,10 @@ void pump_update(struct aqualinkdata *aq_data, int updated) {
   if (updated == -1) {
     for(i=0; i < MAX_PUMPS; i++) {
       if ((updates & bitmask[i]) != bitmask[i]) {
-        aq_data->pumps[i].rpm = PUMP_OFF_RPM;
-        aq_data->pumps[i].gpm = PUMP_OFF_GPM;
-        aq_data->pumps[i].watts = PUMP_OFF_WAT;
-        aq_data->pumps[i].pStatus = PS_OFF;
+        SET_IF_CHANGED(aqdata->pumps[i].rpm, PUMP_OFF_RPM, aqdata->is_dirty);
+        SET_IF_CHANGED(aqdata->pumps[i].gpm, PUMP_OFF_GPM, aqdata->is_dirty);
+        SET_IF_CHANGED(aqdata->pumps[i].watts, PUMP_OFF_WAT, aqdata->is_dirty);
+        SET_IF_CHANGED(aqdata->pumps[i].pStatus, PS_OFF, aqdata->is_dirty);
       }
     }
     updates = '\0';
@@ -745,7 +743,7 @@ void pump_update(struct aqualinkdata *aq_data, int updated) {
 }
 
 
-void rs16led_update(struct aqualinkdata *aq_data, int updated) {
+void rs16led_update(struct aqualinkdata *aqdata, int updated) {
   //LOG(ONET_LOG,LOG_INFO, "******* VLED check %d ******\n",updated);
   const int bitmask[4] = {1,2,4,8};
   static unsigned char updates = '\0';
@@ -755,22 +753,22 @@ void rs16led_update(struct aqualinkdata *aq_data, int updated) {
     return;
 
   if (updated == -1) {
-    for(i=aq_data->rs16_vbutton_start; i <= aq_data->rs16_vbutton_start; i++) {
-      if ((updates & bitmask[i-aq_data->rs16_vbutton_start]) != bitmask[i-aq_data->rs16_vbutton_end]) {
-        aq_data->aqbuttons[i].led->state = OFF;
+    for(i=aqdata->rs16_vbutton_start; i <= aqdata->rs16_vbutton_start; i++) {
+      if ((updates & bitmask[i-aqdata->rs16_vbutton_start]) != bitmask[i-aqdata->rs16_vbutton_end]) {
+        SET_IF_CHANGED(aqdata->aqbuttons[i].led->state, OFF, aqdata->is_dirty);
         //LOG(ONET_LOG,LOG_INFO, "******* Turning off VLED %d ******\n",i);
       }
     }
     updates = '\0';
-  } else if (updated >= aq_data->rs16_vbutton_start && updated <= aq_data->rs16_vbutton_end) {
-    updates |= bitmask[updated - aq_data->rs16_vbutton_start];
+  } else if (updated >= aqdata->rs16_vbutton_start && updated <= aqdata->rs16_vbutton_end) {
+    updates |= bitmask[updated - aqdata->rs16_vbutton_start];
     //LOG(ONET_LOG,LOG_INFO, "******* Updated VLED status %d ******\n",updated);
   }
 }
 
 
 
-bool new_menu(struct aqualinkdata *aq_data)
+bool new_menu(struct aqualinkdata *aqdata)
 {
   static bool initRS = false;
   bool rtn = false;
@@ -785,39 +783,39 @@ bool new_menu(struct aqualinkdata *aq_data)
       break;
     case OTM_EQUIPTMENT_STATUS:
       if (initRS == false) {
-        queueGetProgramData(ONETOUCH, aq_data);
+        queueGetProgramData(ONETOUCH, aqdata);
         initRS = true;
       }
-      rtn = log_qeuiptment_status(aq_data);
+      rtn = log_qeuiptment_status(aqdata);
       // Hit select to get to next menu ASAP.
-      if ( in_ot_programming_mode(aq_data) == false )
+      if ( in_ot_programming_mode(aqdata) == false )
         ot_queue_cmd(KEY_ONET_SELECT);
       break;
     case OTM_SET_TEMP:
-      rtn = log_heater_setpoints(aq_data);
+      rtn = log_heater_setpoints(aqdata);
     break;
     case OTM_FREEZE_PROTECT:
-      rtn = log_freeze_setpoints(aq_data);
+      rtn = log_freeze_setpoints(aqdata);
     break;
     case OTM_VERSION:
-      rtn = log_panelversion(aq_data);
+      rtn = log_panelversion(aqdata);
       LOG(ONET_LOG,LOG_DEBUG, "**** ONETOUCH INIT ****\n");
-      queueGetProgramData(ONETOUCH, aq_data);
+      queueGetProgramData(ONETOUCH, aqdata);
       //set_aqualink_onetouch_pool_heater_temp()
-      //aq_programmer(AQ_SET_ONETOUCH_POOL_HEATER_TEMP, "95", aq_data);
-      //aq_programmer(AQ_SET_ONETOUCH_SPA_HEATER_TEMP, "94", aq_data);
+      //aq_programmer(AQ_SET_ONETOUCH_POOL_HEATER_TEMP, "95", aqdata);
+      //aq_programmer(AQ_SET_ONETOUCH_SPA_HEATER_TEMP, "94", aqdata);
       initRS = true;
     break;
     default:
       break;
   }
 
-  if (last_menu_type == OTM_EQUIPTMENT_STATUS && menu_type != OTM_EQUIPTMENT_STATUS && !in_ot_programming_mode(aq_data) ) {
+  if (last_menu_type == OTM_EQUIPTMENT_STATUS && menu_type != OTM_EQUIPTMENT_STATUS && !in_ot_programming_mode(aqdata) ) {
     // End of equiptment status chain of menus, reset any pump that wasn't listed in menus as long as we are not in programming mode
-    pump_update(aq_data, -1);
+    pump_update(aqdata, -1);
 
     if (PANEL_SIZE() >= 16)
-      rs16led_update(aq_data, -1);
+      rs16led_update(aqdata, -1);
 
   }
 
@@ -872,7 +870,7 @@ void set_onetouch_lastmsg(unsigned char msgtype)
   _last_msg_type = msgtype;
 }
 
-bool process_onetouch_packet(unsigned char *packet, int length, struct aqualinkdata *aq_data)
+bool process_onetouch_packet(unsigned char *packet, int length, struct aqualinkdata *aqdata)
 {
   static bool filling_menu = false;
   bool rtn = false;
@@ -886,7 +884,7 @@ bool process_onetouch_packet(unsigned char *packet, int length, struct aqualinkd
   //LOG(ONET_LOG,LOG_DEBUG, "RS Received ONETOUCH 0x%02hhx\n", packet[PKT_CMD]);
   //debuglogPacket(packet, length);
 
-  process_onetouch_menu_packet(aq_data, packet, length);
+  process_onetouch_menu_packet(aqdata, packet, length);
 
   // Check for new menu.  
   // Usually PDA_CLEAR bunch of CMD_MSG_LONG then a CMD_PDA_HIGHLIGHT or CMD_PDA_HIGHLIGHTCHARS
@@ -900,7 +898,7 @@ bool process_onetouch_packet(unsigned char *packet, int length, struct aqualinkd
       )
   {
     filling_menu = false;
-    rtn = new_menu(aq_data);
+    rtn = new_menu(aqdata);
     _last_kick_type = KICKT_MENU;
   } else {
     _last_kick_type = KICKT_CMD;
@@ -913,7 +911,7 @@ bool process_onetouch_packet(unsigned char *packet, int length, struct aqualinkd
 /*
   //if (_last_msg_type == CMD_MSG_LONG && packet[PKT_CMD] != CMD_MSG_LONG) {
   if (_last_msg_type == CMD_MSG_LONG && ( packet[PKT_CMD] != CMD_MSG_LONG && packet[PKT_CMD] != CMD_PDA_HIGHLIGHTCHARS) ) { // CMD_PDA_SHIFTLINES
-    rtn = new_menu(aq_data);
+    rtn = new_menu(aqdata);
     _last_kick_type = KICKT_MENU;
   } else {
     _last_kick_type = KICKT_CMD;
@@ -938,8 +936,8 @@ bool process_onetouch_packet(unsigned char *packet, int length, struct aqualinkd
 
   //debuglogPacket(packet, length);
 
-  //if ( in_ot_programming_mode(aq_data) == true )
-    kick_aq_program_thread(aq_data, ONETOUCH);
+  //if ( in_ot_programming_mode(aqdata) == true )
+    kick_aq_program_thread(aqdata, ONETOUCH);
 /*
   switch (packet[PKT_CMD])
   {

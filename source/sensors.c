@@ -39,7 +39,7 @@ struct sensorthread {
   pthread_t thread_id;
   pthread_mutex_t thread_mutex;
   pthread_cond_t thread_cond;
-  struct aqualinkdata *aq_data;
+  struct aqualinkdata *aqdata;
   struct timespec timeout;
 };
 
@@ -50,14 +50,16 @@ void *sensors_worker( void *ptr );
 void stop_sensors_thread() {
   LOG(AQUA_LOG, LOG_INFO, "Stopping sensor thread\n");
 
-  pthread_cond_broadcast(&_sthread->thread_cond);
+  if (_sthread != NULL)
+    pthread_cond_broadcast(&_sthread->thread_cond);
+
 }
 
-void start_sensors_thread(struct aqualinkdata *aq_data) {
+void start_sensors_thread(struct aqualinkdata *aqdata) {
 
   _sthread = calloc(1, sizeof(struct sensorthread));
 
-  _sthread->aq_data = aq_data;
+  _sthread->aqdata = aqdata;
   _sthread->thread_id = 0;
 
   if( pthread_create( &_sthread->thread_id , NULL ,  sensors_worker, (void*)_sthread) < 0) {
@@ -87,10 +89,10 @@ void *sensors_worker( void *ptr )
       break;
     }
 
-    for (int i=0; i < sthread->aq_data->num_sensors; i++) {
-      //LOG(AQUA_LOG, LOG_DEBUG, "Sensor thread reading %s\n",sthread->aq_data->sensors[i].label);
-      if (read_sensor(&sthread->aq_data->sensors[i]) ) {
-        sthread->aq_data->updated = true;
+    for (int i=0; i < sthread->aqdata->num_sensors; i++) {
+      //LOG(AQUA_LOG, LOG_DEBUG, "Sensor thread reading %s\n",sthread->aqdata->sensors[i].label);
+      if (read_sensor(&sthread->aqdata->sensors[i]) ) {
+        SET_DIRTY(sthread->aqdata->is_dirty);
       }
     }
 

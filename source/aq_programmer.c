@@ -48,7 +48,7 @@
   #include "timespec_subtract.h"
 #endif
 
-void _aq_programmer(program_type r_type, char *args, struct aqualinkdata *aq_data, bool allowOveride);
+void _aq_programmer(program_type r_type, char *args, struct aqualinkdata *aqdata, bool allowOveride);
 
 
 // Lookup table for programming function to protocal we will use for programming panel
@@ -245,7 +245,7 @@ int setpoint_check(int type, int value, struct aqualinkdata *aqdata)
   Figure out the fastest way in get all needed startup data depending on what protocols
   are available and what's just called us
 */
-void queueGetProgramData(emulation_type source_type, struct aqualinkdata *aq_data)
+void queueGetProgramData(emulation_type source_type, struct aqualinkdata *aqdata)
 {
    LOG(PROG_LOG, LOG_INFO, "Initial setup call from %s with RSSA=%s ONETouch=%s IAQTouch=%s ExtendedProgramming=%s\n",
       (source_type == ALLBUTTON)?"AllButton":((source_type == RSSADAPTER)?"RSSA":((source_type == ONETOUCH)?"OneTouch":((source_type == IAQTOUCH)?"IAQTouch":"PDA"))),
@@ -258,78 +258,78 @@ void queueGetProgramData(emulation_type source_type, struct aqualinkdata *aq_dat
   if (isRSSA_ENABLED && isEXTP_ENABLED == true) {
     // serial adapter enabled and extended programming
     if (source_type == RSSADAPTER) {
-      _aq_programmer(AQ_GET_RSSADAPTER_SETPOINTS, NULL, aq_data, false);
+      _aq_programmer(AQ_GET_RSSADAPTER_SETPOINTS, NULL, aqdata, false);
     } else if (source_type == ONETOUCH && isEXTP_ENABLED) {
-      //_aq_programmer(AQ_GET_ONETOUCH_FREEZEPROTECT, NULL, aq_data, false); // Add back and remove below once tested and working
-      //_aq_programmer(AQ_GET_ONETOUCH_SETPOINTS, NULL, aq_data, false);
+      //_aq_programmer(AQ_GET_ONETOUCH_FREEZEPROTECT, NULL, aqdata, false); // Add back and remove below once tested and working
+      //_aq_programmer(AQ_GET_ONETOUCH_SETPOINTS, NULL, aqdata, false);
     } else if (source_type == IAQTOUCH && isEXTP_ENABLED) {
-      //_aq_programmer(AQ_GET_IAQTOUCH_FREEZEPROTECT, NULL, aq_data, false); // Add back and remove below once tested and working
-      //_aq_programmer(AQ_GET_IAQTOUCH_SETPOINTS, NULL, aq_data, false); // This get's freeze & heaters, we should just get freeze if isRSSA_ENABLED
+      //_aq_programmer(AQ_GET_IAQTOUCH_FREEZEPROTECT, NULL, aqdata, false); // Add back and remove below once tested and working
+      //_aq_programmer(AQ_GET_IAQTOUCH_SETPOINTS, NULL, aqdata, false); // This get's freeze & heaters, we should just get freeze if isRSSA_ENABLED
       if (ENABLE_CHILLER) {
         // Need to get setpoints for chiller.
-        _aq_programmer(AQ_GET_IAQTOUCH_SETPOINTS, NULL, aq_data, false);
+        _aq_programmer(AQ_GET_IAQTOUCH_SETPOINTS, NULL, aqdata, false);
       }
     } else if (source_type == ALLBUTTON) {
-      _aq_programmer(AQ_GET_FREEZE_PROTECT_TEMP, NULL, aq_data, false); // This is still quicker that IAQ or ONE Touch protocols at the moment.
+      _aq_programmer(AQ_GET_FREEZE_PROTECT_TEMP, NULL, aqdata, false); // This is still quicker that IAQ or ONE Touch protocols at the moment.
       if (_aqconfig_.use_panel_aux_labels) {
-        _aq_programmer(AQ_GET_AUX_LABELS, NULL, aq_data, false);
+        _aq_programmer(AQ_GET_AUX_LABELS, NULL, aqdata, false);
       }
     }
   } else if (isRSSA_ENABLED && isEXTP_ENABLED == false) {
     // serial adapter enabled with no extended programming
      if (source_type == RSSADAPTER) {
-      _aq_programmer(AQ_GET_RSSADAPTER_SETPOINTS, NULL, aq_data, false);
+      _aq_programmer(AQ_GET_RSSADAPTER_SETPOINTS, NULL, aqdata, false);
     } else if (source_type == ALLBUTTON) {
-      _aq_programmer(AQ_GET_FREEZE_PROTECT_TEMP, NULL, aq_data, false);
+      _aq_programmer(AQ_GET_FREEZE_PROTECT_TEMP, NULL, aqdata, false);
       if (_aqconfig_.use_panel_aux_labels) {
-        _aq_programmer(AQ_GET_AUX_LABELS, NULL, aq_data, false);
+        _aq_programmer(AQ_GET_AUX_LABELS, NULL, aqdata, false);
       }
     }
   } else if (!isRSSA_ENABLED && isEXTP_ENABLED && isONET_ENABLED) {
     // One touch extended and no serial adapter
     if (source_type == ONETOUCH) {
-      _aq_programmer(AQ_GET_ONETOUCH_SETPOINTS, NULL, aq_data, false);
+      _aq_programmer(AQ_GET_ONETOUCH_SETPOINTS, NULL, aqdata, false);
     } else if (source_type == ALLBUTTON) {
       if (_aqconfig_.use_panel_aux_labels) {
-        _aq_programmer(AQ_GET_AUX_LABELS, NULL, aq_data, false);
+        _aq_programmer(AQ_GET_AUX_LABELS, NULL, aqdata, false);
       }
     }
   } else if (!isRSSA_ENABLED && isEXTP_ENABLED && isIAQT_ENABLED) {
     // IAQ touch extended and no serial adapter
     if (source_type == IAQTOUCH) {
-      _aq_programmer(AQ_GET_IAQTOUCH_SETPOINTS, NULL, aq_data, false);
+      _aq_programmer(AQ_GET_IAQTOUCH_SETPOINTS, NULL, aqdata, false);
     } else if (source_type == ALLBUTTON) {
       if (_aqconfig_.use_panel_aux_labels) {
-        _aq_programmer(AQ_GET_AUX_LABELS, NULL, aq_data, false);
+        _aq_programmer(AQ_GET_AUX_LABELS, NULL, aqdata, false);
       }
     }
 #ifdef AQ_PDA
   } else if ( isPDA_PANEL && source_type == AQUAPDA) {
-    aq_programmer(AQ_PDA_INIT, NULL, aq_data);
+    aq_programmer(AQ_PDA_INIT, NULL, aqdata);
   } else if ( isPDA_PANEL && source_type == IAQTOUCH) {
-    //aq_programmer(AQ_PDA_INIT, NULL, aq_data);
+    //aq_programmer(AQ_PDA_INIT, NULL, aqdata);
     if (_aqconfig_.use_panel_aux_labels) {
-      aq_programmer(AQ_GET_AUX_LABELS, NULL, aq_data);
+      aq_programmer(AQ_GET_AUX_LABELS, NULL, aqdata);
     }
-    aq_programmer(AQ_GET_IAQTOUCH_SETPOINTS, NULL, aq_data);
+    aq_programmer(AQ_GET_IAQTOUCH_SETPOINTS, NULL, aqdata);
     
 #endif
   } else { // Must be all button only
-    aq_programmer(AQ_GET_POOL_SPA_HEATER_TEMPS, NULL, aq_data);
-    aq_programmer(AQ_GET_FREEZE_PROTECT_TEMP, NULL, aq_data);
+    aq_programmer(AQ_GET_POOL_SPA_HEATER_TEMPS, NULL, aqdata);
+    aq_programmer(AQ_GET_FREEZE_PROTECT_TEMP, NULL, aqdata);
     if (_aqconfig_.use_panel_aux_labels) {
-      aq_programmer(AQ_GET_AUX_LABELS, NULL, aq_data);
+      aq_programmer(AQ_GET_AUX_LABELS, NULL, aqdata);
     }
   }
 }
 
 
-bool in_light_programming_mode(struct aqualinkdata *aq_data)
+bool in_light_programming_mode(struct aqualinkdata *aqdata)
 {
-  if ( ( aq_data->active_thread.thread_id != 0 ) &&
-       ( aq_data->active_thread.ptype == AQ_SET_LIGHTPROGRAM_MODE ||
-         aq_data->active_thread.ptype == AQ_SET_LIGHTCOLOR_MODE ||
-         aq_data->active_thread.ptype == AQ_SET_IAQTOUCH_LIGHTCOLOR_MODE)
+  if ( ( aqdata->active_thread.thread_id != 0 ) &&
+       ( aqdata->active_thread.ptype == AQ_SET_LIGHTPROGRAM_MODE ||
+         aqdata->active_thread.ptype == AQ_SET_LIGHTCOLOR_MODE ||
+         aqdata->active_thread.ptype == AQ_SET_IAQTOUCH_LIGHTCOLOR_MODE)
   ) {
     return true;
   }
@@ -337,15 +337,15 @@ bool in_light_programming_mode(struct aqualinkdata *aq_data)
   return false;
 }
 
-bool in_swg_programming_mode(struct aqualinkdata *aq_data)
+bool in_swg_programming_mode(struct aqualinkdata *aqdata)
 {
-  if ( ( aq_data->active_thread.thread_id != 0 ) &&
-       ( aq_data->active_thread.ptype == AQ_SET_ONETOUCH_SWG_PERCENT ||
-         aq_data->active_thread.ptype == AQ_SET_IAQTOUCH_SWG_PERCENT ||
-         aq_data->active_thread.ptype == AQ_SET_SWG_PERCENT ||
-         aq_data->active_thread.ptype == AQ_SET_ONETOUCH_BOOST ||
-         aq_data->active_thread.ptype == AQ_SET_IAQTOUCH_SWG_BOOST ||
-         aq_data->active_thread.ptype == AQ_SET_BOOST)
+  if ( ( aqdata->active_thread.thread_id != 0 ) &&
+       ( aqdata->active_thread.ptype == AQ_SET_ONETOUCH_SWG_PERCENT ||
+         aqdata->active_thread.ptype == AQ_SET_IAQTOUCH_SWG_PERCENT ||
+         aqdata->active_thread.ptype == AQ_SET_SWG_PERCENT ||
+         aqdata->active_thread.ptype == AQ_SET_ONETOUCH_BOOST ||
+         aqdata->active_thread.ptype == AQ_SET_IAQTOUCH_SWG_BOOST ||
+         aqdata->active_thread.ptype == AQ_SET_BOOST)
   ) {
     return true;
   }
@@ -353,31 +353,31 @@ bool in_swg_programming_mode(struct aqualinkdata *aq_data)
   return false;
 }
 
-bool in_ot_programming_mode(struct aqualinkdata *aq_data)
+bool in_ot_programming_mode(struct aqualinkdata *aqdata)
 {
-  if ( aq_data->active_thread.thread_id != 0 &&
-       aq_data->active_thread.ptype >= AQP_ONETOUCH_MIN && 
-       aq_data->active_thread.ptype <= AQP_ONETOUCH_MAX) {
+  if ( aqdata->active_thread.thread_id != 0 &&
+       aqdata->active_thread.ptype >= AQP_ONETOUCH_MIN && 
+       aqdata->active_thread.ptype <= AQP_ONETOUCH_MAX) {
     return true;
   }
   return false;
 }
 
-bool in_iaqt_programming_mode(struct aqualinkdata *aq_data)
+bool in_iaqt_programming_mode(struct aqualinkdata *aqdata)
 {
-  if ( aq_data->active_thread.thread_id != 0 &&
-       aq_data->active_thread.ptype >= AQP_IAQTOUCH_MIN && 
-       aq_data->active_thread.ptype <= AQP_IAQTOUCH_MAX) {
+  if ( aqdata->active_thread.thread_id != 0 &&
+       aqdata->active_thread.ptype >= AQP_IAQTOUCH_MIN && 
+       aqdata->active_thread.ptype <= AQP_IAQTOUCH_MAX) {
     return true;
   }
   return false;
 }
 
-bool in_allb_programming_mode(struct aqualinkdata *aq_data)
+bool in_allb_programming_mode(struct aqualinkdata *aqdata)
 {
-  if ( aq_data->active_thread.thread_id != 0 &&
-       aq_data->active_thread.ptype >= AQP_ALLBUTTON_MIN && 
-       aq_data->active_thread.ptype <= AQP_ALLBUTTONL_MAX) {
+  if ( aqdata->active_thread.thread_id != 0 &&
+       aqdata->active_thread.ptype >= AQP_ALLBUTTON_MIN && 
+       aqdata->active_thread.ptype <= AQP_ALLBUTTONL_MAX) {
     return true;
   }
   return false;
@@ -406,66 +406,66 @@ emulation_type get_programming_mode(program_type type)
   return SIM_NONE;
 }
 
-emulation_type get_current_programming_mode(struct aqualinkdata *aq_data)
+emulation_type get_current_programming_mode(struct aqualinkdata *aqdata)
 {
-  if ( !in_programming_mode(aq_data) ) {
+  if ( !in_programming_mode(aqdata) ) {
      return SIM_NONE;
   }
   
-  return get_programming_mode(aq_data->active_thread.ptype);
+  return get_programming_mode(aqdata->active_thread.ptype);
 }
 
 
-bool in_programming_mode(struct aqualinkdata *aq_data)
+bool in_programming_mode(struct aqualinkdata *aqdata)
 {
-  if ( aq_data->active_thread.thread_id != 0 ) {
+  if ( aqdata->active_thread.thread_id != 0 ) {
      return true;
   }
 
   return false;
 }
 
-void kick_aq_program_thread(struct aqualinkdata *aq_data, emulation_type source_type)
+void kick_aq_program_thread(struct aqualinkdata *aqdata, emulation_type source_type)
 {
-  if ( aq_data->active_thread.thread_id != 0 ) {
-    if ( (source_type == ONETOUCH) && in_ot_programming_mode(aq_data))
+  if ( aqdata->active_thread.thread_id != 0 ) {
+    if ( (source_type == ONETOUCH) && in_ot_programming_mode(aqdata))
     {
-      LOG(ONET_LOG, LOG_DEBUG, "Kicking OneTouch thread %d,%p\n",aq_data->active_thread.ptype, aq_data->active_thread.thread_id);
-      pthread_cond_broadcast(&aq_data->active_thread.thread_cond);   
+      LOG(ONET_LOG, LOG_DEBUG, "Kicking OneTouch thread %d,%p\n",aqdata->active_thread.ptype, aqdata->active_thread.thread_id);
+      pthread_cond_broadcast(&aqdata->active_thread.thread_cond);   
     } 
-    else if (source_type == IAQTOUCH && in_iaqt_programming_mode(aq_data)) {
-      LOG(IAQT_LOG, LOG_DEBUG, "Kicking IAQ Touch thread %d,%p\n",aq_data->active_thread.ptype, aq_data->active_thread.thread_id);
-      pthread_cond_broadcast(&aq_data->active_thread.thread_cond);  
+    else if (source_type == IAQTOUCH && in_iaqt_programming_mode(aqdata)) {
+      LOG(IAQT_LOG, LOG_DEBUG, "Kicking IAQ Touch thread %d,%p\n",aqdata->active_thread.ptype, aqdata->active_thread.thread_id);
+      pthread_cond_broadcast(&aqdata->active_thread.thread_cond);  
     }
-    else if (source_type == ALLBUTTON && !in_ot_programming_mode(aq_data) && !in_iaqt_programming_mode(aq_data)) {
-      LOG(PROG_LOG, LOG_DEBUG, "Kicking RS Allbutton thread %d,%p message '%s'\n",aq_data->active_thread.ptype, aq_data->active_thread.thread_id,aq_data->last_message);
-      pthread_cond_broadcast(&aq_data->active_thread.thread_cond);  
+    else if (source_type == ALLBUTTON && !in_ot_programming_mode(aqdata) && !in_iaqt_programming_mode(aqdata)) {
+      LOG(PROG_LOG, LOG_DEBUG, "Kicking RS Allbutton thread %d,%p message '%s'\n",aqdata->active_thread.ptype, aqdata->active_thread.thread_id,aqdata->last_message);
+      pthread_cond_broadcast(&aqdata->active_thread.thread_cond);  
     }
 #ifdef AQ_PDA
-    else if (source_type == AQUAPDA && !in_ot_programming_mode(aq_data)) {
-      LOG(PDA_LOG, LOG_DEBUG, "Kicking PDA thread %d,%p\n",aq_data->active_thread.ptype, aq_data->active_thread.thread_id);
-      pthread_cond_broadcast(&aq_data->active_thread.thread_cond);  
+    else if (source_type == AQUAPDA && !in_ot_programming_mode(aqdata)) {
+      LOG(PDA_LOG, LOG_DEBUG, "Kicking PDA thread %d,%p\n",aqdata->active_thread.ptype, aqdata->active_thread.thread_id);
+      pthread_cond_broadcast(&aqdata->active_thread.thread_cond);  
     }
 #endif     
   }
 }
 
-void _aq_programmer_(program_type r_type, char *args, aqkey *button, int value, int alt_value, struct aqualinkdata *aq_data, bool allowOveride);
+void _aq_programmer_(program_type r_type, char *args, aqkey *button, int value, int alt_value, struct aqualinkdata *aqdata, bool allowOveride);
 
-void aq_program(program_type r_type, aqkey *button, int value, int alt_value, struct aqualinkdata *aq_data){
-  _aq_programmer_(r_type, NULL, button, value, alt_value, aq_data, true);
+void aq_program(program_type r_type, aqkey *button, int value, int alt_value, struct aqualinkdata *aqdata){
+  _aq_programmer_(r_type, NULL, button, value, alt_value, aqdata, true);
 }
 
-void aq_programmer(program_type r_type, char *args, struct aqualinkdata *aq_data){
-  _aq_programmer(r_type, args, aq_data, true);
+void aq_programmer(program_type r_type, char *args, struct aqualinkdata *aqdata){
+  _aq_programmer(r_type, args, aqdata, true);
 }
 
-void _aq_programmer(program_type r_type, char *args, struct aqualinkdata *aq_data, bool allowOveride)
+void _aq_programmer(program_type r_type, char *args, struct aqualinkdata *aqdata, bool allowOveride)
 {
-  _aq_programmer_(r_type, args, NULL, -1, -1, aq_data, allowOveride);
+  _aq_programmer_(r_type, args, NULL, -1, -1, aqdata, allowOveride);
 }
 
-void _aq_programmer_(program_type r_type, char *args, aqkey *button, int value, int alt_value, struct aqualinkdata *aq_data, bool allowOveride)
+void _aq_programmer_(program_type r_type, char *args, aqkey *button, int value, int alt_value, struct aqualinkdata *aqdata, bool allowOveride)
 {
   struct programmingThreadCtrl *programmingthread = malloc(sizeof(struct programmingThreadCtrl));
 
@@ -654,7 +654,7 @@ void _aq_programmer_(program_type r_type, char *args, aqkey *button, int value, 
 
   LOG(PROG_LOG, LOG_NOTICE, "Starting programming thread '%s'\n",ptypeName(type));
 
-  programmingthread->aq_data = aq_data;
+  programmingthread->aqdata = aqdata;
   programmingthread->thread_id = 0;
   //programmingthread->thread_args = args;
   if (args != NULL /*&& type != AQ_SEND_CMD*/)
@@ -671,19 +671,19 @@ void _aq_programmer_(program_type r_type, char *args, aqkey *button, int value, 
       return; // No need to create this as thread.
       break;
     case AQ_SET_RSSADAPTER_POOL_HEATER_TEMP:
-      set_aqualink_rssadapter_pool_setpoint(args, aq_data);
+      set_aqualink_rssadapter_pool_setpoint(args, aqdata);
       return; // No need to create this as thread.
       break;
     case AQ_SET_RSSADAPTER_SPA_HEATER_TEMP:
-      set_aqualink_rssadapter_spa_setpoint(args, aq_data);
+      set_aqualink_rssadapter_spa_setpoint(args, aqdata);
       return; // No need to create this as thread.
       break;
     case AQ_ADD_RSSADAPTER_POOL_HEATER_TEMP:
-      increase_aqualink_rssadapter_pool_setpoint(args, aq_data);
+      increase_aqualink_rssadapter_pool_setpoint(args, aqdata);
       return; // No need to create this as thread.
       break;
     case AQ_ADD_RSSADAPTER_SPA_HEATER_TEMP:
-      increase_aqualink_rssadapter_spa_setpoint(args, aq_data);
+      increase_aqualink_rssadapter_spa_setpoint(args, aqdata);
       return; // No need to create this as thread.
       break;
     case AQ_SET_IAQLINK_POOL_HEATER_TEMP:
@@ -735,63 +735,64 @@ void waitForSingleThreadOrTerminate(struct programmingThreadCtrl *threadCtrl, pr
     pthread_exit(0);
   }
 */
-  while ( (threadCtrl->aq_data->active_thread.thread_id != 0) && ( i++ <= tries) ) {
-    //LOG(PROG_LOG, LOG_DEBUG, "Thread %d sleeping, waiting for thread %d to finish\n", threadCtrl->thread_id, threadCtrl->aq_data->active_thread.thread_id);
+  while ( (threadCtrl->aqdata->active_thread.thread_id != 0) && ( i++ <= tries) ) {
+    //LOG(PROG_LOG, LOG_DEBUG, "Thread %d sleeping, waiting for thread %d to finish\n", threadCtrl->thread_id, threadCtrl->aqdata->active_thread.thread_id);
     LOG(PROG_LOG, LOG_DEBUG, "Thread %p (%s) sleeping, waiting for thread %p (%s) to finish\n",
                 &threadCtrl->thread_id, ptypeName(type),
-                threadCtrl->aq_data->active_thread.thread_id, ptypeName(threadCtrl->aq_data->active_thread.ptype));
+                threadCtrl->aqdata->active_thread.thread_id, ptypeName(threadCtrl->aqdata->active_thread.ptype));
     sleep(waitTime);
   }
   
   if (i >= tries) {
     //LOG(PROG_LOG, LOG_ERR, "Thread %d timeout waiting, ending\n",threadCtrl->thread_id);
     LOG(PROG_LOG, LOG_ERR, "Thread (%s) %p timeout waiting for thread (%s) %p to finish\n",
-                ptypeName(type), &threadCtrl->thread_id, ptypeName(threadCtrl->aq_data->active_thread.ptype),
-                threadCtrl->aq_data->active_thread.thread_id);
+                ptypeName(type), &threadCtrl->thread_id, ptypeName(threadCtrl->aqdata->active_thread.ptype),
+                threadCtrl->aqdata->active_thread.thread_id);
     free(threadCtrl);
     pthread_exit(0);
   }
  
   // Clear out any messages to the UI.
-  threadCtrl->aq_data->last_display_message[0] = '\0';
-  threadCtrl->aq_data->active_thread.thread_id = &threadCtrl->thread_id;
-  threadCtrl->aq_data->active_thread.ptype = type;
+  threadCtrl->aqdata->last_display_message[0] = '\0';
+  threadCtrl->aqdata->active_thread.thread_id = &threadCtrl->thread_id;
+  threadCtrl->aqdata->active_thread.ptype = type;
 
   #ifdef AQ_DEBUG
-    clock_gettime(CLOCK_REALTIME, &threadCtrl->aq_data->start_active_time);
+    clock_gettime(CLOCK_REALTIME, &threadCtrl->aqdata->start_active_time);
   #endif
 
-  LOG(PROG_LOG, LOG_INFO, "Programming: %s, %d\n", ptypeName(threadCtrl->aq_data->active_thread.ptype), threadCtrl->aq_data->active_thread.ptype);
+  LOG(PROG_LOG, LOG_INFO, "Programming: %s, %d\n", ptypeName(threadCtrl->aqdata->active_thread.ptype), threadCtrl->aqdata->active_thread.ptype);
 
   LOG(PROG_LOG, LOG_DEBUG, "Thread %d,%p is active (%s)\n",
-              threadCtrl->aq_data->active_thread.ptype,
-              threadCtrl->aq_data->active_thread.thread_id,
-              ptypeName(threadCtrl->aq_data->active_thread.ptype));
+              threadCtrl->aqdata->active_thread.ptype,
+              threadCtrl->aqdata->active_thread.thread_id,
+              ptypeName(threadCtrl->aqdata->active_thread.ptype));
 }
 
 void cleanAndTerminateThread(struct programmingThreadCtrl *threadCtrl)
 {
   //waitfor_queue2empty();
   #ifndef AQ_DEBUG
-  LOG(PROG_LOG, LOG_DEBUG, "Thread %d,%p (%s) finished\n",threadCtrl->aq_data->active_thread.ptype, threadCtrl->thread_id,ptypeName(threadCtrl->aq_data->active_thread.ptype));
+  LOG(PROG_LOG, LOG_DEBUG, "Thread %d,%p (%s) finished\n",threadCtrl->aqdata->active_thread.ptype, threadCtrl->thread_id,ptypeName(threadCtrl->aqdata->active_thread.ptype));
   #else
   struct timespec elapsed;
-  clock_gettime(CLOCK_REALTIME, &threadCtrl->aq_data->last_active_time);
-  timespec_subtract(&elapsed, &threadCtrl->aq_data->last_active_time, &threadCtrl->aq_data->start_active_time);
+  clock_gettime(CLOCK_REALTIME, &threadCtrl->aqdata->last_active_time);
+  timespec_subtract(&elapsed, &threadCtrl->aqdata->last_active_time, &threadCtrl->aqdata->start_active_time);
   LOG(PROG_LOG, LOG_NOTICE, "Thread %d,%p (%s) finished in %d.%03ld sec\n",
-             threadCtrl->aq_data->active_thread.ptype,
-             threadCtrl->aq_data->active_thread.thread_id,
-             ptypeName(threadCtrl->aq_data->active_thread.ptype),
+             threadCtrl->aqdata->active_thread.ptype,
+             threadCtrl->aqdata->active_thread.thread_id,
+             ptypeName(threadCtrl->aqdata->active_thread.ptype),
              elapsed.tv_sec, elapsed.tv_nsec / 1000000L);
   #endif
 
   // Quick delay to allow for last message to be sent.
   delay(500);
-  threadCtrl->aq_data->active_thread.thread_id = 0;
-  threadCtrl->aq_data->active_thread.ptype = AQP_NULL;
+  threadCtrl->aqdata->active_thread.thread_id = 0;
+  threadCtrl->aqdata->active_thread.ptype = AQP_NULL;
   threadCtrl->thread_id = 0;
   // Force update, change display message
-  threadCtrl->aq_data->updated = true;
+  //threadCtrl->aqdata->is_dirty = true;
+  SET_DIRTY(threadCtrl->aqdata->is_dirty);
   free(threadCtrl);
   pthread_exit(0);
 }

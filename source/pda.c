@@ -207,8 +207,7 @@ void equiptment_update_cycle(int eqID) {
     //for (i=0; i < _aqualink_data->total_buttons; i++) { // total_buttons - 2 because we don't get heaters in this cycle
       if ((update_equiptment_bitmask & (1 << (i))) != (1 << (i))) {
         if (_aqualink_data->aqbuttons[i].led->state != OFF) {
-          _aqualink_data->aqbuttons[i].led->state = OFF;
-          _aqualink_data->updated = true;
+          SET_IF_CHANGED(_aqualink_data->aqbuttons[i].led->state, OFF, _aqualink_data->is_dirty);
           LOG(PDA_LOG,LOG_DEBUG, "Turn off equipment id %d %s not seen in last cycle\n", i, _aqualink_data->aqbuttons[i].name);
         }
         //LOG(PDA_LOG,LOG_DEBUG, "Thick id %d %s total = %d\n", i, _aqualink_data->aqbuttons[i].name, _aqualink_data->total_buttons);
@@ -218,7 +217,7 @@ void equiptment_update_cycle(int eqID) {
     if ((_aqualink_data->frz_protect_state == ON) &&
         (! (update_equiptment_bitmask & (1 << PDA_FREEZE_PROTECT_INDEX)))) {
         LOG(PDA_LOG,LOG_DEBUG, "Turn off freeze protect not seen in last cycle\n");
-       _aqualink_data->frz_protect_state = ENABLE;
+       SET_IF_CHANGED(_aqualink_data->frz_protect_state, ENABLE, _aqualink_data->is_dirty);
     }
 
     if ((_aqualink_data->boost) &&
@@ -259,30 +258,30 @@ void process_pda_packet_msg_long_temp(const char *msg)
   //           'AIR        WATER'  // In case of single device.
   if (_aqualink_data->temp_units == UNKNOWN && !in_programming_mode(_aqualink_data)) {
     LOG(PDA_LOG,LOG_NOTICE, "Forcing temperature units to FAHRENHEIT\n");
-    _aqualink_data->temp_units = FAHRENHEIT; // Force FAHRENHEIT
+    SET_IF_CHANGED(_aqualink_data->temp_units, FAHRENHEIT, _aqualink_data->is_dirty); // Force FAHRENHEIT
   }
   if (stristr(pda_m_line(1), "AIR") != NULL)
-    _aqualink_data->air_temp = atoi(msg);
+    SET_IF_CHANGED(_aqualink_data->air_temp, atoi(msg), _aqualink_data->is_dirty);
 
   if (stristr(pda_m_line(1), "SPA") != NULL)
   {
-    _aqualink_data->spa_temp = atoi(msg + 4);
-    _aqualink_data->pool_temp = TEMP_UNKNOWN;
+    SET_IF_CHANGED(_aqualink_data->spa_temp, atoi(msg + 4), _aqualink_data->is_dirty);
+    SET_IF_CHANGED(_aqualink_data->pool_temp, TEMP_UNKNOWN, _aqualink_data->is_dirty);
   }
   else if (stristr(pda_m_line(1), "POOL") != NULL)
   {
-    _aqualink_data->pool_temp = atoi(msg + 7);
-    _aqualink_data->spa_temp = TEMP_UNKNOWN;
+    SET_IF_CHANGED(_aqualink_data->pool_temp, atoi(msg + 7), _aqualink_data->is_dirty);
+    SET_IF_CHANGED(_aqualink_data->spa_temp, TEMP_UNKNOWN, _aqualink_data->is_dirty);
   }
   else if (stristr(pda_m_line(1), "WATER") != NULL)
   {
-    _aqualink_data->pool_temp = atoi(msg + 7);
-    _aqualink_data->spa_temp = TEMP_UNKNOWN;
+    SET_IF_CHANGED(_aqualink_data->pool_temp, atoi(msg + 7), _aqualink_data->is_dirty);
+    SET_IF_CHANGED(_aqualink_data->spa_temp, TEMP_UNKNOWN, _aqualink_data->is_dirty);
   }
   else
   {
-    _aqualink_data->pool_temp = TEMP_UNKNOWN;
-    _aqualink_data->spa_temp = TEMP_UNKNOWN;
+    SET_IF_CHANGED(_aqualink_data->pool_temp, TEMP_UNKNOWN, _aqualink_data->is_dirty);
+    SET_IF_CHANGED(_aqualink_data->spa_temp, TEMP_UNKNOWN, _aqualink_data->is_dirty);
   }
   // printf("Air Temp = %d | Water Temp = %d\n",atoi(msg),atoi(msg+7));
 }
@@ -310,7 +309,9 @@ void process_pda_packet_msg_long_time(const char *msg)
   {
     LOG(PDA_LOG,LOG_NOTICE, "RS time is NOT accurate '%s %s', re-setting on controller!\n", _aqualink_data->time, _aqualink_data->date);
     aq_programmer(AQ_SET_TIME, NULL, _aqualink_data);
-  } 
+  }
+  
+  SET_DIRTY(_aqualink_data->is_dirty);
 }
 
 void process_pda_packet_msg_long_equipment_control(const char *msg)
@@ -352,11 +353,11 @@ void process_pda_packet_msg_long_home(const char *msg)
     // If pool mode is on the filter pump is on but if it is off the filter pump might be on if spa mode is on.
     if (msg[AQ_MSGLEN - 1] == 'N')
     {
-      _aqualink_data->aqbuttons[PUMP_INDEX].led->state = ON;
+      SET_IF_CHANGED(_aqualink_data->aqbuttons[PUMP_INDEX].led->state, ON, _aqualink_data->is_dirty) ;
     }
     else if (msg[AQ_MSGLEN - 1] == '*')
     {
-      _aqualink_data->aqbuttons[PUMP_INDEX].led->state = FLASH;
+      SET_IF_CHANGED(_aqualink_data->aqbuttons[PUMP_INDEX].led->state, FLASH, _aqualink_data->is_dirty);
     }
   }
   else if (stristr(msg, "POOL HEATER") != NULL)
@@ -368,17 +369,17 @@ void process_pda_packet_msg_long_home(const char *msg)
     // when SPA mode is on the filter may be on or pending
     if (msg[AQ_MSGLEN - 1] == 'N')
     {
-      _aqualink_data->aqbuttons[PUMP_INDEX].led->state = ON;
-      _aqualink_data->aqbuttons[SPA_INDEX].led->state = ON;
+      SET_IF_CHANGED(_aqualink_data->aqbuttons[PUMP_INDEX].led->state, ON, _aqualink_data->is_dirty);
+      SET_IF_CHANGED(_aqualink_data->aqbuttons[SPA_INDEX].led->state, ON, _aqualink_data->is_dirty);
     }
     else if (msg[AQ_MSGLEN - 1] == '*')
     {
-      _aqualink_data->aqbuttons[PUMP_INDEX].led->state = FLASH;
-      _aqualink_data->aqbuttons[SPA_INDEX].led->state = ON;
+      SET_IF_CHANGED(_aqualink_data->aqbuttons[PUMP_INDEX].led->state, FLASH, _aqualink_data->is_dirty);
+      SET_IF_CHANGED(_aqualink_data->aqbuttons[SPA_INDEX].led->state, ON, _aqualink_data->is_dirty);
     }
     else
     {
-      _aqualink_data->aqbuttons[SPA_INDEX].led->state = OFF;
+      SET_IF_CHANGED(_aqualink_data->aqbuttons[SPA_INDEX].led->state, OFF, _aqualink_data->is_dirty);
     }
   }
   else if (stristr(msg, "SPA HEATER") != NULL)
@@ -426,10 +427,10 @@ void get_pda_temp_units(const char *msg)
   }
 
   if (msg[15] == 'F') {
-    _aqualink_data->temp_units = FAHRENHEIT;
+    SET_IF_CHANGED(_aqualink_data->temp_units, FAHRENHEIT, _aqualink_data->is_dirty);
     LOG(PDA_LOG,LOG_DEBUG, "Set temperature units to FAHRENHEIT\n");
   } else if (msg[15] == 'C') {
-    _aqualink_data->temp_units = CELSIUS;
+    SET_IF_CHANGED(_aqualink_data->temp_units, CELSIUS, _aqualink_data->is_dirty);
     LOG(PDA_LOG,LOG_DEBUG, "Set temperature units to CELSIUS\n");
   } else {
     LOG(PDA_LOG,LOG_DEBUG, "Unknown temperature units '%c'\n",msg[15]);
@@ -442,27 +443,27 @@ void process_pda_packet_msg_long_set_temp(const char *msg)
 
   if (stristr(msg, "POOL HEAT") != NULL)
   {
-    _aqualink_data->pool_htr_set_point = atoi(msg + 10);
+    SET_IF_CHANGED(_aqualink_data->pool_htr_set_point, atoi(msg + 10), _aqualink_data->is_dirty);
     LOG(PDA_LOG,LOG_DEBUG, "pool_htr_set_point = %d\n", _aqualink_data->pool_htr_set_point);
     get_pda_temp_units(msg);
   }
   else if (stristr(msg, "SPA HEAT") != NULL)
   {
-    _aqualink_data->spa_htr_set_point = atoi(msg + 10);
+    SET_IF_CHANGED(_aqualink_data->spa_htr_set_point, atoi(msg + 10), _aqualink_data->is_dirty);
     LOG(PDA_LOG,LOG_DEBUG, "spa_htr_set_point = %d\n", _aqualink_data->spa_htr_set_point);
     get_pda_temp_units(msg);
   }
   else if (stristr(msg, "TEMP1") != NULL)
   {
     setSingleDeviceMode();
-    _aqualink_data->pool_htr_set_point = atoi(msg + 10);
+    SET_IF_CHANGED(_aqualink_data->pool_htr_set_point, atoi(msg + 10), _aqualink_data->is_dirty);
     LOG(PDA_LOG,LOG_DEBUG, "pool_htr_set_point = %d\n", _aqualink_data->pool_htr_set_point);
     get_pda_temp_units(msg);
   }
   else if (stristr(msg, "TEMP2") != NULL)
   {
     setSingleDeviceMode();
-    _aqualink_data->spa_htr_set_point = atoi(msg + 10);
+    SET_IF_CHANGED(_aqualink_data->spa_htr_set_point, atoi(msg + 10), _aqualink_data->is_dirty);
     LOG(PDA_LOG,LOG_DEBUG, "spa_htr_set_point = %d\n", _aqualink_data->spa_htr_set_point);
     get_pda_temp_units(msg);
   }
@@ -474,11 +475,11 @@ void process_pda_packet_msg_long_spa_heat(const char *msg)
 {
   if (strncasecmp(msg, "    ENABLED     ", 16) == 0)
   {
-    _aqualink_data->aqbuttons[_aqualink_data->spa_heater_index].led->state = ENABLE;
+    SET_IF_CHANGED(_aqualink_data->aqbuttons[_aqualink_data->spa_heater_index].led->state, ENABLE, _aqualink_data->is_dirty);
   }
   else if (strncasecmp(msg, "  SET TO", 8) == 0)
   {
-    _aqualink_data->spa_htr_set_point = atoi(msg + 8);
+    SET_IF_CHANGED(_aqualink_data->spa_htr_set_point, atoi(msg + 8), _aqualink_data->is_dirty);
     LOG(PDA_LOG,LOG_DEBUG, "spa_htr_set_point = %d\n", _aqualink_data->spa_htr_set_point);
   }
 }
@@ -487,11 +488,11 @@ void process_pda_packet_msg_long_pool_heat(const char *msg)
 {
   if (strncasecmp(msg, "    ENABLED     ", 16) == 0)
   {
-    _aqualink_data->aqbuttons[_aqualink_data->pool_heater_index].led->state = ENABLE;
+    SET_IF_CHANGED(_aqualink_data->aqbuttons[_aqualink_data->pool_heater_index].led->state, ENABLE, _aqualink_data->is_dirty);
   }
   else if (strncasecmp(msg, "  SET TO", 8) == 0)
   {
-    _aqualink_data->pool_htr_set_point = atoi(msg + 8);
+    SET_IF_CHANGED(_aqualink_data->pool_htr_set_point, atoi(msg + 8), _aqualink_data->is_dirty);
     LOG(PDA_LOG,LOG_DEBUG, "pool_htr_set_point = %d\n", _aqualink_data->pool_htr_set_point);
   }
 }
@@ -500,7 +501,7 @@ void process_pda_packet_msg_long_freeze_protect(const char *msg)
 {
   if (strncasecmp(msg, "TEMP      ", 10) == 0)
   {
-    _aqualink_data->frz_protect_set_point = atoi(msg + 10);
+    SET_IF_CHANGED(_aqualink_data->frz_protect_set_point, atoi(msg + 10), _aqualink_data->is_dirty);
     LOG(PDA_LOG,LOG_DEBUG, "frz_protect_set_point = %d\n", _aqualink_data->frz_protect_set_point);
   }
 }
@@ -565,7 +566,7 @@ void process_pda_packet_msg_long_unknown(const char *msg)
   }
 }
 
-void pda_pump_update(struct aqualinkdata *aq_data, int updated) {
+void pda_pump_update(struct aqualinkdata *aqdata, int updated) {
   const int bitmask[MAX_PUMPS] = {1,2,4,8};
   static unsigned char updates = '\0';
   int i;
@@ -573,10 +574,10 @@ void pda_pump_update(struct aqualinkdata *aq_data, int updated) {
   if (updated == -1) {
     for(i=0; i < MAX_PUMPS; i++) {
       if ((updates & bitmask[i]) != bitmask[i]) {
-        aq_data->pumps[i].rpm = PUMP_OFF_RPM;
-        aq_data->pumps[i].gpm = PUMP_OFF_GPM;
-        aq_data->pumps[i].watts = PUMP_OFF_WAT;
-        aq_data->pumps[i].pStatus = PS_OFF;
+        SET_IF_CHANGED(aqdata->pumps[i].rpm, PUMP_OFF_RPM, aqdata->is_dirty);
+        SET_IF_CHANGED(aqdata->pumps[i].gpm, PUMP_OFF_GPM, aqdata->is_dirty);
+        SET_IF_CHANGED(aqdata->pumps[i].watts, PUMP_OFF_WAT, aqdata->is_dirty);
+        SET_IF_CHANGED(aqdata->pumps[i].pStatus, PS_OFF, aqdata->is_dirty);
       }
     }
     updates = '\0';
@@ -661,18 +662,18 @@ void get_pda_pumpinfo_from_menu(int menuLineIdx, int pump_number)
     if (_aqualink_data->pumps[i].pumpIndex == pump_number) {
       LOG(PDA_LOG,LOG_DEBUG, "Pump label: %s Index: %d, Number: %d, RPM: %d, Watts: %d, GPM: %d\n",_aqualink_data->pumps[i].button->name, i ,pump_number,rpm,watts,gpm);
       pda_pump_update(_aqualink_data, i);
-      _aqualink_data->pumps[i].rpm = rpm;
-      _aqualink_data->pumps[i].watts = watts;
-      _aqualink_data->pumps[i].gpm = gpm;
-      _aqualink_data->pumps[i].pStatus = pStatus;
+      SET_IF_CHANGED(_aqualink_data->pumps[i].rpm, rpm, _aqualink_data->is_dirty);
+      SET_IF_CHANGED(_aqualink_data->pumps[i].watts, watts, _aqualink_data->is_dirty);
+      SET_IF_CHANGED(_aqualink_data->pumps[i].gpm, gpm, _aqualink_data->is_dirty);
+      SET_IF_CHANGED(_aqualink_data->pumps[i].pStatus, pStatus, _aqualink_data->is_dirty);
       if (_aqualink_data->pumps[i].pumpType == PT_UNKNOWN){
         if (rsm_strcmp(pda_m_line(menuLineIdx),"Intelliflo VS") == 0)
-          _aqualink_data->pumps[i].pumpType = VSPUMP;
+          SET_IF_CHANGED(_aqualink_data->pumps[i].pumpType, VSPUMP, _aqualink_data->is_dirty);
         else if (rsm_strcmp(pda_m_line(menuLineIdx),"Intelliflo VF") == 0)
-          _aqualink_data->pumps[i].pumpType = VFPUMP;
+          SET_IF_CHANGED(_aqualink_data->pumps[i].pumpType, VFPUMP, _aqualink_data->is_dirty);
         else if (rsm_strcmp(pda_m_line(menuLineIdx),"Jandy ePUMP") == 0 ||
                    rsm_strcmp(pda_m_line(menuLineIdx),"ePump AC") == 0)
-          _aqualink_data->pumps[i].pumpType = EPUMP;
+          SET_IF_CHANGED(_aqualink_data->pumps[i].pumpType, EPUMP, _aqualink_data->is_dirty);
 
         LOG(PDA_LOG, LOG_DEBUG, "Pump index %d set PumpType to %d\n", i, _aqualink_data->pumps[i].pumpType);
       }
@@ -697,9 +698,9 @@ void log_pump_information() {
     }
     /* // NSF This need to be used in the future and not process_pda_packet_msg_long_equiptment_status()
     else if (rsm_strcmp(pda_m_line(i),"AQUAPURE") == 0) {
-      rtn = get_aquapureinfo_from_menu(aq_data, i);
+      rtn = get_aquapureinfo_from_menu(aqdata, i);
     } else if (rsm_strcmp(pda_m_line(i),"Chemlink") == 0) {
-      rtn = get_chemlinkinfo_from_menu(aq_data, i);
+      rtn = get_chemlinkinfo_from_menu(aqdata, i);
     */
   }
 }
@@ -757,7 +758,7 @@ void process_pda_packet_msg_long_equiptment_status(const char *msg_line, int lin
   }
   else if ((index = rsm_strncasestr(msg, "FREEZE PROTECT", AQ_MSGLEN)) != NULL)
   {
-    _aqualink_data->frz_protect_state = ON;
+    SET_IF_CHANGED(_aqualink_data->frz_protect_state, ON, _aqualink_data->is_dirty);
     equiptment_update_cycle(PDA_FREEZE_PROTECT_INDEX);
     LOG(PDA_LOG,LOG_DEBUG, "Freeze Protect is on\n");
   }
@@ -771,7 +772,7 @@ void process_pda_packet_msg_long_equiptment_status(const char *msg_line, int lin
     //snprintf(_aqualink_data->boost_msg, sizeof(_aqualink_data->boost_msg), "%s", msg+2);
     //Message is '  23:21 Remain', we only want time part 
     snprintf(_aqualink_data->boost_msg, 6, "%s", msg);
-    _aqualink_data->boost_duration = rsm_HHMM2min(_aqualink_data->boost_msg);
+    SET_IF_CHANGED(_aqualink_data->boost_duration, rsm_HHMM2min(_aqualink_data->boost_msg), _aqualink_data->is_dirty);
   }
   else if ((index = rsm_strncasestr(msg, MSG_SWG_PCT, AQ_MSGLEN)) != NULL)
   {
@@ -782,19 +783,19 @@ void process_pda_packet_msg_long_equiptment_status(const char *msg_line, int lin
   }
   else if ((index = rsm_strncasestr(msg, MSG_SWG_PPM, AQ_MSGLEN)) != NULL)
   {
-    _aqualink_data->swg_ppm = atoi(index + strlen(MSG_SWG_PPM));
+    SET_IF_CHANGED(_aqualink_data->swg_ppm, atoi(index + strlen(MSG_SWG_PPM)), _aqualink_data->is_dirty);
     //if (_aqualink_data->ar_swg_status == SWG_STATUS_OFF) {_aqualink_data->ar_swg_status = SWG_STATUS_ON;}
     LOG(PDA_LOG,LOG_DEBUG, "SALT = %d\n", _aqualink_data->swg_ppm);
   }  
   else if (rsm_strncmp(msg_line, "POOL HEAT ENA",AQ_MSGLEN) == 0)
   {
-      _aqualink_data->aqbuttons[_aqualink_data->pool_heater_index].led->state = ENABLE;
+      SET_IF_CHANGED(_aqualink_data->aqbuttons[_aqualink_data->pool_heater_index].led->state, ENABLE, _aqualink_data->is_dirty);
       LOG(PDA_LOG,LOG_DEBUG, "Pool Hearter is enabled\n");
       //equiptment_update_cycle(_aqualink_data->pool_heater_index);
   }
   else if (rsm_strncmp(msg_line, "SPA HEAT ENA",AQ_MSGLEN) == 0)
   {
-      _aqualink_data->aqbuttons[_aqualink_data->spa_heater_index].led->state = ENABLE;
+      SET_IF_CHANGED(_aqualink_data->aqbuttons[_aqualink_data->spa_heater_index].led->state, ENABLE, _aqualink_data->is_dirty);
       LOG(PDA_LOG,LOG_DEBUG, "Spa Hearter is enabled\n");
       //equiptment_update_cycle(_aqualink_data->spa_heater_index);
   }
@@ -812,7 +813,7 @@ void process_pda_packet_msg_long_equiptment_status(const char *msg_line, int lin
           // It's on (or delayed) if it's listed here.
           if (_aqualink_data->aqbuttons[i].led->state != FLASH)
           {
-            _aqualink_data->aqbuttons[i].led->state = ON;
+            SET_IF_CHANGED(_aqualink_data->aqbuttons[i].led->state, ON, _aqualink_data->is_dirty);
           }
           break;
         }
@@ -878,7 +879,7 @@ void process_pda_freeze_protect_devices()
       LOG(PDA_LOG,LOG_DEBUG, "PDA freeze protect enabled by %s\n", pda_m_line(i));
       if (_aqualink_data->frz_protect_state == OFF)
       {
-        _aqualink_data->frz_protect_state = ENABLE;
+        SET_IF_CHANGED(_aqualink_data->frz_protect_state, ENABLE, _aqualink_data->is_dirty);
         break;
       }
     }
@@ -899,7 +900,6 @@ bool process_pda_packet(unsigned char *packet, int length)
 
   process_pda_menu_packet(packet, length, in_programming_mode(_aqualink_data));
 
-
   switch (packet[PKT_CMD])
   {
     case CMD_ACK:
@@ -913,7 +913,8 @@ bool process_pda_packet(unsigned char *packet, int length)
 
     case CMD_STATUS:
       //LOG(PDA_LOG,LOG_DEBUG, "**** PDA Menu type %d ****\n", pda_m_type());
-      _aqualink_data->last_display_message[0] = '\0';
+      //_aqualink_data->last_display_message[0] = '\0';
+      SET_IF_CHANGED_STRCPY(_aqualink_data->last_display_message, "", _aqualink_data->is_dirty);
       if (equiptment_update_loop == false && pda_m_type() == PM_EQUIPTMENT_STATUS)
       {
         LOG(PDA_LOG,LOG_DEBUG, "**** PDA Start new Equiptment loop ****\n");

@@ -171,7 +171,7 @@ struct programmingThreadCtrl {
   //void *thread_args;
   struct programmerArgs pArgs;
   char thread_args[PTHREAD_ARG];
-  struct aqualinkdata *aq_data;
+  struct aqualinkdata *aqdata;
 };
  
 
