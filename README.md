@@ -174,7 +174,9 @@ Here is the mosquitto.conf:
 
 Hardware
 
-The hardware that I used is "Radxa Zero 3W with 2GB RAM/16GB eMMC. For mounting, use this 3D model - https://github.com/locnho/AqualinkD/blob/master/extras/Radxa%20Zero%203W%20AquaLinkD%20mount.3mf.
+The original hardware was "Radxa Zero 3W with 2GB RAM/16GB eMMC". For mounting, use this 3D model - https://github.com/locnho/AqualinkD/blob/master/extras/Radxa%20Zero%203W%20AquaLinkD%20mount.3mf. But the software for this "Radxa Zero 3W" isn't stable. I would lose network connection or RS485 would fail. 
+
+As such, I had switched to Raspberry PI 5 for 3 weeks now and had no issue. It is powered via 60W USB plug.
 
 
 ## AquaLinkd Info
