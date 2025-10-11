@@ -42,6 +42,7 @@
 
 
 #define CONFIG_C
+#include "rs_devices.h"
 #include "config.h"
 #include "utils.h"
 #include "aq_serial.h"
@@ -1321,7 +1322,7 @@ bool populatePumpData(struct aqualinkdata *aqdata, char *pumpcfg ,aqkey *button,
     strncpy(pump->pumpName ,cleanwhitespace(value), PUMP_NAME_LENGTH-1);
   } else if (strncasecmp(pumpcfg, "pumpID", 6) == 0) {
     pump->pumpID = strtoul(cleanalloc(value), NULL, 16);
-    if ( (int)pump->pumpID >= PENTAIR_DEC_PUMP_MIN && (int)pump->pumpID <= PENTAIR_DEC_PUMP_MAX) {
+    if ( is_pentair_pump_id(pump->pumpID) ) {
       pump->prclType = PENTAIR;
     } else {
       pump->prclType = JANDY;
@@ -1858,10 +1859,8 @@ void check_print_config (struct aqualinkdata *aqdata)
                   aqdata->pumps[j].pumpName[0]=='\0'?"":aqdata->pumps[j].pumpName);
       }
     }
-    for (j = 0; j < aqdata->num_lights; j++) {
-      if (aqdata->lights[j].button == &aqdata->aqbuttons[i]) {
-        sprintf(ext,"Light Progm %-1d |",aqdata->lights[j].lightType);
-      }
+    if (isPLIGHT(aqdata->aqbuttons[i].special_mask)) {
+      sprintf(ext,"Light Progm %-1d |", ((clight_detail *)aqdata->aqbuttons[i].special_mask_ptr)->lightType);
     }
     if (isVBUTTON(aqdata->aqbuttons[i].special_mask)) {
       if (aqdata->aqbuttons[i].rssd_code != NUL) {
@@ -2061,12 +2060,12 @@ int save_config_js(const char* inBuf, int inSize, char* outBuf, int outSize, str
 
   // The above will reset all the panel profocol masks since it re-sets the panel, so set them back here.
 
-  if (_aqconfig_.rssa_device_id >= 0x48 && _aqconfig_.rssa_device_id <= 0x49) {
+  if (is_rsserialadapter_id(_aqconfig_.rssa_device_id)) {
     addPanelRSserialAdapterInterface();
   }
-  if (_aqconfig_.extended_device_id >= 0x40 && _aqconfig_.extended_device_id <= 0x43) {
+  if (is_onetouch_id(_aqconfig_.extended_device_id)) {
     addPanelOneTouchInterface();
-  } else if (_aqconfig_.extended_device_id >= 0x30 && _aqconfig_.extended_device_id <= 0x33) {
+  } else if ( is_aqualink_touch_id(_aqconfig_.extended_device_id)) {
     addPanelIAQTouchInterface();
   }
 

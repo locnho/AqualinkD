@@ -3,6 +3,7 @@
 #include <ctype.h>
 #include <string.h>
 
+#include "rs_devices.h"
 #include "aqualink.h"
 #include "aq_serial.h"
 #include "auto_configure.h"
@@ -147,9 +148,23 @@ bool auto_configure(struct aqualinkdata *aqdata, unsigned char* packet, int pack
     PDA_ID = packet[PKT_DEST];
   }
 
+  if (is_iaqualink_id(lastID) && packet[PKT_DEST] == DEV_MASTER && seen_iAqualink2 == false ) 
+  { // Saw a iAqualink2/3 device, so can't use ID, but set to read device info.
+    // NSF This is not a good way to check, will probably be false positive if you are using iAqualink2 and hit restart.
+    _aqconfig_.extended_device_id2 = 0x00;
+    _aqconfig_.enable_iaqualink = false;
+    _aqconfig_.read_RS485_devmask |= READ_RS485_IAQUALNK;
+    seen_iAqualink2 = true;
+    LOG(AQUA_LOG,LOG_NOTICE, "Saw inuse iAqualink2/3 ID 0x%02hhx, turning off AqualinkD on that ID\n",lastID);
+  } 
+
+
+
   if (lastID != 0x00 && packet[PKT_DEST] == DEV_MASTER ) { // Can't use got a reply to the last probe.
-    lastID = 0x00; 
-  } else if (lastID != 0x00 && packet[PKT_DEST] != DEV_MASTER) {
+    lastID = 0x00;
+  }
+  else if (lastID != 0x00 && packet[PKT_DEST] != DEV_MASTER) 
+  {
     // We can use last ID.
     // Save the first good ID.
     if (firstprobe == 0x00 && lastID != 0x60) {
@@ -165,26 +180,20 @@ bool auto_configure(struct aqualinkdata *aqdata, unsigned char* packet, int pack
       SET_DIRTY(aqdata->is_dirty);
       //AddAQDstatusMask(AUTOCONFIGURE_PANEL); // Not implimented yet.
     }
-
-
-    if ( (lastID >= 0x08 && lastID <= 0x0B) && 
-         (_aqconfig_.device_id == 0x00 || _aqconfig_.device_id == 0xFF) ) {
+    if ( is_allbutton_id(lastID) && (_aqconfig_.device_id == 0x00 || _aqconfig_.device_id == 0xFF) ) {
       _aqconfig_.device_id = lastID;
       LOG(AQUA_LOG,LOG_NOTICE, "Found valid unused device ID 0x%02hhx\n",lastID);
       foundIDs++;
-    } else if ( (lastID >= 0x48 && lastID <= 0x49) && 
-                (_aqconfig_.rssa_device_id == 0x00 || _aqconfig_.rssa_device_id == 0xFF) ) {
+    } else if ( is_rsserialadapter_id(lastID) && (_aqconfig_.rssa_device_id == 0x00 || _aqconfig_.rssa_device_id == 0xFF) ) {
       _aqconfig_.rssa_device_id = lastID;
       LOG(AQUA_LOG,LOG_NOTICE, "Found valid unused RSSA ID 0x%02hhx\n",lastID);
       foundIDs++;
-    } else if ( (lastID >= 0x40 && lastID <= 0x43) &&
-                (_aqconfig_.extended_device_id == 0x00 || _aqconfig_.extended_device_id == 0xFF) ) {
+    } else if ( is_onetouch_id(lastID) && (_aqconfig_.extended_device_id == 0x00 || _aqconfig_.extended_device_id == 0xFF) ) {
       _aqconfig_.extended_device_id = lastID;
       _aqconfig_.extended_device_id_programming = true;
       // Don't increase  foundIDs as we prefer not to use this one.
       LOG(AQUA_LOG,LOG_NOTICE, "Found valid unused extended ID 0x%02hhx\n",lastID);
-    } else if ( (lastID >= 0x30 && lastID <= 0x33) &&
-                  (_aqconfig_.extended_device_id < 0x30 || _aqconfig_.extended_device_id > 0x33)) { //Overide if it's been set to Touch or not set.
+    } else if ( is_aqualink_touch_id(lastID) && (_aqconfig_.extended_device_id < 0x30 || _aqconfig_.extended_device_id > 0x33)) { //Overide if it's been set to Touch or not set.
       _aqconfig_.extended_device_id = lastID;
       _aqconfig_.extended_device_id_programming = true;
       if (!seen_iAqualink2) {
@@ -211,15 +220,19 @@ bool auto_configure(struct aqualinkdata *aqdata, unsigned char* packet, int pack
   }
 
   if ( (packet[PKT_CMD] == CMD_PROBE) && (
-       (packet[PKT_DEST] >= 0x08 && packet[PKT_DEST] <= 0x0B) ||
+       is_allbutton_id(packet[PKT_DEST]) ||
        //(packet[PKT_DEST] >= 0x60 && packet[PKT_DEST] <= 0x63) ||
-       (packet[PKT_DEST] >= 0x40 && packet[PKT_DEST] <= 0x43) ||
-       (packet[PKT_DEST] >= 0x30 && packet[PKT_DEST] <= 0x33) ||
-       (packet[PKT_DEST] >= 0x48 && packet[PKT_DEST] <= 0x49) ))
+       is_rsserialadapter_id(packet[PKT_DEST]) ||
+       is_aqualink_touch_id(packet[PKT_DEST]) ||
+       is_onetouch_id(packet[PKT_DEST])  ))
   {
     lastID = packet[PKT_DEST]; // Store the valid ID.
   } 
-  else if (packet[PKT_DEST] >= 0xa0 && packet[PKT_DEST] <= 0xa3 && seen_iAqualink2 == false ) // we get a packet to iAqualink2/3 make sure to turn off, 
+  else if (is_iaqualink_id(packet[PKT_DEST])) {
+    lastID = packet[PKT_DEST]; // Store the valid ID.
+  }
+  /*
+  else if (is_iaqualink_id(packet[PKT_DEST]) && seen_iAqualink2 == false ) // we get a packet to iAqualink2/3 make sure to turn off, 
   { // Saw a iAqualink2/3 device, so can't use ID, but set to read device info.
     // NSF This is not a good way to check, will probably be false positive if you are using iAqualink2 and hit restart.
     _aqconfig_.extended_device_id2 = 0x00;
@@ -227,7 +240,7 @@ bool auto_configure(struct aqualinkdata *aqdata, unsigned char* packet, int pack
     _aqconfig_.read_RS485_devmask |= READ_RS485_IAQUALNK;
     seen_iAqualink2 = true;
     LOG(AQUA_LOG,LOG_NOTICE, "Saw inuse iAqualink2/3 ID 0x%02hhx, turning off AqualinkD on that ID\n",packet[PKT_DEST]);
-  }
+  }*/
 
   if (!done)
     return false;

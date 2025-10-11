@@ -41,22 +41,63 @@ const char *getJandyDeviceName(emulation_type etype);
 #  Jandy pump ID's
 #  0x78, 0x79, 0x7A, 0x7B
 */
-#define PENTAIR_DEC_PUMP_MIN   96   // 0x60
-#define PENTAIR_DEC_PUMP_MAX  111   // 0x6F
-#define JANDY_DEC_SWG_MIN      80   // 0x50
-#define JANDY_DEC_SWG_MAX      83   // 0x53
-#define JANDY_DEC_PUMP_MIN    120   // 0x78
-#define JANDY_DEC_PUMP_MAX    123   // 0x7b
-// Have also seen epump at 0xe0 with panel rev W that supports more pumps
-#define JANDY_DEC_PUMP2_MIN    224   // 0xe0
-#define JANDY_DEC_PUMP2_MAX    228   // 0xe3 // (should be 0xEF?????) Their are probably more, but this is a guess
 
-#define JANDY_DEC_JXI_MIN     104   // 0x68
-#define JANDY_DEC_JXI_MAX     107   // 0x6B
-#define JANDY_DEC_LX_MIN       56   // 0x38
-#define JANDY_DEC_LX_MAX       59   // 0x3B 
-#define JANDY_DEC_CHEM_MIN    128   // 0x80
-#define JANDY_DEC_CHEM_MAX    131   // 0x83
+/*
+#define PENTAIR_DEV_PUMP_MIN   0x60  // 96
+#define PENTAIR_DEV_PUMP_MAX   0x6F  // 111
+
+#define JANDY_DEV_SWG_MIN      0x50  // 80
+#define JANDY_DEV_SWG_MAX      0x53  // 83
+
+#define JANDY_DEV_PUMP_MIN     0x78  // 120
+#define JANDY_DEV_PUMP_MAX     0x7B  // 123
+// Have also seen epump at 0xE0 with panel rev W that supports more pumps
+#define JANDY_DEV_PUMP2_MIN    0xE0  // 224
+#define JANDY_DEV_PUMP2_MAX    0xE3  // 228  // (should be 0xEF?????) Guess
+
+#define JANDY_DEV_JXI_MIN      0x68  // 104
+#define JANDY_DEV_JXI_MAX      0x6B  // 107
+
+#define JANDY_DEV_LX_MIN       0x38  // 56
+#define JANDY_DEV_LX_MAX       0x3B  // 59
+
+#define JANDY_DEV_CHEM_MIN     0x80  // 128
+#define JANDY_DEV_CHEM_MAX     0x83  // 131
+
+#define JANDY_DEV_IAQLN_MIN    0xA0  // 160
+#define JANDY_DEV_IAQLN_MAX    0xA3  // 163
+
+#define JANDY_DEV_AQLNK_MIN    0x30  // 48
+#define JANDY_DEV_AQLNK_MAX    0x33  // 51
+
+#define JANDY_DEV_HPUMP_MIN    0x70  // 112
+#define JANDY_DEV_HPUMP_MAX    0x73  // 115
+
+#define JANDY_DEV_JLIGHT_MIN   0xF0  // 240
+#define JANDY_DEV_JLIGHT_MAX   0xF4  // 244 (guess)
+*/
+/* Below is a guess.  We *think* 0x84 and 0x86 are one TruSense, so assuming 0x85 and 0x87 would be a 2nd */
+// 0x83 is ChemLink and 0x88 is heater, so 84 to 86 are free
+//#define JANDY_DEV_CHEM_ANLZ_MIN    0x84  
+//#define JANDY_DEV_CHEM_ANLZ_MAX    0x87
+
+/*
+#define PENTAIR_DEV_PUMP_MIN   96   // 0x60
+#define PENTAIR_DEV_PUMP_MAX  111   // 0x6F
+#define JANDY_DEV_SWG_MIN      80   // 0x50
+#define JANDY_DEV_SWG_MAX      83   // 0x53
+#define JANDY_DEV_PUMP_MIN    120   // 0x78
+#define JANDY_DEV_PUMP_MAX    123   // 0x7b
+// Have also seen epump at 0xe0 with panel rev W that supports more pumps
+#define JANDY_DEV_PUMP2_MIN    224   // 0xe0
+#define JANDY_DEV_PUMP2_MAX    228   // 0xe3 // (should be 0xEF?????) Their are probably more, but this is a guess
+
+#define JANDY_DEV_JXI_MIN     104   // 0x68
+#define JANDY_DEV_JXI_MAX     107   // 0x6B
+#define JANDY_DEV_LX_MIN       56   // 0x38
+#define JANDY_DEV_LX_MAX       59   // 0x3B 
+#define JANDY_DEV_CHEM_MIN    128   // 0x80
+#define JANDY_DEV_CHEM_MAX    131   // 0x83
 
 #define JANDY_DEV_IAQLN_MIN    0xa0   // 
 #define JANDY_DEV_IAQLN_MAX    0xa3   // 0
@@ -70,13 +111,13 @@ const char *getJandyDeviceName(emulation_type etype);
 #define JANDY_DEV_JLIGHT_MIN    0xF0
 #define JANDY_DEV_JLIGHT_MAX    0xF4 // 0xF4 is total guess.
 
-//#define JANDY_DEC_CHEM_SENSOR1  0x84 // Not sure if this is a range or not.
-//#define JANDY_DEC_CHEM_SENSOR2  0x86 // Not sure if this is a range or not.
-
+//#define JANDY_DEV_CHEM_SENSOR1  0x84 // Not sure if this is a range or not.
+//#define JANDY_DEV_CHEM_SENSOR2  0x86 // Not sure if this is a range or not.
+*/
 /* Below is a guess.  We *think* 0x84 and 0x86 are one TruSense, so assuming 0x85 and 0x87 would be a 2nd */
 // 0x83 is ChemLink and 0x88 is heater, so 84 to 86 are free
-#define JANDY_DEV_CHEM_ANLZ_MIN    0x84
-#define JANDY_DEV_CHEM_ANLZ_MAX    0x87
+//#define JANDY_DEV_CHEM_ANLZ_MIN    0x84
+//#define JANDY_DEV_CHEM_ANLZ_MAX    0x87
 
 /*
 //===== Device ID's =====//

@@ -19,6 +19,7 @@
 #include <string.h>
 #include <ctype.h>
 
+#include "rs_devices.h"
 #include "config.h"
 #include "aq_panel.h"
 #include "serialadapter.h"
@@ -134,7 +135,7 @@ void checkPanelConfig(struct aqualinkdata *aqdata) {
   // Check panel rev for common errors.
 
   // Aqualink Touch.
-  if ( _aqconfig_.extended_device_id >= 0x30 && _aqconfig_.extended_device_id <= 0x33) {
+  if ( is_aqualink_touch_id(_aqconfig_.extended_device_id)) {
     if ( !isMASKSET(aqdata->panel_support_options, RSP_SUP_AQLT)) {
       LOG(PANL_LOG, LOG_ERR, "Panel REV %s does not support AqualinkTouch protocol, please change configuration option '%s'\n",aqdata->panel_rev, CFG_N_extended_device_id);
       LOG(PANL_LOG, LOG_WARNING, "Removing option '%s', please correct configuration\n",CFG_N_extended_device_id);
@@ -144,7 +145,7 @@ void checkPanelConfig(struct aqualinkdata *aqdata) {
   }
 
   // One Touch
-  if ( _aqconfig_.extended_device_id >= 0x40 && _aqconfig_.extended_device_id <= 0x43) {
+  if ( is_onetouch_id(_aqconfig_.extended_device_id)) {
     if ( !isMASKSET(aqdata->panel_support_options, RSP_SUP_ONET)) {
       LOG(PANL_LOG, LOG_ERR, "Panel REV %s does not support OneTouch protocol, please change configuration option '%s'\n",aqdata->panel_rev, CFG_N_extended_device_id);
       LOG(PANL_LOG, LOG_WARNING, "Removing option '%s', please correct configuration\n",CFG_N_extended_device_id);
@@ -154,7 +155,7 @@ void checkPanelConfig(struct aqualinkdata *aqdata) {
   }
 
   // Serial Adapter
-  if ( _aqconfig_.rssa_device_id >= 0x48 && _aqconfig_.rssa_device_id <= 0x49) {
+  if ( is_rsserialadapter_id(_aqconfig_.rssa_device_id)) {
     if ( !isMASKSET(aqdata->panel_support_options, RSP_SUP_RSSA)) {
       LOG(PANL_LOG, LOG_ERR, "Panel REV %s does not support RS SerialAdapter protocol, please change configuration option '%s'\n",aqdata->panel_rev, CFG_N_rssa_device_id);
       LOG(PANL_LOG, LOG_WARNING, "Removing option '%s', please correct configuration\n",CFG_N_rssa_device_id);
@@ -1223,7 +1224,10 @@ bool setDeviceState(struct aqualinkdata *aqdata, int deviceIndex, bool isON, req
     {
       // Check for panel programmable light. if so simple ON isn't going to work well
       // Could also add "light mode" check, as this is only valid for panel configured light not aqualinkd configured light.
-      if (isPLIGHT(button->special_mask) && button->led->state == OFF) {
+      if (isPLIGHT(button->special_mask) && isVBUTTON(button->special_mask)) {
+        programDeviceLightMode(aqdata, (isON?0:-1), deviceIndex); // -1 means off 0 means use current light mode
+        //aq_program(AQ_SET_IAQTOUCH_LIGHTCOLOR_MODE, button,  (isON?0:-1), 0, aqdata);  // should use this in teh furuter, or get programDeviceLightMode to call it. 
+      } else if (isPLIGHT(button->special_mask) && button->led->state == OFF) {
         // Full range dimmer can get stuck off on rev T.2 (maybe others), to overcome use allbutton with any % other than 0
         if ( ((clight_detail *)button->special_mask_ptr)->lightType == LC_DIMMER2 ||
              ((clight_detail *)button->special_mask_ptr)->lightType == LC_DIMMER ) // NSF should remove this once figured out Line #1354 programDeviceLightBrightness()

@@ -26,6 +26,7 @@
 #include <fcntl.h>
 #include <time.h>
 
+#include "rs_devices.h"
 #include "serial_logger.h"
 #include "aq_serial.h"
 #include "utils.h"
@@ -161,6 +162,7 @@ int serial_logger (int rs_fd, char *port_name, int logLevel, int slogger_packets
 #define EPUMP " <-- Jandy VSP ePump"
 #define EPUMP2 " <-- Jandy VSP (rev W or newer)"
 #define CHEM " <-- Chemlink"
+#define CHEM_ANLZ " <-- TruSense"
 #define JXI_HEATER " <-- JXi / LRZ Heater"
 
 #define IAQLNK2 " <-- iAqualink 2.0"
@@ -181,6 +183,72 @@ int serial_logger (int rs_fd, char *port_name, int logLevel, int slogger_packets
 
 // 0xE0 -> this is pump ID on rev W panel (16 pumps available total) - so maybe last is 0xF0 or 0xEF
 
+const char *getDevice(unsigned char ID)
+{
+  if (ID >= 0x00 && ID <= 0x03)
+    return MASTER;
+
+  if (is_allbutton_id(ID))
+    return KEYPAD;
+
+  if (is_swg_id(ID))
+    return SWG;
+
+  if (is_spa_remote_id(ID))
+    return SPA_R;
+
+  if (is_aqualink_touch_id(ID))
+    return AQUA;
+
+  if (is_onetouch_id(ID))
+    return ONE_T;
+
+  if (is_rsserialadapter_id(ID))
+    return RS_SERL;
+
+  if (is_pc_dock_id(ID))
+    return PC_DOCK;
+
+  if (is_pda_id(ID))
+    return PDA;
+
+  if (is_lx_heater_id(ID))
+    return LX_HEATER;
+
+  if (is_jxi_heater_id(ID))
+    return JXI_HEATER;
+
+  if (is_heat_pump_id(ID))
+    return HEAT_PUMP;
+
+  if (is_jandy_pump_id(ID))
+    return EPUMP;
+
+  if (is_chem_feeder_id(ID))
+    return CHEM;
+ 
+  if (is_chem_anlzer_id(ID))
+    return CHEM_ANLZ;
+
+  if (is_iaqualink_id(ID))
+    return IAQLNK2;
+
+  if (is_remote_powercenter_id(ID))
+    return REM_PWR_CENT;
+
+  if (is_jandy_pump_std_id(ID))
+    return EPUMP;
+
+  if (is_jandy_pump_new_id(ID))
+    return EPUMP2;
+
+  if (is_jandy_light_id(ID))
+    return JWC_LIGHTS;
+
+  return UNKNOWN;
+}
+
+/*
 const char *getDevice(unsigned char ID) {
   if (ID >= 0x00 && ID <= 0x03)
     return MASTER;
@@ -241,6 +309,8 @@ const char *getDevice(unsigned char ID) {
 
   return UNKNOWN;
 }
+*/
+
 
 const char *getPentairDevice(unsigned char ID) {
   if (ID >= 0x60 && ID <= 0x6F)
@@ -715,7 +785,8 @@ int _serial_logger(int rs_fd, char *port_name, int logPackets, int logLevel, boo
   bool found_vsp =false;
   bool found_jxi =false;
   bool found_lx =false;
-  bool found_chem =false;
+  bool found_chemlink =false;
+  bool found_trusense =false;
   bool found_pent_vsp =false;
   bool found_iAqualnk =false;
 
@@ -935,17 +1006,19 @@ int _serial_logger(int rs_fd, char *port_name, int logPackets, int logLevel, boo
     }
 
     if (slog[i].inuse == true) {
-      if (slog[i].ID >= JANDY_DEC_SWG_MIN && slog[i].ID <= JANDY_DEC_SWG_MAX) {
+      if ( is_swg_id(slog[i].ID)) {
         found_swg =true;
-      } else if (slog[i].ID >= JANDY_DEC_PUMP_MIN && slog[i].ID <= JANDY_DEC_PUMP_MAX) {
+      } else if ( is_jandy_pump_id(slog[i].ID )) {
         found_vsp =true;
-      } else if (slog[i].ID >= JANDY_DEC_JXI_MIN && slog[i].ID <= JANDY_DEC_JXI_MAX) {
+      } else if ( is_jxi_heater_id(slog[i].ID)) {
         found_jxi =true;
-      } else if (slog[i].ID >= JANDY_DEC_LX_MIN && slog[i].ID <= JANDY_DEC_LX_MAX) {
+      } else if ( is_lx_heater_id(slog[i].ID)) {
         found_lx =true;
-      } else if (slog[i].ID >= JANDY_DEC_CHEM_MIN && slog[i].ID <= JANDY_DEC_CHEM_MAX) {
-        found_chem =true;
-      } else if (slog[i].ID >= JANDY_DEV_AQLNK_MIN && slog[i].ID <= JANDY_DEV_AQLNK_MAX) {
+      } else if ( is_chem_feeder_id(slog[i].ID )) {
+        found_chemlink =true;
+      } else if ( is_chem_anlzer_id(slog[i].ID )) {
+        found_trusense =true;
+      } else if ( is_iaqualink_id(slog[i].ID )) {
         found_iAqualnk =true;
       }
     }
@@ -960,7 +1033,7 @@ int _serial_logger(int rs_fd, char *port_name, int logPackets, int logLevel, boo
                (pent_slog[i].inuse == false)?canUseExtended(pent_slog[i].ID):getPentairDevice(pent_slog[i].ID));
 
     if (pent_slog[i].inuse == true) {
-      if (pent_slog[i].ID >= PENTAIR_DEC_PUMP_MIN && pent_slog[i].ID <= PENTAIR_DEC_PUMP_MAX) {
+      if (is_pentair_pump_id(pent_slog[i].ID)) {
         found_pent_vsp=true;
       }
     }
@@ -1027,11 +1100,13 @@ int _serial_logger(int rs_fd, char *port_name, int logPackets, int logLevel, boo
     LOG(SLOG_LOG, LOG_NOTICE, "read_RS485_JXi = yes\n");
   if (found_lx)
     LOG(SLOG_LOG, LOG_NOTICE, "read_RS485_LX = yes\n");
-  if (found_chem)
-    LOG(SLOG_LOG, LOG_NOTICE, "read_RS485_Chem = yes\n");
+  if (found_chemlink)
+    LOG(SLOG_LOG, LOG_NOTICE, "read_RS485_ChemLink = yes\n");
+  if (found_trusense)
+    LOG(SLOG_LOG, LOG_NOTICE, "read_RS485_TruSense = yes\n");
   if (found_iAqualnk)
     LOG(SLOG_LOG, LOG_NOTICE, "read_RS485_iAqualink = yes\n");
-  else if (!found_iAqualnk && (extID >= JANDY_DEV_AQLNK_MIN && extID <= JANDY_DEV_AQLNK_MAX))
+  else if (!found_iAqualnk && (is_aqualink_touch_id(extID)))
     LOG(SLOG_LOG, LOG_NOTICE, "enable_iaqualink = yes\n");
 
   LOG(SLOG_LOG, LOG_NOTICE, "-------------------------\n");

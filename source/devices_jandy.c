@@ -14,9 +14,12 @@
  *  https://github.com/sfeakes/aqualinkd
  */
 
+
 #include <stdio.h>
 #include <string.h>
+#include <stdbool.h>
 
+#include "rs_devices.h"
 #include "devices_jandy.h"
 #include "aq_serial.h"
 #include "aqualink.h"
@@ -134,62 +137,61 @@ bool processJandyPacket(unsigned char *packet_buffer, int packet_length, struct 
     interestedInNextAck = DRS_NONE;
     previous_packet_to = NUL;
   }
-  else if (READ_RSDEV_SWG && packet_buffer[PKT_DEST] >= JANDY_DEC_SWG_MIN && packet_buffer[PKT_DEST] <= JANDY_DEC_SWG_MAX)
+  else if (READ_RSDEV_SWG && is_swg_id(packet_buffer[PKT_DEST]))
   {
     interestedInNextAck = DRS_SWG;
     printJandyDebugPacket("SWG", packet_buffer, packet_length);
     rtn = processPacketToSWG(packet_buffer, packet_length, aqdata/*, _aqconfig_.swg_zero_ignore*/);
     previous_packet_to = packet_buffer[PKT_DEST];
   }
-  else if (READ_RSDEV_ePUMP && (   (packet_buffer[PKT_DEST] >= JANDY_DEC_PUMP_MIN && packet_buffer[PKT_DEST] <= JANDY_DEC_PUMP_MAX) 
-                               ||  (packet_buffer[PKT_DEST] >= JANDY_DEC_PUMP2_MIN && packet_buffer[PKT_DEST] <= JANDY_DEC_PUMP2_MAX) ) )
+  else if (READ_RSDEV_ePUMP && is_jandy_pump_id(packet_buffer[PKT_DEST]))
   {
     interestedInNextAck = DRS_EPUMP;
     printJandyDebugPacket("EPump", packet_buffer, packet_length);
     rtn = processPacketToJandyPump(packet_buffer, packet_length, aqdata);
     previous_packet_to = packet_buffer[PKT_DEST];
   }
-  else if (READ_RSDEV_JXI && packet_buffer[PKT_DEST] >= JANDY_DEC_JXI_MIN && packet_buffer[PKT_DEST] <= JANDY_DEC_JXI_MAX)
+  else if (READ_RSDEV_JXI && is_jxi_heater_id(packet_buffer[PKT_DEST]))
   {
     interestedInNextAck = DRS_JXI;
     printJandyDebugPacket("JXi", packet_buffer, packet_length);
     rtn = processPacketToJandyJXiHeater(packet_buffer, packet_length, aqdata);
     previous_packet_to = packet_buffer[PKT_DEST];
   }
-  else if (READ_RSDEV_LX && packet_buffer[PKT_DEST] >= JANDY_DEC_LX_MIN && packet_buffer[PKT_DEST] <= JANDY_DEC_LX_MAX)
+  else if (READ_RSDEV_LX && is_lx_heater_id(packet_buffer[PKT_DEST]))
   {
     interestedInNextAck = DRS_LX;
     printJandyDebugPacket("LX", packet_buffer, packet_length);
     rtn = processPacketToJandyLXHeater(packet_buffer, packet_length, aqdata);
     previous_packet_to = packet_buffer[PKT_DEST];
   }
-  else if (READ_RSDEV_CHEM_FEDR && packet_buffer[PKT_DEST] >= JANDY_DEC_CHEM_MIN && packet_buffer[PKT_DEST] <= JANDY_DEC_CHEM_MAX)
+  else if (READ_RSDEV_CHEM_FEDR && is_chem_feeder_id(packet_buffer[PKT_DEST] ))
   {
     interestedInNextAck = DRS_CHEM_FEED;
     printJandyDebugPacket("ChemL", packet_buffer, packet_length);
     rtn = processPacketToJandyChemFeeder(packet_buffer, packet_length, aqdata);
     previous_packet_to = packet_buffer[PKT_DEST];
   }
-  else if (READ_RSDEV_CHEM_ANLZ && packet_buffer[PKT_DEST] == JANDY_DEV_CHEM_ANLZ_MIN && packet_buffer[PKT_DEST] == JANDY_DEV_CHEM_ANLZ_MAX)
+  else if (READ_RSDEV_CHEM_ANLZ && is_chem_anlzer_id(packet_buffer[PKT_DEST]))
   {
     interestedInNextAck = DRS_CHEM_ANLZ;
     printJandyDebugPacket("CemSnr", packet_buffer, packet_length);
     rtn = processPacketToJandyChemAnalyzer(packet_buffer, packet_length, aqdata);
     previous_packet_to = packet_buffer[PKT_DEST];
   }
-  else if (READ_RSDEV_iAQLNK && packet_buffer[PKT_DEST] >= JANDY_DEV_AQLNK_MIN && packet_buffer[PKT_DEST] <= JANDY_DEV_AQLNK_MAX 
+  else if (READ_RSDEV_iAQLNK && is_aqualink_touch_id(packet_buffer[PKT_DEST]) // should we add is_iaqualink_id() as well????
           && packet_buffer[PKT_DEST] != _aqconfig_.extended_device_id) // We would have already read extended_device_id frame
   {
     process_iAqualinkStatusPacket(packet_buffer, packet_length, aqdata);
   }
-  else if (READ_RSDEV_HPUMP && packet_buffer[PKT_DEST] >= JANDY_DEV_HPUMP_MIN && packet_buffer[PKT_DEST] <= JANDY_DEV_HPUMP_MAX)
+  else if (READ_RSDEV_HPUMP && is_heat_pump_id(packet_buffer[PKT_DEST] ))
   {
     interestedInNextAck = DRS_HEATPUMP;
     printJandyDebugPacket("HPump", packet_buffer, packet_length);
     rtn = processPacketToHeatPump(packet_buffer, packet_length, aqdata);
     previous_packet_to = packet_buffer[PKT_DEST];
   }
-  else if (READ_RSDEV_JLIGHT && packet_buffer[PKT_DEST] >= JANDY_DEV_JLIGHT_MIN && packet_buffer[PKT_DEST] <= JANDY_DEV_JLIGHT_MAX)
+  else if (READ_RSDEV_JLIGHT && is_jandy_light_id(packet_buffer[PKT_DEST]))
   {
     interestedInNextAck = DRS_JLIGHT;
     printJandyDebugPacket("JLight", packet_buffer, packet_length);

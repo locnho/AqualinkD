@@ -723,6 +723,9 @@ void waitForSingleThreadOrTerminate(struct programmingThreadCtrl *threadCtrl, pr
   int tries = 120;
   static int waitTime = 1;
   int i=0;
+
+  // Make sure to update UI
+  SET_DIRTY(threadCtrl->aqdata->is_dirty);
 /*
   i = 0;
   while (get_aq_cmd_length() > 0 && ( i++ <= tries) ) {
@@ -767,6 +770,9 @@ void waitForSingleThreadOrTerminate(struct programmingThreadCtrl *threadCtrl, pr
               threadCtrl->aqdata->active_thread.ptype,
               threadCtrl->aqdata->active_thread.thread_id,
               ptypeName(threadCtrl->aqdata->active_thread.ptype));
+
+  // Make sure to update UI
+  SET_DIRTY(threadCtrl->aqdata->is_dirty);
 }
 
 void cleanAndTerminateThread(struct programmingThreadCtrl *threadCtrl)

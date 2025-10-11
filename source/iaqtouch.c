@@ -187,9 +187,13 @@ struct iaqt_page_button *iaqtFindButtonByLabel(const char *label) {
 
   for (i=0; i < IAQ_PAGE_BUTTONS; i++) {
     //if (_pageButtons[i].state != 0 || _pageButtons[i].type != 0 || _pageButtons[i].unknownByte != 0)
-    if (rsm_strcmp((char *)buttons[i].name,label) == 0)
+    if (rsm_strcmp((char *)buttons[i].name,label) == 0) {
+      LOG(IAQT_LOG, LOG_DEBUG, "Found button '%s'\n",label);
       return &buttons[i];
+    }
   }
+
+  LOG(IAQT_LOG, LOG_DEBUG, "Did not find button '%s'\n",label);
   return NULL;
 }
 
@@ -958,7 +962,8 @@ bool process_iaqtouch_packet(unsigned char *packet, int length, struct aqualinkd
         // NEED to rethink this approach.  ie, selecting light needs to hold open while showing page, no page end, then select light color, then message "please wait", the finally done 
       }
     }
-  } else if (isPDA_PANEL && packet[PKT_CMD] == CMD_IAQ_MSG_LONG) {
+  //} else if (isPDA_PANEL && packet[PKT_CMD] == CMD_IAQ_MSG_LONG) { // might want to add isPDA or JandyInfinateLight
+  } else if (packet[PKT_CMD] == CMD_IAQ_MSG_LONG) {
     char *sp;
     // Set disply message if PDA panel
     memset(message, 0, AQ_MSGLONGLEN + 1);

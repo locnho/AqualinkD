@@ -31,6 +31,7 @@
 
 
 #include "aq_serial.h"
+#include "rs_devices.h"
 #include "utils.h"
 #include "config.h"
 #include "packetLogger.h"
@@ -53,17 +54,17 @@ emulation_type getJandyDeviceType(unsigned char ID) {
   // Using emulation_type from aqprogrammer. At some point may merge into one
   // and call device type
 
-  if (ID >= 0x08 && ID <= 0x0B)
+  if ( is_allbutton_id(ID) )
     return ALLBUTTON;
-  if (ID >= 0x40 && ID <= 0x43)
+  if ( is_onetouch_id(ID))
     return ONETOUCH;
-  if (ID >= 0x48 && ID <= 0x4B)
+  if ( is_rsserialadapter_id(ID))
     return RSSADAPTER;
-  if (ID >= 0x60 && ID <= 0x63)
+  if ( is_pda_id(ID))
     return AQUAPDA;
-  if (ID >= 0x30 && ID <= 0x33)
+  if (is_aqualink_touch_id(ID ))
     return IAQTOUCH;
-   if (ID >= 0xa0 && ID <= 0xa3)
+  if (is_iaqualink_id(ID))
     return IAQUALNK;
 
 /*

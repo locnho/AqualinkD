@@ -1376,11 +1376,11 @@ uriAtype action_URI(request_source from, const char *URI, int uri_length, float 
   //aqualinkd/CHEM/pH/set
   //aqualinkd/CHEM/ORP/set
     if ( strncasecmp(ri2, "ORP", 3) == 0 ) {
-      _aqualink_data->orp = round(value);
+      SET_IF_CHANGED(_aqualink_data->orp, round(value), _aqualink_data->is_dirty);
       rtn = uActioned;
       LOG(NET_LOG,LOG_NOTICE, "%s: request to set ORP to %d\n",actionName[from],_aqualink_data->orp);
     } else if ( strncasecmp(ri2, "Ph", 2) == 0 ) {
-      _aqualink_data->ph = value;
+      SET_IF_CHANGED(_aqualink_data->ph, value, _aqualink_data->is_dirty);
       rtn = uActioned;
       LOG(NET_LOG,LOG_NOTICE, "%s: request to set Ph to %.2f\n",actionName[from],_aqualink_data->ph);
     } else {

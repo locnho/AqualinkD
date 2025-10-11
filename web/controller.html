@@ -52,8 +52,9 @@
       --tile_status_text: rgb(87, 87, 87);
 
       --value_tile_normal_color: rgb(4, 159, 248);
-      --value_tile_attention_color:  rgb(255, 187, 0);
-      --value_tile_outofrange_color:  rgb(255, 123, 0);
+      /*--value_tile_attention_color:  rgb(255, 187, 0);*/
+      --value_tile_attention_color:  rgb(255, 160, 0);
+      --value_tile_outofrange_color:  rgb(255, 100, 0);
 
       --options_radio_ball: 20px;
       --options_radio_highlight: #2196F3;
@@ -711,7 +712,7 @@
         //console.log("The code is not running inside an iframe.");
       }
 
-      console.log("Tile width "+window.getComputedStyle(document.documentElement).getPropertyValue('--tile-width'));
+      //console.log("Tile width "+window.getComputedStyle(document.documentElement).getPropertyValue('--tile-width'));
     }
 
     function populateLightProgram(type=0, current_mode="") {
@@ -2808,8 +2809,10 @@
         socket_di.onopen = function() {
           // success!
           get_devices();
-          // Set another load 1 minute from now just incase the server hasn't got all the devices yet
-          window.setTimeout(get_devices, (60 * 1000));
+          // Set recurring fetch every 1 minute
+          if (!window.devicesInterval) {
+            window.devicesInterval = setInterval(() => {get_devices();}, 60 * 1000);
+          }
           // Get Status just incase control panel hasn't connected yet
           get_status();
         }
@@ -2821,8 +2824,6 @@
           } else if (data.type == 'devices') {
             check_devices(data);
             resetBackgroundSize();
-            //window.setTimeout(get_devices, (300 * 1000)); // Check for new dvices ever 5 mins.
-            window.setTimeout(get_devices, (60 * 1000)); // Check for new dvices ever 1 mins.
           } else if (data.type == 'schedules') {
             cs_schedules(data);
           }

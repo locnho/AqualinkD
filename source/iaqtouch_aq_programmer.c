@@ -615,19 +615,32 @@ void *set_aqualink_iaqtouch_light_colormode( void *ptr )
   int typ = atoi(&buf[10]);
   bool use_current_mode = false;
   bool turn_off = false;
+  aqkey *key = NULL;
 
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_IAQTOUCH_LIGHTCOLOR_MODE);
 
   //char *buf = (char*)threadCtrl->thread_args;
   
-
-  if (btn < 0 || btn >= aqdata->total_buttons ) {
-    LOG(IAQT_LOG, LOG_ERR, "Can't program light mode on button %d\n", btn);
-    cleanAndTerminateThread(threadCtrl);
-    return ptr;
+  struct programmerArgs *pargs = &threadCtrl->pArgs;
+  if (pargs->button != NULL) {
+    key = threadCtrl->pArgs.button;
+    val = pargs->value;
+    if (isPLIGHT(key->special_mask)) {
+      typ = ((clight_detail *)key->special_mask_ptr)->lightType;
+    } else {
+      LOG(IAQT_LOG, LOG_ERR, "Can't can't get light type for button %s\n", key->label);
+      cleanAndTerminateThread(threadCtrl);
+      return ptr;
+    }
+  } else {
+    if (btn < 0 || btn >= aqdata->total_buttons ) {
+      LOG(IAQT_LOG, LOG_ERR, "Can't program light mode on button %d\n", btn);
+      cleanAndTerminateThread(threadCtrl);
+      return ptr;
+    }
+    key = &aqdata->aqbuttons[btn];
   }
 
-  aqkey *key = &aqdata->aqbuttons[btn];
   //unsigned char code = key->code;
   
   // We also need to cater for light being ON AND changing the color mode.  we have extra OK to hit.
@@ -635,11 +648,11 @@ void *set_aqualink_iaqtouch_light_colormode( void *ptr )
     use_current_mode = true;
     LOG(IAQT_LOG, LOG_INFO, "Light Programming #: %d, button: %s, color light type: %d, using current mode\n", val, key->label, typ);
     // NOT SURE WHAT TO DO HERE..... No color mode and iaatouch doesn;t support last color in PDA mode.
-  } else if (val == -1) {
+   } else if (val == -1) {
     turn_off = true;
     LOG(IAQT_LOG, LOG_INFO, "Light Programming #: %d, button: %s, color light type: %d, Turning off\n", val, key->label, typ);
-  } else {
-    mode_name = light_mode_name(typ, val-1, IAQTOUCH);
+   } else {
+    mode_name = light_mode_name(typ, val, IAQTOUCH);
     use_current_mode = false;
     if (mode_name == NULL) {
       LOG(IAQT_LOG, LOG_ERR, "Light Programming #: %d, button: %s, color light type: %d, couldn't find mode name '%s'\n", val, key->label, typ, mode_name);
@@ -650,9 +663,12 @@ void *set_aqualink_iaqtouch_light_colormode( void *ptr )
     }
   }
   
+  
   // See if it's on the current page
   button = iaqtFindButtonByLabel(key->label);
-  
+
+PRINTF("First button find = %s\n",button==NULL?"null":button->name);
+
   if (button == NULL) {
     // No luck, go to the device page
     if ( goto_iaqt_page(IAQ_PAGE_DEVICES, aqdata) == false )
@@ -660,12 +676,14 @@ void *set_aqualink_iaqtouch_light_colormode( void *ptr )
 
     button = iaqtFindButtonByLabel(key->label);
  
+PRINTF("Second button find = %s\n",button==NULL?"null":button->name);
   // If not found see if page has next
     if (button == NULL && iaqtFindButtonByIndex(16)->type == 0x03 ) {
       iaqt_queue_cmd(KEY_IAQTCH_NEXT_PAGE);
       waitfor_iaqt_nextPage(aqdata);
     // This will fail, since not looking at device page 2 buttons
       button = iaqtFindButtonByLabel(key->label);
+PRINTF("Third button find = %s\n",button==NULL?"null":button->name);
     }
   }
 
@@ -673,7 +691,9 @@ void *set_aqualink_iaqtouch_light_colormode( void *ptr )
     LOG(IAQT_LOG, LOG_ERR, "IAQ Touch did not find '%s' button on device list\n", key->label);
     goto f_end;
   }
+PRINTF("FOUND button = %s\n",button==NULL?"null":button->name);
   // WE have a iaqualink button, press it.
+  LOG(IAQT_LOG, LOG_DEBUG, "IAQ Touch found '%s' sending keycode '0x%02hhx'\n", key->label, button->keycode);
   send_aqt_cmd(button->keycode);
 
   // See if we want to use the last color, or turn it off
@@ -681,6 +701,7 @@ void *set_aqualink_iaqtouch_light_colormode( void *ptr )
     // After pressing the button, Just need to wait for 5 seconds and it will :- 
     // a) if off turn on and default to last color.
     // b) if on, turn off. (pain that we need to wait 5 seconds.)
+PRINTF("******** WAIT for next message\n");
     waitfor_iaqt_queue2empty();
     waitfor_iaqt_nextPage(aqdata);
     if (use_current_mode) {
@@ -707,19 +728,29 @@ void *set_aqualink_iaqtouch_light_colormode( void *ptr )
     goto f_end;
   }
 
+  // Now find the light mode and press it.
   button = iaqtFindButtonByLabel(mode_name);
   
   if (button == NULL) {
     LOG(IAQT_LOG, LOG_ERR, "IAQ Touch did find color '%s' in color light page\n",mode_name);
     goto f_end;
   }
+  
+  LOG(IAQT_LOG, LOG_DEBUG, "IAQ Touch found '%s' sending keycode '0x%02hhx'\n", mode_name, button->keycode);
+  send_aqt_cmd(button->keycode);
+  waitfor_iaqt_queue2empty();
+  // Wait for popup message to disapera
+  unsigned char page;
+  while ( (page = waitfor_iaqt_nextPage(aqdata)) != NUL) {
+     PRINTF("******** next page is '0x%02hhx'\n",page);
+  }
 
   //LOG(IAQT_LOG, LOG_ERR, "IAQ Touch WAIYING FOR 1 MESSAGES\n");
   //waitfor_iaqt_messages(aqdata, 1);
 
   // Finally found the color.  select it
-  send_aqt_cmd(button->keycode);
-  waitfor_iaqt_nextPage(aqdata);
+  //send_aqt_cmd(button->keycode);
+  //waitfor_iaqt_nextPage(aqdata);
   
   f_end:
   goto_iaqt_page(IAQ_PAGE_HOME, aqdata);

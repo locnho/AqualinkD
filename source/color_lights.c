@@ -23,14 +23,14 @@ bool isShowMode(const char *mode);
 char *_color_light_options[NUMBER_LIGHT_COLOR_TYPES][LIGHT_COLOR_OPTIONS] = 
 //char *_color_light_options[NUMBER_LIGHT_COLOR_TYPES][LIGHT_COLOR_OPTIONS] = 
 {
-   // AqualnkD Colors ignored as no names in control panel.
+   // 0 = AqualnkD Colors ignored as no names in control panel.
    { "Off", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18" },
-   { // Jandy Color
+   { // 1 = Jandy Color
         "Off",
         "Alpine White",  // 0x41
         "Sky Blue",
         "Cobalt Blue",
-        "Caribbean Blue",
+        "Caribbean Blu",
         "Spring Green",
         "Emerald Green",
         "Emerald Rose",
@@ -39,12 +39,12 @@ char *_color_light_options[NUMBER_LIGHT_COLOR_TYPES][LIGHT_COLOR_OPTIONS] =
         "Violet",
         "Color Splash"
   },
-  { // Jandy LED
+  { // 2 = Jandy LED
         "Off",
         "Alpine White",
         "Sky Blue",
         "Cobalt Blue",
-        "Caribbean Blue",
+        "Caribbean Blu",
         "Spring Green",
         "Emerald Green",
         "Emerald Rose",
@@ -56,7 +56,7 @@ char *_color_light_options[NUMBER_LIGHT_COLOR_TYPES][LIGHT_COLOR_OPTIONS] =
         "Fat Tuesday",
         "Disco Tech"
   },
-  { // SAm/SAL
+  { // 3 = SAm/SAL
         "Off",
         "White",
         "Light Green",
@@ -66,7 +66,7 @@ char *_color_light_options[NUMBER_LIGHT_COLOR_TYPES][LIGHT_COLOR_OPTIONS] =
         "Lavender",
         "Magenta"
   },
-  { // Color Logic 
+  { // 4 = Color Logic 
         "Off",
         "Voodoo Lounge",   // 0x41 (both home and sim)
         "Deep Blue Sea",   // 0x42 (both gome and sim)
@@ -81,7 +81,7 @@ char *_color_light_options[NUMBER_LIGHT_COLOR_TYPES][LIGHT_COLOR_OPTIONS] =
         "Mardi Gras",      // 0x50 (home panel) // 0x4b (simulator)
         "Cool Cabaret"     // 0x51 (home panel) // 0x4c
   },                 
-  { // IntelliBrite
+  { // 5 = IntelliBrite
         "Off",
         "SAm",
         "Party",
@@ -96,7 +96,7 @@ char *_color_light_options[NUMBER_LIGHT_COLOR_TYPES][LIGHT_COLOR_OPTIONS] =
         "White",
         "Magenta"
   },
-  { // Haywood Universal Color
+  { // 6 = Haywood Universal Color
         "Off",
         "Voodoo Lounge",   // 0x41 (both home and sim) // Looks like 28 + <value or index> = 0x41 = 1st index
         "Deep Blue Sea",   // 0x42 (both gome and sim)
@@ -116,7 +116,7 @@ char *_color_light_options[NUMBER_LIGHT_COLOR_TYPES][LIGHT_COLOR_OPTIONS] =
         "Mardi Gras",      // 0x50 (home panel) // 0x4b (simulator)
         "Cool Cabaret"     // 0x51 (home panel) // 0x4c
   },
-  {// Jandy Infinate Water Colors (RS485)
+  {// 7 = Jandy Infinate Water Colors (RS485)
         "Off",
         "Alpine White",
         "Sky Blue",
@@ -134,16 +134,16 @@ char *_color_light_options[NUMBER_LIGHT_COLOR_TYPES][LIGHT_COLOR_OPTIONS] =
         "Fat Tuesday",
         "Disco Tech"
   },
-  {/*Spare 2*/},
-  {/*Spare 3*/},
-  { // Dimmer    // From manual this is 0 for off, 128+<value%> so 153 = 25%  = 0x99
+  {/* 8 = Spare 2*/},
+  {/* 9 = Spare 3*/},
+  { // 10 = Dimmer    // From manual this is 0 for off, 128+<value%> so 153 = 25%  = 0x99
         "Off",
         "25%",  // 0x99 (simulator)  = 153 dec
         "50%",  // 0xb2 (simulator)  = 178 dec  same as (0x99 + 25)
         "75%",  // 0xcb (simulator)  = 203 dec
         "100%"  // 0xe4              = 228 dec
   },
-  {/* Dimmer with full range */}
+  {/* 11 = Dimmer with full range */}
 };
 
 // DON'T FORGET TO CHANGE    #define DIMMER_LIGHT_INDEX 10   in color_lights.h
@@ -251,9 +251,15 @@ const char *get_currentlight_mode_name(clight_detail light, emulation_type proto
   }
   // Rename any modes depending on emulation type
   if (protocol == ALLBUTTON) {
+    // Afternoon Skies = Afternoon Sky
     if (strcmp(_color_light_options[light.lightType][light.currentValue],"Afternoon Skies") == 0) {
       return "Afternoon Sky";
     }
+    //Caribbean Blue = Caribbean Blu
+    if (strcmp(_color_light_options[light.lightType][light.currentValue],"Caribbean Blue") == 0) {
+      return "Caribbean Blu";
+    }
+    
   }
 
   return _color_light_options[light.lightType][light.currentValue];

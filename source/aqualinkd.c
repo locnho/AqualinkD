@@ -29,6 +29,7 @@
 #include <time.h> // Need GNU_SOURCE & XOPEN defined for strptime
 
 #define AQUALINKD_C
+#include "rs_devices.h"
 #include "mongoose.h"
 #include "aqualink.h"
 #include "utils.h"
@@ -589,7 +590,7 @@ int startup(char *self, char *cfgFile)
 
   // Sanity check on Device ID's against panel type
   if (isRS_PANEL) {
-    if ( (_aqconfig_.device_id >= 0x08 && _aqconfig_.device_id <= 0x0B) || _aqconfig_.device_id == 0x00 ||  _aqconfig_.device_id == 0xFF) {
+    if ( is_allbutton_id(_aqconfig_.device_id) || _aqconfig_.device_id == 0x00 ||  _aqconfig_.device_id == 0xFF) {
       // We are good
     } else {
       LOG(AQUA_LOG,LOG_ERR, "Device ID 0x%02hhx does not match RS panel, Going to search for ID!\n", _aqconfig_.device_id);
@@ -597,7 +598,7 @@ int startup(char *self, char *cfgFile)
       //return EXIT_FAILURE;
     }
   } else if (isPDA_PANEL) {
-    if ( (_aqconfig_.device_id >= 0x60 && _aqconfig_.device_id <= 0x63) || _aqconfig_.device_id == 0x33 ||  _aqconfig_.device_id == 0xFF) {
+    if ( is_pda_id(_aqconfig_.device_id) || _aqconfig_.device_id == 0x33 ||  _aqconfig_.device_id == 0xFF) {
       if ( _aqconfig_.device_id == 0x33 ) {
         LOG(AQUA_LOG,LOG_NOTICE, "Enabeling iAqualink protocol.\n");
         _aqconfig_.enable_iaqualink = true;
@@ -613,7 +614,7 @@ int startup(char *self, char *cfgFile)
   }
 
   if (_aqconfig_.rssa_device_id != 0x00) {
-    if (_aqconfig_.rssa_device_id >= 0x48 && _aqconfig_.rssa_device_id <= 0x4B  /*&& _aqconfig_.rssa_device_id != 0xFF*/) {
+    if ( is_rsserialadapter_id(_aqconfig_.rssa_device_id) ) {
       // We are good
     } else {
       LOG(AQUA_LOG,LOG_ERR, "RSSA Device ID 0x%02hhx does not match RS panel, please check config!\n", _aqconfig_.rssa_device_id);
@@ -623,9 +624,7 @@ int startup(char *self, char *cfgFile)
 
 
   if (_aqconfig_.extended_device_id != 0x00) {
-    if ( (_aqconfig_.extended_device_id >= 0x30 && _aqconfig_.extended_device_id <= 0x33) || 
-         (_aqconfig_.extended_device_id >= 0x40 && _aqconfig_.extended_device_id <= 0x43) /*||
-          _aqconfig_.extended_device_id != 0xFF*/ ) {
+    if ( is_aqualink_touch_id(_aqconfig_.extended_device_id) ||  is_onetouch_id(_aqconfig_.extended_device_id ) ) {
       // We are good
     } else {
       LOG(AQUA_LOG,LOG_ERR, "Extended Device ID 0x%02hhx does not match OneTouch or AqualinkTouch ID, please check config!\n", _aqconfig_.extended_device_id);
@@ -1087,13 +1086,13 @@ void main_loop()
   }
 #endif
 
-  if (_aqconfig_.rssa_device_id >= 0x48 && _aqconfig_.rssa_device_id <= 0x49) {
+  if ( is_rsserialadapter_id(_aqconfig_.rssa_device_id )) {
     addPanelRSserialAdapterInterface();
   }
 
-  if (_aqconfig_.extended_device_id >= 0x40 && _aqconfig_.extended_device_id <= 0x43) {
+  if ( is_onetouch_id(_aqconfig_.extended_device_id)) {
     addPanelOneTouchInterface();
-  } else if (_aqconfig_.extended_device_id >= 0x30 && _aqconfig_.extended_device_id <= 0x33) {
+  } else if ( is_aqualink_touch_id(_aqconfig_.extended_device_id)) {
     addPanelIAQTouchInterface();
   }
 

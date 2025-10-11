@@ -21,6 +21,7 @@
 #include <string.h>
 
 #include "aqualink.h"
+#include "rs_devices.h"
 #include "aq_serial.h"
 #include "devices_pentair.h"
 #include "utils.h"
@@ -45,7 +46,7 @@ bool processPentairPacket(unsigned char *packet, int packet_length, struct aqual
   //static int pumpIndex = 1;
   
   // Status from pump
-  if ( packet[PEN_PKT_CMD] == PEN_CMD_STATUS && packet[PEN_PKT_FROM] >= PENTAIR_DEC_PUMP_MIN &&  packet[PEN_PKT_FROM] <= PENTAIR_DEC_PUMP_MAX ){
+  if ( packet[PEN_PKT_CMD] == PEN_CMD_STATUS && is_pentair_pump_id(packet[PEN_PKT_FROM] ) ){
     // We have Pentair Pump packet, let's see if it's configured.
     //printf("PUMP\n");
 
@@ -97,7 +98,7 @@ bool processPentairPacket(unsigned char *packet, int packet_length, struct aqual
     // 
   }
   // Set RPM/GPM to pump 
-  else if (packet[PEN_PKT_CMD] == PEN_CMD_SPEED && packet[PEN_PKT_DEST] >= PENTAIR_DEC_PUMP_MIN &&  packet[PEN_PKT_DEST] <= PENTAIR_DEC_PUMP_MAX) {
+  else if (packet[PEN_PKT_CMD] == PEN_CMD_SPEED && packet[PEN_PKT_DEST] >= PENTAIR_DEV_PUMP_MIN &&  packet[PEN_PKT_DEST] <= PENTAIR_DEV_PUMP_MAX) {
 
     //(msg.extractPayloadByte(2) & 32) >> 5 === 0 ? 'RPM' : 'GPM';
 
@@ -110,7 +111,7 @@ bool processPentairPacket(unsigned char *packet, int packet_length, struct aqual
     }
   }
   // Set power to pump 
-  else if (packet[PEN_PKT_CMD] == PEN_CMD_POWER && packet[PEN_PKT_DEST] >= PENTAIR_DEC_PUMP_MIN &&  packet[PEN_PKT_DEST] <= PENTAIR_DEC_PUMP_MAX) {
+  else if (packet[PEN_PKT_CMD] == PEN_CMD_POWER && packet[PEN_PKT_DEST] >= PENTAIR_DEV_PUMP_MIN &&  packet[PEN_PKT_DEST] <= PENTAIR_DEV_PUMP_MAX) {
     if (packet[9] == 0x0A) {
       LOG(DPEN_LOG, LOG_INFO,"Pentair Pump 0x%02hhx request set power ON\n",packet[PEN_PKT_DEST]);
     } else {
