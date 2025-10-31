@@ -481,6 +481,12 @@ void init_parameters (struct aqconfig * parms)
   _cfgParams[_numCfgParams].name = CFG_N_force_chem_feeder;
   _cfgParams[_numCfgParams].mask = FORCE_CHEM_FEEDER;
   _cfgParams[_numCfgParams].default_value = (void *)&_dcfg_false;
+  _numCfgParams++;
+  _cfgParams[_numCfgParams].value_ptr = &_aqconfig_.force_device_devmask;
+  _cfgParams[_numCfgParams].value_type = CFG_BITMASK;
+  _cfgParams[_numCfgParams].name = CFG_N_force_chem_feeder_mqtt;
+  _cfgParams[_numCfgParams].mask = FORCE_CHEM_FEEDER_MQTT;
+  _cfgParams[_numCfgParams].default_value = (void *)&_dcfg_false;
 
     //When we add chiller support
   _numCfgParams++;

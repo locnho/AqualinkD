@@ -48,6 +48,7 @@
 #include "color_lights.h"
 #include "net_interface.h"
 #include "aq_systemutils.h"
+#include "chem_feeder_mqtt.h"
 
 #ifdef AQ_PDA
 #include "pda.h"
@@ -1999,6 +2000,13 @@ static void ev_handler(struct mg_connection *nc, int ev, void *ev_data) {
       send_mqtt(nc, aq_topic ,MQTT_ON);
 
       publish_mqtt_discovery( _aqualink_data, nc);
+
+      if (ENABLE_CHEM_FEEDER_MQTT) {
+        memset(&sub_opts, 0, sizeof(sub_opts));
+        sub_opts.topic = mg_str(CHEM_FEEDER_MQTT_TOPIC);
+        sub_opts.qos = qos;
+        mg_mqtt_sub(nc, &sub_opts);
+      }
     }
     break;
 
@@ -2016,7 +2024,11 @@ static void ev_handler(struct mg_connection *nc, int ev, void *ev_data) {
         DEBUG_TIMER_START(&tid); 
         action_mqtt_message(nc, mqtt_msg);
         DEBUG_TIMER_STOP(tid, NET_LOG, "MQTT Request action_mqtt_message() took"); 
-    } else {
+    } else if (ENABLE_CHEM_FEEDER_MQTT && is_chem_feeder_mqtt(mqtt_msg->topic.buf, mqtt_msg->topic.len)) {
+        LOG(NET_LOG,LOG_DEBUG, "MQTT: received (msg_id: %d), %.*s\n", mqtt_msg->id, mqtt_msg->topic.len, mqtt_msg->topic.buf);
+        chem_feeder_mqtt_process_msg(_aqualink_data, mqtt_msg->data.buf, mqtt_msg->data.len);
+    }
+    else {
       LOG(NET_LOG,LOG_DEBUG, "MQTT: received (msg_id: %d), %.*s ignoring\n", mqtt_msg->id, mqtt_msg->topic.len, mqtt_msg->topic.buf);
     }
     break;

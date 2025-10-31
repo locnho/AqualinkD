@@ -141,12 +141,14 @@ struct aqconfig _aqconfig_;
 #define FORCE_FREEZEPROTECT_SP (1 << 2)
 #define FORCE_CHEM_FEEDER      (1 << 3) // rename to FORCE_CHEMICALS
 #define FORCE_CHILLER          (1 << 4)
+#define FORCE_CHEM_FEEDER_MQTT (1 << 5)
 
 #define ENABLE_SWG           ((_aqconfig_.force_device_devmask & FORCE_SWG_SP) == FORCE_SWG_SP)
 #define ENABLE_HEATERS       ((_aqconfig_.force_device_devmask & FORCE_POOLSPA_SP) == FORCE_POOLSPA_SP)
 #define ENABLE_FREEZEPROTECT ((_aqconfig_.force_device_devmask & FORCE_FREEZEPROTECT_SP) == FORCE_FREEZEPROTECT_SP)
 #define ENABLE_CHEM_FEEDER   ((_aqconfig_.force_device_devmask & FORCE_CHEM_FEEDER) == FORCE_CHEM_FEEDER)
 #define ENABLE_CHILLER       ((_aqconfig_.force_device_devmask & FORCE_CHILLER) == FORCE_CHILLER)
+#define ENABLE_CHEM_FEEDER_MQTT ((_aqconfig_.force_device_devmask & FORCE_CHEM_FEEDER_MQTT) == FORCE_CHEM_FEEDER_MQTT)
 
 /*
 #ifndef CONFIG_C
@@ -286,6 +288,7 @@ int _numCfgParams;
 #define CFG_N_force_ps_setpoints                "force_ps_setpoints"
 #define CFG_N_force_frzprotect_setpoints        "force_frzprotect_setpoints"
 #define CFG_N_force_chem_feeder                 "force_chem_feeder"
+#define CFG_N_force_chem_feeder_mqtt            "force_mqtt_chem_feeder"
 #define CFG_N_force_chiller                     "force_chiller"
 #define CFG_N_display_warnings_web              "display_warnings_web"
 #define CFG_N_log_protocol_packets              "log_protocol_packets"

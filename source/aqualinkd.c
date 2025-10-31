@@ -59,6 +59,7 @@
 #include "json_messages.h"
 #include "aq_systemutils.h"
 #include "auto_configure.h"
+#include "chem_feeder_mqtt.h"
 
 #ifdef AQ_MANAGER
 #include "serial_logger.h"
@@ -1116,6 +1117,10 @@ void main_loop()
 
   if ( _aqualink_data.num_sensors > 0){
     start_sensors_thread(&_aqualink_data);
+  }
+
+  if (ENABLE_CHEM_FEEDER_MQTT) {
+    chem_feeder_mqtt_init(&_aqualink_data);
   }
 
   /*
