@@ -9,12 +9,14 @@ jobs:
   stale:
     runs-on: ubuntu-latest
     permissions:
+      actions: write
       issues: write
       pull-requests: write
     steps:
       - uses: actions/stale@v9
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+          operations-per-run: 60
           days-before-issue-stale: 120
           days-before-issue-close: 10
           stale-issue-message: "This issue has been automatically marked as stale because it has not had recent activity. It will be closed if no further activity occurs within 30 days."
