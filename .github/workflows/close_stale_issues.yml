@@ -3,6 +3,7 @@ on:
   schedule:
     # Run every day at 1:30 UTC
     - cron: '30 1 * * *'
+  workflow_dispatch: # Allow manual run
 
 jobs:
   stale:
