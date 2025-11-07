@@ -137,6 +137,7 @@ NEED TO FIX FOR THIS RELEASE.
 
 -->
 # Updates in 3.0.0 (dev)
+* WARNING V3.0 has undergone a significant amount code changes and refactoring, there may be issues.
 * Serial optimization for AqualinkD HAT.
 * upgraded network library ( HTTP(S), MQTT(S), WS )
 * Added support for HTTPS and MQTTS
@@ -159,7 +160,7 @@ NEED TO FIX FOR THIS RELEASE.
   * Finish off assigning light mode & functionality to a vbutton (for Jandy Infinite water color support )
   * cleanup rs_msg_utils.c
   * WebUI Config in aqmanager.
-  * Move all programming threads over to using struct programmerArgs.
+
   
 # Updates in 2.6.11 (Sept 14 2025)
 * Cleaned up exit codes.

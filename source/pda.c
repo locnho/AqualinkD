@@ -308,7 +308,11 @@ void process_pda_packet_msg_long_time(const char *msg)
   if (checkAqualinkTime() != true)
   {
     LOG(PDA_LOG,LOG_NOTICE, "RS time is NOT accurate '%s %s', re-setting on controller!\n", _aqualink_data->time, _aqualink_data->date);
+#ifdef NEW_AQ_PROGRAMMER
+    aq_programmer(AQ_SET_TIME, NULL, AQP_NULL, AQP_NULL, _aqualink_data);
+#else
     aq_programmer(AQ_SET_TIME, NULL, _aqualink_data);
+#endif
   }
   
   SET_DIRTY(_aqualink_data->is_dirty);
@@ -465,6 +469,12 @@ void process_pda_packet_msg_long_set_temp(const char *msg)
     setSingleDeviceMode();
     SET_IF_CHANGED(_aqualink_data->spa_htr_set_point, atoi(msg + 10), _aqualink_data->is_dirty);
     LOG(PDA_LOG,LOG_DEBUG, "spa_htr_set_point = %d\n", _aqualink_data->spa_htr_set_point);
+    get_pda_temp_units(msg);
+  }
+  else if (stristr(msg, "CHILLER") != NULL)
+  {
+    SET_IF_CHANGED(_aqualink_data->chiller_set_point, atoi(msg + 10), _aqualink_data->is_dirty);
+    LOG(PDA_LOG,LOG_DEBUG, "chiller_set_point = %d\n", _aqualink_data->chiller_set_point);
     get_pda_temp_units(msg);
   }
 
@@ -1046,10 +1056,18 @@ bool process_pda_packet(unsigned char *packet, int length)
           if (_aqconfig_->use_panel_aux_labels)
              aq_programmer(AQ_GET_AUX_LABELS, NULL, _aqualink_data);
 #endif
+#ifdef NEW_AQ_PROGRAMMER
+          aq_programmer(AQ_PDA_WAKE_INIT, NULL, AQP_NULL, AQP_NULL, _aqualink_data);
+#else
           aq_programmer(AQ_PDA_WAKE_INIT, NULL, _aqualink_data);
+#endif
         } else {
           LOG(PDA_LOG,LOG_DEBUG, "**** PDA WAKE INIT ****\n");
+#ifdef NEW_AQ_PROGRAMMER
+          aq_programmer(AQ_PDA_WAKE_INIT, NULL, AQP_NULL, AQP_NULL, _aqualink_data);
+#else
           aq_programmer(AQ_PDA_WAKE_INIT, NULL, _aqualink_data);
+#endif
         }
       }
     break;

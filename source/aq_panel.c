@@ -19,6 +19,7 @@
 #include <string.h>
 #include <ctype.h>
 
+#define AQ_PANEL_C_
 #include "rs_devices.h"
 #include "config.h"
 #include "aq_panel.h"
@@ -33,6 +34,7 @@ void programDeviceLightMode(struct aqualinkdata *aqdata, int value, int button);
 void programDeviceLightBrightness(struct aqualinkdata *aqdata, int value, int deviceIndex, bool expectMultiple, request_source source);
 void printPanelSupport(struct aqualinkdata *aqdata);
 uint16_t setPanelSupport(struct aqualinkdata *aqdata);
+uint16_t getPanelBitmaskFromName(const char *str);
 
 
 void removePanelRSserialAdapterInterface();
@@ -154,7 +156,7 @@ void checkPanelConfig(struct aqualinkdata *aqdata) {
     }
   }
 
-  // Serial Adapter
+  // Serial Adapter supported and set
   if ( is_rsserialadapter_id(_aqconfig_.rssa_device_id)) {
     if ( !isMASKSET(aqdata->panel_support_options, RSP_SUP_RSSA)) {
       LOG(PANL_LOG, LOG_ERR, "Panel REV %s does not support RS SerialAdapter protocol, please change configuration option '%s'\n",aqdata->panel_rev, CFG_N_rssa_device_id);
@@ -163,6 +165,29 @@ void checkPanelConfig(struct aqualinkdata *aqdata) {
       removePanelRSserialAdapterInterface();
     }
   }
+
+
+  if ( isMASKSET(aqdata->panel_support_options, RSP_SUP_RSSA)) {
+    if ( ! is_rsserialadapter_id(_aqconfig_.rssa_device_id)) {
+      LOG(PANL_LOG, LOG_WARNING, "Panel supports RS Serial Adapter, for better performance please set '%s=0x%02hhx' in config\n", CFG_N_rssa_device_id, RS_SERIAL_ADAPTER_MIN);
+    }
+  }
+
+  // At present only need to set extended_device_id for certain things, no need to print warning as it only add to panel load
+  // VSP / Chiller / VButtons etc
+/* 
+  if ( isMASKSET(aqdata->panel_support_options, RSP_SUP_AQLT)) {
+    if ( ! is_aqualink_touch_id(_aqconfig_.extended_device_id)) {
+      LOG(PANL_LOG, LOG_WARNING, "Panel supports iAqualink Touch, for better performance please set '%s' to an ID between 0x%02hhx & 0x%02hhx' in config\n", CFG_N_extended_device_id_programming, AQUALINKTOUCH_MIN, AQUALINKTOUCH_MAX);
+    
+    }
+  } else if ( isMASKSET(aqdata->panel_support_options, RSP_SUP_ONET)) {
+    if ( ! is_onetouch_id(_aqconfig_.extended_device_id) ) {
+      LOG(PANL_LOG, LOG_WARNING, "Panel supports OneTouch, for better performance please set '%s' to an ID between 0x%02hhx & 0x%02hhx' in config\n", CFG_N_extended_device_id_programming, ONETOUCH_MIN, ONETOUCH_MAX);
+    }
+  }
+*/
+
 }
 
 /*
@@ -227,7 +252,7 @@ uint8_t setPanelInformationFromPanelMsg(struct aqualinkdata *aqdata, const char 
             setMASK(rtn, PANEL_REV);
             LOG(PANL_LOG, LOG_NOTICE, "Panel REV %s from %s\n",aqdata->panel_rev,getJandyDeviceName(source));
             setPanelSupport(aqdata);
-            //printPanelSupport(aqdata);
+            printPanelSupport(aqdata);
             if (source == SIM_NONE) { 
               // We pass SIM_NONE when we are in auto_config mode, so reset the panel name so we get it again when we fully start
               aqdata->panel_rev[0] = '\0';
@@ -295,25 +320,73 @@ uint8_t setPanelInformationFromPanelMsg(struct aqualinkdata *aqdata, const char 
           if (source == SIM_NONE) { 
             // We pass SIM_NONE when we are in auto_config mode,so re-set the actual panel size
             setPanelByName(aqdata, aqdata->panel_string);
+          } else {
+            // Should check panel.
+            uint16_t panelMask = getPanelBitmaskFromName(aqdata->panel_string);
+            
+            if ( (panelMask & PANEL_COMPARISON_MASK) != (_aqconfig_.paneltype_mask & PANEL_COMPARISON_MASK) ) {
+              //printf("******** Config mismatch = %s vs %s\n",aqdata->panel_string, getPanelString());
+              LOG(PANL_LOG, LOG_ERR, "Panel type mismatch, Panel returned = '%s', AqualinkD Config = '%s'\n",aqdata->panel_string, getPanelString());
+              //PRINT_SET_BITS(panelMask);
+              //PRINT_SET_BITS(_aqconfig_.paneltype_mask);
+            } else {/*
+              printf("******** Config mismatch = %s vs %s\n",aqdata->panel_string, getPanelString());
+              PRINT_SET_BITS(panelMask);
+              PRINT_SET_BITS(_aqconfig_.paneltype_mask);
+              printf("Compared\n");
+              PRINT_SET_BITS((panelMask & PANEL_COMPARISON_MASK));
+              PRINT_SET_BITS((_aqconfig_.paneltype_mask & PANEL_COMPARISON_MASK));*/
+            }
           }
         } else {
-        // ERROR not in string.
+          // ERROR not in string.
+          //LOG(PANL_LOG, LOG_ERR, "Did not understand panel string '%s'\n",input);
         }
       } else {
         //already set
       }
     }
 
+    aqdata->is_dirty = true;
     return rtn;
 }
 
+
+uint16_t setPDAPanelSupport(struct aqualinkdata *aqdata)
+{
+  //LOG(PANL_LOG,LOG_NOTICE, "PDA Panel revision '%s' unknown support options\n", aqdata->panel_rev);
+
+  if (aqdata->panel_rev[0] >= 49){ // 1 in ascii
+    //aqdata->panel_support_options
+  }
+  if (aqdata->panel_rev[0] >= 50){ // 2 in ascii
+    //aqdata->panel_support_options
+  }  
+  if (aqdata->panel_rev[0] >= 51){ // 3 in ascii
+    aqdata->panel_support_options |= RSP_SUP_HPCHIL;
+  }
+  if (aqdata->panel_rev[0] >= 52){ // 4 in ascii
+    aqdata->panel_support_options |= RSP_SUP_VSP;
+  }
+  if (aqdata->panel_rev[0] >= 53){ // 5 in ascii
+    aqdata->panel_support_options |= RSP_SUP_CHEM;
+  }
+  if (aqdata->panel_rev[0] >= 54){ // 6 in ascii
+    aqdata->panel_support_options  |= RSP_SUP_AQLT;
+  }
+  if (aqdata->panel_rev[0] >= 55){ // 7 in ascii
+    //aqdata->panel_support_options
+  }
+
+  return aqdata->panel_support_options;
+}
 
 uint16_t setPanelSupport(struct aqualinkdata *aqdata)
 {
 
   if (! isalpha(aqdata->panel_rev[0])) {
     if (isPDA_PANEL) {
-      LOG(PANL_LOG,LOG_NOTICE, "PDA Panel revision '%s' unknown support options\n", aqdata->panel_rev);
+      return setPDAPanelSupport(aqdata);
     } else {
       LOG(PANL_LOG,LOG_WARNING, "Panel revision is not understood '%s', please report this issue\n", aqdata->panel_rev);
     }
@@ -407,52 +480,52 @@ uint16_t setPanelSupport(struct aqualinkdata *aqdata)
 
 void printPanelSupport(struct aqualinkdata *aqdata) {
   if (isMASK_SET(aqdata->panel_support_options, RSP_SUP_ONET )) {
-    LOG(PANL_LOG,LOG_NOTICE, "Panel supports: One Touch\n");
+    LOG(PANL_LOG,LOG_DEBUG, "Panel supports: One Touch\n");
   }
   if (isMASK_SET(aqdata->panel_support_options, RSP_SUP_AQLT )) {
-    LOG(PANL_LOG,LOG_NOTICE, "Panel supports: Aqualink Touch\n");
+    LOG(PANL_LOG,LOG_DEBUG, "Panel supports: Aqualink Touch\n");
   }
   if (isMASK_SET(aqdata->panel_support_options, RSP_SUP_ONET_EARLY )) {
-    LOG(PANL_LOG,LOG_NOTICE, "Panel supports: One Touch (Early)\n");
+    LOG(PANL_LOG,LOG_DEBUG, "Panel supports: One Touch (Early)\n");
   }
   if (isMASK_SET(aqdata->panel_support_options, RSP_SUP_IAQL )) {
-    LOG(PANL_LOG,LOG_NOTICE, "Panel supports: iAqualink 1.0/2.0\n");
+    LOG(PANL_LOG,LOG_DEBUG, "Panel supports: iAqualink 1.0/2.0\n");
   }
    if (isMASK_SET(aqdata->panel_support_options, RSP_SUP_IAQL3 )) {
-    LOG(PANL_LOG,LOG_NOTICE, "Panel supports: iAqualink 3.0\n");
+    LOG(PANL_LOG,LOG_DEBUG, "Panel supports: iAqualink 3.0\n");
   }
   if (isMASK_SET(aqdata->panel_support_options, RSP_SUP_RSSA )) {
-    LOG(PANL_LOG,LOG_NOTICE, "Panel supports: RS Serial Adapter\n");
+    LOG(PANL_LOG,LOG_DEBUG, "Panel supports: RS Serial Adapter\n");
   }
   if (isMASK_SET(aqdata->panel_support_options, RSP_SUP_VSP )) {
-    LOG(PANL_LOG,LOG_NOTICE, "Panel supports: Variable Speed Pumps\n");
+    LOG(PANL_LOG,LOG_DEBUG, "Panel supports: Variable Speed Pumps\n");
   }
   if (isMASK_SET(aqdata->panel_support_options, RSP_SUP_CHEM )) {
-    LOG(PANL_LOG,LOG_NOTICE, "Panel supports: Chemical feeder\n");
+    LOG(PANL_LOG,LOG_DEBUG, "Panel supports: Chemical feeder\n");
   }
   if (isMASK_SET(aqdata->panel_support_options, RSP_SUP_TSCHEM )) {
-    LOG(PANL_LOG,LOG_NOTICE, "Panel supports: True Sense Chemical Reader\n");
+    LOG(PANL_LOG,LOG_DEBUG, "Panel supports: True Sense Chemical Reader\n");
   }
   if (isMASK_SET(aqdata->panel_support_options, RSP_SUP_SWG )) {
-    LOG(PANL_LOG,LOG_NOTICE, "Panel supports: Salt Water Generator\n");
+    LOG(PANL_LOG,LOG_DEBUG, "Panel supports: Salt Water Generator\n");
   }
   if (isMASK_SET(aqdata->panel_support_options, RSP_SUP_CLIT )) {
-    LOG(PANL_LOG,LOG_NOTICE, "Panel supports: Color Lights\n");
+    LOG(PANL_LOG,LOG_DEBUG, "Panel supports: Color Lights\n");
   }
   if (isMASK_SET(aqdata->panel_support_options, RSP_SUP_DLIT )) {
-    LOG(PANL_LOG,LOG_NOTICE, "Panel supports: Dimmable Lights\n");
+    LOG(PANL_LOG,LOG_DEBUG, "Panel supports: Dimmable Lights\n");
   }
   if (isMASK_SET(aqdata->panel_support_options, RSP_SUP_VBTN )) {
-    LOG(PANL_LOG,LOG_NOTICE, "Panel supports: Virtual Button\n");
+    LOG(PANL_LOG,LOG_DEBUG, "Panel supports: Virtual Button\n");
   }
   if (isMASK_SET(aqdata->panel_support_options, RSP_SUP_PLAB )) {
-    LOG(PANL_LOG,LOG_NOTICE, "Panel supports: Variable Speed Pump (By Label & extended ID)\n");
+    LOG(PANL_LOG,LOG_DEBUG, "Panel supports: Variable Speed Pump (By Label & extended ID)\n");
   }
   if (isMASK_SET(aqdata->panel_support_options, RSP_SUP_HPCHIL )) {
-    LOG(PANL_LOG,LOG_NOTICE, "Panel supports: Heat Pump / Chiller\n");
+    LOG(PANL_LOG,LOG_DEBUG, "Panel supports: Heat Pump / Chiller\n");
   }
   if (isMASK_SET(aqdata->panel_support_options, RSP_SUP_PCDOC )) {
-    LOG(PANL_LOG,LOG_NOTICE, "Panel supports: PC Dock\n");
+    LOG(PANL_LOG,LOG_DEBUG, "Panel supports: PC Dock\n");
   }
 }
 
@@ -491,7 +564,29 @@ void removePanelIAQTouchInterface() {
   _aqconfig_.paneltype_mask &= ~RSP_IAQT;
 }
 
+int pSizeFromMask(uint16_t mask) {
+  if ((mask & RSP_4) == RSP_4)
+    return 4;
+  else if ((mask & RSP_6) == RSP_6)
+    return 6;
+  else if ((mask & RSP_8) == RSP_8)
+    return 8;
+  else if ((mask & RSP_12) == RSP_12)
+    return 10;
+  else if ((mask & RSP_10) == RSP_10)
+    return 12;
+  else if ((mask & RSP_14) == RSP_14)
+    return 14;
+  else if ((mask & RSP_16) == RSP_16)
+    return 16;
+  
+  LOG(PANL_LOG,LOG_ERR, "Internal error, panel size not set, using 8\n");
+  return 8;
+}
+
 int PANEL_SIZE() {
+  return pSizeFromMask(_aqconfig_.paneltype_mask);
+  /*
   if ((_aqconfig_.paneltype_mask & RSP_4) == RSP_4)
     return 4;
   else if ((_aqconfig_.paneltype_mask & RSP_6) == RSP_6)
@@ -509,6 +604,7 @@ int PANEL_SIZE() {
   
   LOG(PANL_LOG,LOG_ERR, "Internal error, panel size not set, using 8\n");
   return 8;
+  */
 }
 //bool setPanel(const char *str);
 /*
@@ -645,8 +741,83 @@ void setPanel(struct aqualinkdata *aqdata, bool rs, int size, bool combo, bool d
   setPanelString();
 }
 
+uint16_t getPanelBitmaskFromName(const char *str)
+{
+  uint16_t paneltype_mask = 0;
+  int i;
+  int size = 0;
+  //bool rs = true;
+  //bool combo = true;
+  //bool dual = false;
+  //int16_t panelbits = 0;
+  
+  if (str[0] == 'R' && str[1] == 'S') { // RS Panel
+    paneltype_mask |= RSP_RS;
+    if (str[4] == '/')
+      size = atoi(&str[5]);
+    else
+      size = atoi(&str[3]);
+  } else if (str[0] == 'P' && str[1] == 'D') { // PDA Panel
+    paneltype_mask |= RSP_PDA;
+    //printf("Char at 0=%c 1=%c 2=%c 3=%c 4=%c 5=%d 6=%c\n", str[0], str[1], str[2], str[3], str[4], str[5], str[6]);
+    if (str[2] == '-' || str[2] == ' ') // Account for PD-8
+      size = atoi(&str[3]);
+    else if (str[3] == '-' && str[4] == 'P' && str[5] == 'S') // PDA-PS4 Combo
+      size = atoi(&str[6]);
+    else if (str[3] == '-' && str[4] == 'P') // PDA-P6 Only
+      size = atoi(&str[5]);
+    else // Account for PDA-8
+      size = atoi(&str[4]);
+  } else {
+    LOG(PANL_LOG,LOG_ERR, "Didn't understand panel type, '%.2s' from '%s' setting to size to RS-8\n",str,str);
+  }
+
+  switch (size) {
+    case 4:
+      paneltype_mask |= RSP_4;
+    break;
+    case 6:
+      paneltype_mask |= RSP_6;
+    break;
+    case 8:
+      paneltype_mask |= RSP_8;
+    break;
+    case 10:
+      paneltype_mask |= RSP_10;
+    break;
+    case 12:
+      paneltype_mask |= RSP_12;
+    break;
+    case 14:
+      paneltype_mask |= RSP_14;
+    break;
+    case 16:
+      paneltype_mask |= RSP_16;
+    break;
+    default:
+      LOG(PANL_LOG,LOG_ERR, "Didn't understand panel size, '%d' setting to size to 8\n",size);
+    break;
+  }
+
+  i=3;
+  while(str[i] != ' ' && i < strlen(str)) {i++;}
+  
+  if (str[i+1] == 'O' || str[i+1] == 'o') {
+    paneltype_mask |= RSP_SINGLE;
+  } else if (str[i+1] == 'C' || str[i+1] == 'c') {
+    paneltype_mask |= RSP_COMBO;
+  } else if (str[i+1] == 'D' || str[i+1] == 'd') {
+    paneltype_mask |= RSP_DUAL_EQPT;
+  } else {
+    LOG(PANL_LOG,LOG_ERR, "Didn't understand panel type, '%s' from '%s' setting to Combo\n",&str[i+1],str);
+  }
+
+  return paneltype_mask;
+}
+
 void setPanelByName(struct aqualinkdata *aqdata, const char *str)
 {
+  /*
   int i;
   int size = 0;
   bool rs = true;
@@ -692,9 +863,19 @@ void setPanelByName(struct aqualinkdata *aqdata, const char *str)
     LOG(PANL_LOG,LOG_ERR, "Didn't understand panel type, '%s' from '%s' setting to Combo\n",&str[i+1],str);
     combo = true;
   }
-
+  
   //setPanelSize(size, combo, dual, pda)
   setPanel(aqdata, rs, size, combo, dual);
+  */
+
+  uint16_t panelMask = getPanelBitmaskFromName(str);
+
+  setPanel(aqdata,
+          ((panelMask & RSP_RS) == RSP_RS),
+          pSizeFromMask(panelMask),
+          ((panelMask & RSP_COMBO) == RSP_COMBO),
+          ((panelMask & RSP_DUAL_EQPT) == RSP_DUAL_EQPT));
+
 }
 
 aqkey *addVirtualButton(struct aqualinkdata *aqdata, char *label, int vindex) {
@@ -1064,9 +1245,8 @@ void initPanelButtons(struct aqualinkdata *aqdata, bool rs, int size, bool combo
   aqdata->total_buttons = index;
   aqdata->virtual_button_start = 0;
 
-
-    aqdata->rs16_vbutton_start = 13 - (combo?0:1);
-    aqdata->rs16_vbutton_end = 16 - (combo?0:1);
+  aqdata->rs16_vbutton_start = 13 - (combo?0:1);
+  aqdata->rs16_vbutton_end = 16 - (combo?0:1);
 
   #ifdef AQ_PDA
     aqdata->pool_heater_index = index-3;
@@ -1214,9 +1394,13 @@ bool setDeviceState(struct aqualinkdata *aqdata, int deviceIndex, bool isON, req
         if ( isPDA_IAQT && isIAQL_ACTIVE) {
           set_iaqualink_aux_state(button, isON);
         } else {
+#ifdef NEW_AQ_PROGRAMMER
+          aq_programmer(AQ_PDA_DEVICE_ON_OFF, button, (isON == false ? OFF : ON), deviceIndex, aqdata);
+#else
           char msg[PTHREAD_ARG];
           sprintf(msg, "%-5d%-5d", deviceIndex, (isON == false ? OFF : ON));
           aq_programmer(AQ_PDA_DEVICE_ON_OFF, msg, aqdata);
+#endif
         }
       }
     } else
@@ -1265,12 +1449,14 @@ bool setDeviceState(struct aqualinkdata *aqdata, int deviceIndex, bool isON, req
             //LOG(PANL_LOG, LOG_NOTICE, "********** USE iaqualink2 ********\n");
             set_iaqualink_aux_state(button, isON);
           } else {
+#ifdef NEW_AQ_PROGRAMMER         
+            aq_programmer(AQ_SET_IAQTOUCH_DEVICE_ON_OFF, button, (isON == false ? OFF : ON), deviceIndex, aqdata);
+#else
             char msg[PTHREAD_ARG];
             sprintf(msg, "%-5d%-5d", deviceIndex, (isON == false ? OFF : ON));
-            //if (button->rssd_code != VBUTTON_RSSD) {
-            //LOG(PANL_LOG, LOG_NOTICE, "********** USE AQ_SET_IAQTOUCH_DEVICE_ON_OFF ********\n");
-              aq_programmer(AQ_SET_IAQTOUCH_DEVICE_ON_OFF, msg, aqdata);
-              set_pre_state = false;
+            aq_programmer(AQ_SET_IAQTOUCH_DEVICE_ON_OFF, msg, aqdata);
+#endif
+            set_pre_state = false;
             //} else if (button->rssd_code != VBUTTON_ONETOUCH_RSSD) {
             //  LOG(PANL_LOG, LOG_NOTICE, "********** USE AQ_SET_IAQTOUCH_ONETOUCH_ON_OFF ********\n");
             //  aq_programmer(AQ_SET_IAQTOUCH_ONETOUCH_ON_OFF, msg, aqdata);
@@ -1350,9 +1536,22 @@ bool programDeviceValue(struct aqualinkdata *aqdata, action_type type, int value
     aqdata->unactioned.value = value;
   }
 
+  if (type == PUMP_RPM || type == PUMP_VSPROGRAM) {
+    for (int i=0; i < aqdata->num_pumps; i++) {
+      if (aqdata->pumps[i].pumpIndex == value) {
+        if (aqdata->pumps[i].pumpType == PT_UNKNOWN) {
+          LOG(ONET_LOG,LOG_ERR, "Can't set Pump RPM/GPM until type is known\n");
+        }
+        aqdata->unactioned.button = aqdata->pumps[i].button;
+        break;
+      }
+    }
+  }
+
   aqdata->unactioned.type = type;
   aqdata->unactioned.id = id; // This is only valid for pump.
 
+  
   // Should probably limit this to setpoint and no aq_serial protocol.
   if (expectMultiple) // We can get multiple MQTT requests from some, so this will wait for last one to come in.
     time(&aqdata->unactioned.requested);
@@ -1497,26 +1696,33 @@ void programDeviceLightMode(struct aqualinkdata *aqdata, int value, int deviceIn
     return;
   }
 
-  char buf[LIGHT_MODE_BUFER];
-
   if (isMASK_SET(light->button->special_mask, VIRTUAL_BUTTON)) {
     // We can only program a light on virtual button on iaqtouch or onetouch
     if (isIAQT_ENABLED ) {
+#ifdef NEW_AQ_PROGRAMMER
+      aq_programmer(AQ_SET_IAQTOUCH_LIGHTCOLOR_MODE, light->button, value, AQP_NULL, aqdata);
+#else
+      char buf[LIGHT_MODE_BUFER];
       sprintf(buf, "%-5d%-5d%-5d",value, deviceIndex, light->lightType);
       aq_programmer(AQ_SET_IAQTOUCH_LIGHTCOLOR_MODE, buf, aqdata);
+#endif
     } else if (isONET_ENABLED ) {
       LOG(PANL_LOG,LOG_ERR, "Light mode on virtual button not implimented on OneTouch protocol (needs AqualinkTouch)\n");
     } else {
       LOG(PANL_LOG,LOG_ERR, "Light mode on virtual button needs AqualinkTouch protocol\n");
     }
   } else if (light->lightType == LC_PROGRAMABLE ) {
-    //sprintf(buf, "%-5s%-5d%-5d%-5d%.2f",value, 
+#ifdef NEW_AQ_PROGRAMMER
+    aq_programmer(AQ_SET_LIGHTPROGRAM_MODE, light->button, value, AQP_NULL, aqdata);
+#else
+    char buf[LIGHT_MODE_BUFER];
     sprintf(buf, "%-5d%-5d%-5d%-5d%.2f",value, 
                                       deviceIndex, 
                                       _aqconfig_.light_programming_initial_on,
                                       _aqconfig_.light_programming_initial_off,
                                       _aqconfig_.light_programming_mode );
     aq_programmer(AQ_SET_LIGHTPROGRAM_MODE, buf, aqdata);
+#endif
   } else if (isRSSA_ENABLED ) {
     // If we are using rs-serial then turn light on first.
     if (light->button->led->state != ON) {
@@ -1564,10 +1770,14 @@ void programDeviceLightMode(struct aqualinkdata *aqdata, int value, int deviceIn
   } else if (isRSSA_ENABLED && light->lightType != LC_PROGRAMABLE) {
     // Any programmable COLOR light (that's programmed by panel)
     set_aqualink_rssadapter_aux_extended_state(light->button, value);*/
-  } else {
-    //sprintf(buf, "%-5s%-5d%-5d",value, button, light->lightType);
+  } else {  
+#ifdef NEW_AQ_PROGRAMMER
+    aq_programmer(AQ_SET_LIGHTCOLOR_MODE, light->button, value, AQP_NULL, aqdata);
+#else
+    char buf[LIGHT_MODE_BUFER];
     sprintf(buf, "%-5d%-5d%-5d",value, deviceIndex, light->lightType);
     aq_programmer(AQ_SET_LIGHTCOLOR_MODE, buf, aqdata);
+#endif
   }
 
   // Use function so can be called from programming thread if we decide to in future.
@@ -1592,10 +1802,16 @@ bool panel_device_request(struct aqualinkdata *aqdata, action_type type, int dev
                           deviceIndex,
                           value,
                           getRequestName(source));
-  } else {
+  } else if (type == ON_OFF || type == TIMER || type == LIGHT_BRIGHTNESS || type == LIGHT_MODE){
     LOG(PANL_LOG,LOG_INFO, "Device request type '%s' for deviceindex %d '%s' of value %d from '%s'\n",
                           getActionName(type),
-                          deviceIndex,aqdata->aqbuttons[deviceIndex].label, 
+                          deviceIndex,
+                          aqdata->aqbuttons[deviceIndex].label, 
+                          value, 
+                          getRequestName(source));
+  } else {
+    LOG(PANL_LOG,LOG_INFO, "Device request type '%s' of value %d from '%s'\n",
+                          getActionName(type),
                           value, 
                           getRequestName(source));
   }
@@ -1640,7 +1856,11 @@ bool panel_device_request(struct aqualinkdata *aqdata, action_type type, int dev
       programDeviceValue(aqdata, type, value, deviceIndex, (source==NET_MQTT?true:false) );
     break;
     case DATE_TIME:
+#ifdef NEW_AQ_PROGRAMMER
+      aq_programmer(AQ_SET_TIME, NULL, AQP_NULL, AQP_NULL, aqdata);
+#else
       aq_programmer(AQ_SET_TIME, NULL, aqdata);
+#endif
     break;
     default:
       LOG(PANL_LOG,LOG_ERR, "Unknown device request type %d for deviceindex %d\n",type,deviceIndex);

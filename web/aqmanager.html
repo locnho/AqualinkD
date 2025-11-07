@@ -167,6 +167,10 @@
             color: rgb(255, 0, 0) !important;
         }
 
+        .logmsgwarning {
+            color: rgb(255, 204, 0) !important;
+        }
+
         .newversion {
             background-color: rgb(148, 195, 233) !important;
         }
@@ -475,6 +479,9 @@
 
             if (message.startsWith("Error:")) {
                 element.classList.add("logmsgerror");
+            }
+            if (message.startsWith("Warning:")) {
+                element.classList.add("logmsgwarning");
             }
 
             var logcontainer = document.getElementById("logs");

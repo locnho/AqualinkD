@@ -15,8 +15,8 @@ jobs:
       - uses: actions/stale@v9
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          days-before-issue-stale: 150
-          days-before-issue-close: 30
+          days-before-issue-stale: 120
+          days-before-issue-close: 10
           stale-issue-message: "This issue has been automatically marked as stale because it has not had recent activity. It will be closed if no further activity occurs within 30 days."
           close-issue-message: "This issue has been automatically closed due to sustained inactivity."
           stale-issue-label: "stale"

@@ -305,20 +305,20 @@ void queueGetProgramData(emulation_type source_type, struct aqualinkdata *aqdata
     }
 #ifdef AQ_PDA
   } else if ( isPDA_PANEL && source_type == AQUAPDA) {
-    aq_programmer(AQ_PDA_INIT, NULL, aqdata);
+    _aq_programmer(AQ_PDA_INIT, NULL, aqdata, true);
   } else if ( isPDA_PANEL && source_type == IAQTOUCH) {
     //aq_programmer(AQ_PDA_INIT, NULL, aqdata);
     if (_aqconfig_.use_panel_aux_labels) {
-      aq_programmer(AQ_GET_AUX_LABELS, NULL, aqdata);
+      _aq_programmer(AQ_GET_AUX_LABELS, NULL, aqdata, true);
     }
-    aq_programmer(AQ_GET_IAQTOUCH_SETPOINTS, NULL, aqdata);
+    _aq_programmer(AQ_GET_IAQTOUCH_SETPOINTS, NULL, aqdata, true);
     
 #endif
   } else { // Must be all button only
-    aq_programmer(AQ_GET_POOL_SPA_HEATER_TEMPS, NULL, aqdata);
-    aq_programmer(AQ_GET_FREEZE_PROTECT_TEMP, NULL, aqdata);
+    _aq_programmer(AQ_GET_POOL_SPA_HEATER_TEMPS, NULL, aqdata, true);
+    _aq_programmer(AQ_GET_FREEZE_PROTECT_TEMP, NULL, aqdata, true);
     if (_aqconfig_.use_panel_aux_labels) {
-      aq_programmer(AQ_GET_AUX_LABELS, NULL, aqdata);
+      _aq_programmer(AQ_GET_AUX_LABELS, NULL, aqdata, true);
     }
   }
 }
@@ -425,47 +425,74 @@ bool in_programming_mode(struct aqualinkdata *aqdata)
   return false;
 }
 
+const char *get_current_programming_mode_name(struct aqualinkdata *aqdata)
+{
+  if (in_programming_mode(aqdata))
+    return ptypeName(aqdata->active_thread.ptype);
+  
+  return "None";
+}
+
 void kick_aq_program_thread(struct aqualinkdata *aqdata, emulation_type source_type)
 {
   if ( aqdata->active_thread.thread_id != 0 ) {
     if ( (source_type == ONETOUCH) && in_ot_programming_mode(aqdata))
     {
-      LOG(ONET_LOG, LOG_DEBUG, "Kicking OneTouch thread %d,%p\n",aqdata->active_thread.ptype, aqdata->active_thread.thread_id);
+      LOG(ONET_LOG, LOG_DEBUG, "Kicking OneTouch thread '%s'(%d),%p\n",get_current_programming_mode_name(aqdata),aqdata->active_thread.ptype, aqdata->active_thread.thread_id);
       pthread_cond_broadcast(&aqdata->active_thread.thread_cond);   
     } 
     else if (source_type == IAQTOUCH && in_iaqt_programming_mode(aqdata)) {
-      LOG(IAQT_LOG, LOG_DEBUG, "Kicking IAQ Touch thread %d,%p\n",aqdata->active_thread.ptype, aqdata->active_thread.thread_id);
+      LOG(IAQT_LOG, LOG_DEBUG, "Kicking IAQ Touch thread '%s'(%d),%p\n",get_current_programming_mode_name(aqdata),aqdata->active_thread.ptype, aqdata->active_thread.thread_id);
       pthread_cond_broadcast(&aqdata->active_thread.thread_cond);  
     }
     else if (source_type == ALLBUTTON && !in_ot_programming_mode(aqdata) && !in_iaqt_programming_mode(aqdata)) {
-      LOG(PROG_LOG, LOG_DEBUG, "Kicking RS Allbutton thread %d,%p message '%s'\n",aqdata->active_thread.ptype, aqdata->active_thread.thread_id,aqdata->last_message);
+      LOG(PROG_LOG, LOG_DEBUG, "Kicking RS Allbutton thread '%s'(%d),%p message '%s'\n",get_current_programming_mode_name(aqdata),aqdata->active_thread.ptype, aqdata->active_thread.thread_id,aqdata->last_message);
       pthread_cond_broadcast(&aqdata->active_thread.thread_cond);  
     }
 #ifdef AQ_PDA
     else if (source_type == AQUAPDA && !in_ot_programming_mode(aqdata)) {
-      LOG(PDA_LOG, LOG_DEBUG, "Kicking PDA thread %d,%p\n",aqdata->active_thread.ptype, aqdata->active_thread.thread_id);
+      LOG(PDA_LOG, LOG_DEBUG, "Kicking PDA thread '%s'(%d),%p\n",get_current_programming_mode_name(aqdata),aqdata->active_thread.ptype, aqdata->active_thread.thread_id);
       pthread_cond_broadcast(&aqdata->active_thread.thread_cond);  
     }
 #endif     
   }
 }
 
+
+
+
+#ifdef NEW_AQ_PROGRAMMER
+void _aq_programmer_(program_type r_type, aqkey *button, int value, int alt_value, struct aqualinkdata *aqdata, bool allowOveride);
+
+void aq_program(program_type r_type, aqkey *button, int value, int alt_value, struct aqualinkdata *aqdata){
+  _aq_programmer_(r_type, button, value, alt_value, aqdata, true);
+}
+void aq_programmer(program_type r_type, aqkey *button, int value, int alt_value, struct aqualinkdata *aqdata){
+  _aq_programmer_(r_type, button, value, alt_value, aqdata, true);
+}
+void _aq_programmer(program_type r_type, char *args, struct aqualinkdata *aqdata, bool allowOveride){
+  _aq_programmer_(r_type, NULL, AQP_NULL, AQP_NULL, aqdata, allowOveride);
+}
+#else
 void _aq_programmer_(program_type r_type, char *args, aqkey *button, int value, int alt_value, struct aqualinkdata *aqdata, bool allowOveride);
 
 void aq_program(program_type r_type, aqkey *button, int value, int alt_value, struct aqualinkdata *aqdata){
   _aq_programmer_(r_type, NULL, button, value, alt_value, aqdata, true);
 }
-
 void aq_programmer(program_type r_type, char *args, struct aqualinkdata *aqdata){
   _aq_programmer(r_type, args, aqdata, true);
 }
-
 void _aq_programmer(program_type r_type, char *args, struct aqualinkdata *aqdata, bool allowOveride)
 {
   _aq_programmer_(r_type, args, NULL, -1, -1, aqdata, allowOveride);
 }
+#endif
 
+#ifdef NEW_AQ_PROGRAMMER
+void _aq_programmer_(program_type r_type, aqkey *button, int value, int alt_value, struct aqualinkdata *aqdata, bool allowOveride)
+#else
 void _aq_programmer_(program_type r_type, char *args, aqkey *button, int value, int alt_value, struct aqualinkdata *aqdata, bool allowOveride)
+#endif
 {
   struct programmingThreadCtrl *programmingthread = malloc(sizeof(struct programmingThreadCtrl));
 
@@ -657,33 +684,78 @@ void _aq_programmer_(program_type r_type, char *args, aqkey *button, int value, 
   programmingthread->aqdata = aqdata;
   programmingthread->thread_id = 0;
   //programmingthread->thread_args = args;
+
+#ifndef NEW_AQ_PROGRAMMER
   if (args != NULL /*&& type != AQ_SEND_CMD*/)
     strncpy(programmingthread->thread_args, args, sizeof(programmingthread->thread_args)-1);
+#endif
 
   programmingthread->pArgs.button = button;
   programmingthread->pArgs.value = value;
   programmingthread->pArgs.alt_value = alt_value;
 
-
+#ifdef NEW_AQ_PROGRAMMER
   switch(type) {
     case AQ_GET_RSSADAPTER_SETPOINTS:
       get_aqualink_rssadapter_setpoints();
       return; // No need to create this as thread.
       break;
     case AQ_SET_RSSADAPTER_POOL_HEATER_TEMP:
-      set_aqualink_rssadapter_pool_setpoint(args, aqdata);
+      set_aqualink_rssadapter_pool_setpoint(value, aqdata);
       return; // No need to create this as thread.
       break;
     case AQ_SET_RSSADAPTER_SPA_HEATER_TEMP:
-      set_aqualink_rssadapter_spa_setpoint(args, aqdata);
+      set_aqualink_rssadapter_spa_setpoint(value, aqdata);
       return; // No need to create this as thread.
       break;
     case AQ_ADD_RSSADAPTER_POOL_HEATER_TEMP:
-      increase_aqualink_rssadapter_pool_setpoint(args, aqdata);
+      increase_aqualink_rssadapter_pool_setpoint(value, aqdata);
       return; // No need to create this as thread.
       break;
     case AQ_ADD_RSSADAPTER_SPA_HEATER_TEMP:
-      increase_aqualink_rssadapter_spa_setpoint(args, aqdata);
+      increase_aqualink_rssadapter_spa_setpoint(value, aqdata);
+      return; // No need to create this as thread.
+      break;
+    case AQ_SET_IAQLINK_POOL_HEATER_TEMP:
+      set_iaqualink_heater_setpoint(value, SP_POOL);
+      return; // No need to create this as thread.
+      break;
+    case AQ_SET_IAQLINK_SPA_HEATER_TEMP:
+      set_iaqualink_heater_setpoint(value, SP_SPA);
+      return; // No need to create this as thread.
+      break;
+    case AQ_SET_IAQLINK_CHILLER_TEMP:
+      set_iaqualink_heater_setpoint(value, SP_CHILLER);
+      return; // No need to create this as thread.
+      break;
+    default:
+      // Should check that _prog_functions[type] is valid.
+      if( pthread_create( &programmingthread->thread_id , NULL ,  _prog_functions[type], (void*)programmingthread) < 0) {
+        LOG(PROG_LOG, LOG_ERR, "could not create thread\n");
+        return;
+      }
+    break;
+  }
+#else
+  switch(type) {
+    case AQ_GET_RSSADAPTER_SETPOINTS:
+      get_aqualink_rssadapter_setpoints();
+      return; // No need to create this as thread.
+      break;
+    case AQ_SET_RSSADAPTER_POOL_HEATER_TEMP:
+      set_aqualink_rssadapter_pool_setpoint(atoi(args), aqdata);
+      return; // No need to create this as thread.
+      break;
+    case AQ_SET_RSSADAPTER_SPA_HEATER_TEMP:
+      set_aqualink_rssadapter_spa_setpoint(atoi(args), aqdata);
+      return; // No need to create this as thread.
+      break;
+    case AQ_ADD_RSSADAPTER_POOL_HEATER_TEMP:
+      increase_aqualink_rssadapter_pool_setpoint(atoi(args), aqdata);
+      return; // No need to create this as thread.
+      break;
+    case AQ_ADD_RSSADAPTER_SPA_HEATER_TEMP:
+      increase_aqualink_rssadapter_spa_setpoint(atoi(args), aqdata);
       return; // No need to create this as thread.
       break;
     case AQ_SET_IAQLINK_POOL_HEATER_TEMP:
@@ -705,8 +777,8 @@ void _aq_programmer_(program_type r_type, char *args, aqkey *button, int value, 
         return;
       }
     break;
-    
   }
+#endif
   
   if ( programmingthread->thread_id != 0 ) {
     //LOG(PROG_LOG, LOG_DEBUG, "********* DID pthread_detach %d\n",programmingthread->thread_id);

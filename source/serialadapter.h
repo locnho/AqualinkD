@@ -15,11 +15,11 @@ void set_aqualink_rssadapter_aux_state(const aqkey *button, bool turnOn);
 //void set_aqualink_rssadapter_aux_extended_state(int buttonIndex, const unsigned char state);
 void set_aqualink_rssadapter_aux_extended_state(const aqkey *button, const unsigned char state);
 void get_aqualink_rssadapter_setpoints();
-void set_aqualink_rssadapter_pool_setpoint(char *args, struct aqualinkdata *aqdata);
-void set_aqualink_rssadapter_spa_setpoint(char *args, struct aqualinkdata *aqdata);
+void set_aqualink_rssadapter_pool_setpoint(int value, struct aqualinkdata *aqdata);
+void set_aqualink_rssadapter_spa_setpoint(int value, struct aqualinkdata *aqdata);
 
-void increase_aqualink_rssadapter_pool_setpoint(char *args, struct aqualinkdata *aqdata);
-void increase_aqualink_rssadapter_spa_setpoint(char *args, struct aqualinkdata *aqdata);
+void increase_aqualink_rssadapter_pool_setpoint(int value, struct aqualinkdata *aqdata);
+void increase_aqualink_rssadapter_spa_setpoint(int value, struct aqualinkdata *aqdata);
 
 #ifdef CLIGHT_PANEL_FIX 
   void get_aqualink_rssadapter_colorlight_statuses(struct aqualinkdata *aqdata);

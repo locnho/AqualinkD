@@ -160,8 +160,8 @@ void set_aqualink_rssadapter_aux_state(int buttonIndex, bool turnOn)
   rssadapter_device_state( RSSAdevID(buttonIndex), (turnOn?RS_SA_ON:RS_SA_OFF) );
 }
 */
-void increase_aqualink_rssadapter_pool_setpoint(char *args, struct aqualinkdata *aqdata) {
-  int val = atoi(args);
+void increase_aqualink_rssadapter_pool_setpoint(int val, struct aqualinkdata *aqdata) {
+
   val = setpoint_check(POOL_HTR_SETPOINT, aqdata->pool_htr_set_point + val, aqdata);
 
   LOG(RSSA_LOG,LOG_DEBUG, "Increasing pool heater from %d to %d\n",aqdata->pool_htr_set_point,val);
@@ -169,8 +169,8 @@ void increase_aqualink_rssadapter_pool_setpoint(char *args, struct aqualinkdata 
   queue_aqualink_rssadapter_setpoint(RS_SA_POOLSP, val);
 }
 
-void increase_aqualink_rssadapter_spa_setpoint(char *args, struct aqualinkdata *aqdata) {
-  int val = atoi(args);
+void increase_aqualink_rssadapter_spa_setpoint(int val, struct aqualinkdata *aqdata) {
+
 
   val = setpoint_check(SPA_HTR_SETPOINT, aqdata->spa_htr_set_point + val, aqdata);
 
@@ -179,8 +179,8 @@ void increase_aqualink_rssadapter_spa_setpoint(char *args, struct aqualinkdata *
   queue_aqualink_rssadapter_setpoint( (isSINGLE_DEV_PANEL?RS_SA_POOLSP2:RS_SA_SPASP), val);
 }
 
-void set_aqualink_rssadapter_pool_setpoint(char *args, struct aqualinkdata *aqdata) {
-  int val = atoi(args);
+void set_aqualink_rssadapter_pool_setpoint(int val, struct aqualinkdata *aqdata) {
+
   val = setpoint_check(POOL_HTR_SETPOINT, val, aqdata);
 
   LOG(RSSA_LOG,LOG_DEBUG, "Setting pool heater to %d\n",val);
@@ -195,8 +195,7 @@ void set_aqualink_rssadapter_pool_setpoint(char *args, struct aqualinkdata *aqda
   */
 }
 
-void set_aqualink_rssadapter_spa_setpoint(char *args, struct aqualinkdata *aqdata) {
-  int val = atoi(args);
+void set_aqualink_rssadapter_spa_setpoint(int val, struct aqualinkdata *aqdata) {
 
   val = setpoint_check(SPA_HTR_SETPOINT, val, aqdata);
 

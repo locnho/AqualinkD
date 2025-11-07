@@ -280,7 +280,11 @@ void action_delayed_request()
     _aqualink_data.unactioned.value = setpoint_check(POOL_HTR_SETPOINT, _aqualink_data.unactioned.value, &_aqualink_data);
     if (_aqualink_data.pool_htr_set_point != _aqualink_data.unactioned.value)
     {
+#ifdef NEW_AQ_PROGRAMMER
+      aq_programmer(AQ_SET_POOL_HEATER_TEMP, NULL, _aqualink_data.unactioned.value, AQP_NULL, &_aqualink_data);
+#else
       aq_programmer(AQ_SET_POOL_HEATER_TEMP, sval, &_aqualink_data);
+#endif
       LOG(AQUA_LOG,LOG_NOTICE, "Setting pool heater setpoint to %d\n", _aqualink_data.unactioned.value);
     }
     else
@@ -293,7 +297,11 @@ void action_delayed_request()
     _aqualink_data.unactioned.value = setpoint_check(SPA_HTR_SETPOINT, _aqualink_data.unactioned.value, &_aqualink_data);
     if (_aqualink_data.spa_htr_set_point != _aqualink_data.unactioned.value)
     {
+#ifdef NEW_AQ_PROGRAMMER
+      aq_programmer(AQ_SET_SPA_HEATER_TEMP, NULL, _aqualink_data.unactioned.value, AQP_NULL, &_aqualink_data);
+#else
       aq_programmer(AQ_SET_SPA_HEATER_TEMP, sval, &_aqualink_data);
+#endif
       LOG(AQUA_LOG,LOG_NOTICE, "Setting spa heater setpoint to %d\n", _aqualink_data.unactioned.value);
     }
     else
@@ -306,7 +314,11 @@ void action_delayed_request()
     _aqualink_data.unactioned.value = setpoint_check(FREEZE_SETPOINT, _aqualink_data.unactioned.value, &_aqualink_data);
     if (_aqualink_data.frz_protect_set_point != _aqualink_data.unactioned.value)
     {
+#ifdef NEW_AQ_PROGRAMMER
+      aq_programmer(AQ_SET_FRZ_PROTECTION_TEMP, NULL, _aqualink_data.unactioned.value, AQP_NULL, &_aqualink_data);
+#else
       aq_programmer(AQ_SET_FRZ_PROTECTION_TEMP, sval, &_aqualink_data);
+#endif
       LOG(AQUA_LOG,LOG_NOTICE, "Setting freeze protect to %d\n", _aqualink_data.unactioned.value);
     }
     else
@@ -319,7 +331,11 @@ void action_delayed_request()
     _aqualink_data.unactioned.value = setpoint_check(CHILLER_SETPOINT, _aqualink_data.unactioned.value, &_aqualink_data);
     if (_aqualink_data.chiller_set_point != _aqualink_data.unactioned.value)
     {
+#ifdef NEW_AQ_PROGRAMMER
+      aq_programmer(AQ_SET_CHILLER_TEMP, NULL, _aqualink_data.unactioned.value, AQP_NULL, &_aqualink_data);
+#else
       aq_programmer(AQ_SET_CHILLER_TEMP, sval, &_aqualink_data);
+#endif
       LOG(AQUA_LOG,LOG_NOTICE, "Setting Chiller setpoint to %d\n", _aqualink_data.unactioned.value);
     }
     else
@@ -341,7 +357,11 @@ void action_delayed_request()
     {
       if (_aqualink_data.swg_percent != _aqualink_data.unactioned.value)
       {
+#ifdef NEW_AQ_PROGRAMMER
+        aq_programmer(AQ_SET_SWG_PERCENT, NULL, _aqualink_data.unactioned.value, AQP_NULL, &_aqualink_data);
+#else
         aq_programmer(AQ_SET_SWG_PERCENT, sval, &_aqualink_data);
+#endif
         LOG(AQUA_LOG,LOG_NOTICE, "Setting SWG %% to %d\n", _aqualink_data.unactioned.value);
       }
       else
@@ -364,7 +384,11 @@ void action_delayed_request()
     } else if (_aqualink_data.unactioned.value == _aqualink_data.boost ) {
       LOG(AQUA_LOG,LOG_ERR, "Request to turn Boost %s ignored, Boost is already %s\n",_aqualink_data.unactioned.value?"On":"Off", _aqualink_data.boost?"On":"Off");
     } else {
+#ifdef NEW_AQ_PROGRAMMER
+      aq_programmer(AQ_SET_BOOST, NULL, _aqualink_data.unactioned.value, AQP_NULL, &_aqualink_data);
+#else
       aq_programmer(AQ_SET_BOOST, sval, &_aqualink_data);
+#endif
     }
     // Let's just tell everyone we set it, before we actually did.  Makes homekit happy, and it will re-correct on error.
     _aqualink_data.boost = _aqualink_data.unactioned.value;
@@ -373,23 +397,39 @@ void action_delayed_request()
   {
     snprintf(sval, 9, "%1d|%d", _aqualink_data.unactioned.id, _aqualink_data.unactioned.value);
     //printf("**** program string '%s'\n",sval);
+#ifdef NEW_AQ_PROGRAMMER
+    aq_programmer(AQ_SET_PUMP_RPM, NULL, _aqualink_data.unactioned.value,  _aqualink_data.unactioned.id, &_aqualink_data);
+#else
     aq_programmer(AQ_SET_PUMP_RPM, sval, &_aqualink_data);
+#endif
   }
   else if (_aqualink_data.unactioned.type == PUMP_VSPROGRAM)
   {
     snprintf(sval, 9, "%1d|%d", _aqualink_data.unactioned.id, _aqualink_data.unactioned.value);
     //printf("**** program string '%s'\n",sval);
+#ifdef NEW_AQ_PROGRAMMER
+    aq_programmer(AQ_SET_PUMP_VS_PROGRAM, NULL, _aqualink_data.unactioned.value,  _aqualink_data.unactioned.id, &_aqualink_data);
+#else
     aq_programmer(AQ_SET_PUMP_VS_PROGRAM, sval, &_aqualink_data);
+#endif
   }
   else if (_aqualink_data.unactioned.type == POOL_HTR_INCREMENT && isRSSA_ENABLED) // RSSA for this to work
   {
     LOG(AQUA_LOG,LOG_NOTICE, "Changing pool heater setpoint by %d | %s\n", _aqualink_data.unactioned.value, sval);
+#ifdef NEW_AQ_PROGRAMMER
+    aq_programmer(AQ_ADD_RSSADAPTER_POOL_HEATER_TEMP, NULL, _aqualink_data.unactioned.value, AQP_NULL, &_aqualink_data);
+#else
     aq_programmer(AQ_ADD_RSSADAPTER_POOL_HEATER_TEMP, sval, &_aqualink_data);
+#endif
   }
   else if (_aqualink_data.unactioned.type == SPA_HTR_INCREMENT && isRSSA_ENABLED)  // RSSA for this to work
   {
     LOG(AQUA_LOG,LOG_NOTICE, "Changing spa heater setpoint by %d\n", _aqualink_data.unactioned.value);
+#ifdef NEW_AQ_PROGRAMMER
+    aq_programmer(AQ_ADD_RSSADAPTER_SPA_HEATER_TEMP, NULL, _aqualink_data.unactioned.value, AQP_NULL, &_aqualink_data);
+#else
     aq_programmer(AQ_ADD_RSSADAPTER_SPA_HEATER_TEMP, sval, &_aqualink_data); 
+#endif
   } 
   else if (_aqualink_data.unactioned.type == LIGHT_MODE) {
     panel_device_request(&_aqualink_data, LIGHT_MODE, _aqualink_data.unactioned.id, _aqualink_data.unactioned.value, UNACTION_TIMER);
@@ -1025,7 +1065,7 @@ void main_loop()
     }
     else if (packet_length > 0) {
       blank_read = 0;
-      if (i++ > 1000) {
+      if (i++ > 2000) {
         if(!got_probe) {
           if (_aqconfig_.deamonize) {
             LOG(AQUA_LOG,LOG_ERR, "No probe on device_id '0x%02hhx', Can't start! (please check config)\n",_aqconfig_.device_id);

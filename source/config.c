@@ -1581,10 +1581,26 @@ char *errorlevel2text(int level)
 //#ifdef CONFIG_EDITOR
 
 #define MAX_PRINTLEN 35
+
+#define ERR_INVALID_SENSORS                       (1<<0)
+#define ERR_FORCE_CHILLER                         (1<<1)
+#define ERR_ENABLE_IAQUALINK                      (1<<2)
+#define ERR_READ_IAQUALINK                        (1<<3)
+#define ERR_VSP_EXTENDEDID                        (1<<4)
+#define ERR_LIGHT_ADVANCE_MODE                    (1<<5)
+#define ERR_PDA_DIMMER2                           (1<<6)
+#define ERR_SCHEDULER_DISABLED_PUMP_EVENT_ENABLED (1<<7)
+#define ERR_VBUTTON_NO_EXTENDEDID                 (1<<8)
+#define ERR_VBUTTON_4_BOOSTON                     (1<<9)
+#define ERR_HEATPUMP_CHILLER                      (1<<10)
+
+
+
 void check_print_config (struct aqualinkdata *aqdata)
 {
   int i, j;
   char name[MAX_PRINTLEN];
+  uint32_t errors=0;
 
   // Sanity checks
   
@@ -1602,6 +1618,7 @@ void check_print_config (struct aqualinkdata *aqdata)
     //}
     if ( aqdata->sensors[i].label == NULL ||  aqdata->sensors[i].path == NULL ) {
       LOG(AQUA_LOG,LOG_ERR, "Invalid sensor %d, removing!\n",i+1);
+      setMASK(errors, ERR_INVALID_SENSORS);
       if (i == (aqdata->num_sensors-1) ) { // last sensor
         // don't need to do anything, just reduce total number sensors
       } else if (aqdata->num_sensors > 1) { // there are more sensors adter this bad one
@@ -1633,7 +1650,8 @@ void check_print_config (struct aqualinkdata *aqdata)
           //aqdata->chiller_button->special_mask |= VIRTUAL_BUTTON_CHILLER;
           setMASK(aqdata->chiller_button->special_mask, VIRTUAL_BUTTON_CHILLER);
         } else if (isVBUTTON(aqdata->aqbuttons[i].special_mask) && rsm_strmatch(aqdata->aqbuttons[i].label, "Heat Pump") == 0 ) {
-          LOG(AQUA_LOG,LOG_ERR, "Config error, `%s` is enabled, but Virtual Button Heat Pump does not have alt_name Chiller! Creating.",CFG_N_force_chiller);
+          setMASK(errors, ERR_HEATPUMP_CHILLER);
+          LOG(AQUA_LOG,LOG_ERR, "Config error, `%s` is enabled, but Virtual Button 'Heat Pump' does not have alt_name Chiller! Creating.",CFG_N_force_chiller);
           setVirtualButtonAltLabel(&aqdata->aqbuttons[i], cleanalloc("Chiller")); // Need to malloc this so it can be freed
           aqdata->chiller_button = &aqdata->aqbuttons[i];
           //aqdata->chiller_button->special_mask |= VIRTUAL_BUTTON_CHILLER;
@@ -1641,6 +1659,7 @@ void check_print_config (struct aqualinkdata *aqdata)
         }
       }
       if (aqdata->chiller_button == NULL) {
+        setMASK(errors, ERR_HEATPUMP_CHILLER);
         LOG(AQUA_LOG,LOG_ERR, "Config error, `%s` is enabled, but no Virtual Button set for Heat Pump / Chiller! Creating vbutton.",CFG_N_force_chiller);
         aqkey *button = getVirtualButton(aqdata, 0);
         if (button != NULL) {
@@ -1654,7 +1673,8 @@ void check_print_config (struct aqualinkdata *aqdata)
         }
       }
     } else {
-      LOG(AQUA_LOG,LOG_ERR, "Config error, `%s` can only be enabled, if using an iAqualink Touch ID for `%s`, Turning off\n",CFG_N_force_chiller, CFG_N_extended_device_id );
+      //LOG(AQUA_LOG,LOG_ERR, "Config error, `%s` can only be enabled, if using an iAqualink Touch ID for `%s`, Turning off\n",CFG_N_force_chiller, CFG_N_extended_device_id );
+      setMASK(errors, ERR_FORCE_CHILLER);
       removeMASK(_aqconfig_.force_device_devmask,FORCE_CHILLER);
       aqdata->chiller_button = NULL;
     }
@@ -1672,15 +1692,17 @@ void check_print_config (struct aqualinkdata *aqdata)
   if ( bitmask READ_RS485_IAQUALNK && _aqconfig_.enable_iaqualink ) error and use (_aqconfig_.enable_iaqualink, disable bitmask
   */
 
-  if (_aqconfig_.enable_iaqualink==true && (_aqconfig_.extended_device_id < 0x30 || _aqconfig_.extended_device_id > 0x33) )
+  if (_aqconfig_.enable_iaqualink==true && ( ! is_aqualink_touch_id(_aqconfig_.extended_device_id)) )
   {
-    LOG(AQUA_LOG,LOG_WARNING, "Config error, 'enable_iaqualink', is only valed with AqualinkTouch ID's, ignoring!\n");
+    //LOG(AQUA_LOG,LOG_WARNING, "Config error, 'enable_iaqualink', is only valed with AqualinkTouch ID's, ignoring!\n");
+    setMASK(errors, ERR_ENABLE_IAQUALINK);
     _aqconfig_.enable_iaqualink = true;
   }
   // Can't read iaqualink if we are also using iaqualink protocol.
   if (isMASK_SET(_aqconfig_.enable_iaqualink, READ_RS485_IAQUALNK) && _aqconfig_.enable_iaqualink == true )
   {
-    LOG(AQUA_LOG,LOG_WARNING, "Config error, 'read_RS485_iAqualink' is not valid when 'enable_iaqualink=yes', ignoring read_RS485_iAqualink!\n");
+    //LOG(AQUA_LOG,LOG_WARNING, "Config error, 'read_RS485_iAqualink' is not valid when 'enable_iaqualink=yes', ignoring read_RS485_iAqualink!\n");
+    setMASK(errors, ERR_READ_IAQUALINK);
     _aqconfig_.read_RS485_devmask &= ~READ_RS485_IAQUALNK;
   }
 
@@ -1695,8 +1717,10 @@ void check_print_config (struct aqualinkdata *aqdata)
         break;
       }
     }
-    if (i >= aqdata->total_buttons)
-      LOG(AQUA_LOG,LOG_WARNING, "Config error, couldn't find button `%s` from config option `%s`\n",_aqconfig_.sched_chk_booston_device,CFG_N_event_check_booston_device);
+    if (i >= aqdata->total_buttons) {
+      //LOG(AQUA_LOG,LOG_WARNING, "Config error, couldn't find button '%s' from config option '%s'\n",_aqconfig_.sched_chk_booston_device,CFG_N_event_check_booston_device);
+      setMASK(errors, ERR_VBUTTON_4_BOOSTON);
+    }
   } else {
     aqdata->boost_linked_device = AQ_UNKNOWN;
   }
@@ -1711,12 +1735,18 @@ void check_print_config (struct aqualinkdata *aqdata)
       //aqdata.pumps[i].minSpeed = (_aqualink_data.pumps[i].pumpType==VFPUMP?PUMP_GPM_MIN:PUMP_RPM_MIN);
       aqdata->pumps[i].minSpeed = getPumpDefaultSpeed(&aqdata->pumps[i], false);
     }
+
+    if ( ! is_aqualink_touch_id(_aqconfig_.extended_device_id) && ! is_onetouch_id(_aqconfig_.extended_device_id))  {
+      setMASK(errors, ERR_VSP_EXTENDEDID);
+      //LOG(AQUA_LOG,LOG_WARNING, "Config error, '%s' must be set for VSP's\n", CFG_N_extended_device_id_programming);
+    }
   }
   
   // We need to store light values if using light advance mode
   if (_aqconfig_.light_programming_advance_mode) {
     if (_aqconfig_.save_light_programming_value == false) {
-      LOG(AQUA_LOG,LOG_WARNING, "Config error, `%s` must be enabled for `%s`, enabeling!",CFG_N_save_light_programming_value,CFG_N_light_programming_advance_mode);
+      setMASK(errors, ERR_LIGHT_ADVANCE_MODE);
+      //LOG(AQUA_LOG,LOG_WARNING, "Config error, '%s' must be enabled for '%s', enabeling!",CFG_N_save_light_programming_value,CFG_N_light_programming_advance_mode);
       _aqconfig_.save_light_programming_value = true;
     }
   }
@@ -1735,7 +1765,8 @@ void check_print_config (struct aqualinkdata *aqdata)
       {
         if (isPLIGHT(aqdata->aqbuttons[i].special_mask)) {
           if ( ((clight_detail *)aqdata->aqbuttons[i].special_mask_ptr)->lightType == LC_DIMMER2 ) {
-            LOG(AQUA_LOG,LOG_WARNING, "Config error, PDA does not support lightmode %d setting to %d\n",LC_DIMMER2,LC_DIMMER);
+            setMASK(errors, ERR_PDA_DIMMER2);
+            //LOG(AQUA_LOG,LOG_WARNING, "Config error, PDA does not support lightmode %d setting to %d\n",LC_DIMMER2,LC_DIMMER);
             ((clight_detail *)aqdata->aqbuttons[i].special_mask_ptr)->lightType = LC_DIMMER;
           }
         }
@@ -1835,7 +1866,8 @@ void check_print_config (struct aqualinkdata *aqdata)
       if (_aqconfig_.enable_scheduler) {
         get_cron_pump_times();
       } else {
-        LOG(AQUA_LOG,LOG_ERR,"Scheduler is disabled, but use pump times from scheduler is enabled\n");
+        setMASK(errors, ERR_SCHEDULER_DISABLED_PUMP_EVENT_ENABLED);
+        //LOG(AQUA_LOG,LOG_ERR,"Scheduler is disabled, but use pump times from scheduler is enabled\n");
       }
     }
     //LOG(AQUA_LOG,LOG_NOTICE, "Start Pump on events          = %s %s %s\n",isAQS_POWER_ON_ENABED?"PowerON":"",AQS_FRZ_PROTECT_OFF?"FreezeProtect":"",AQS_BOOST_OFF?"Boost":"");
@@ -1877,8 +1909,10 @@ void check_print_config (struct aqualinkdata *aqdata)
 
     if ( ((aqdata->aqbuttons[i].special_mask & VIRTUAL_BUTTON) == VIRTUAL_BUTTON)  && 
          ((aqdata->aqbuttons[i].special_mask & VS_PUMP ) != VS_PUMP) &&
-          (_aqconfig_.extended_device_id < 0x30 || _aqconfig_.extended_device_id > 0x33 ) ){
-      LOG(AQUA_LOG,LOG_WARNING, "Config error, extended_device_id must be one of the folowing (0x30,0x31,0x32,0x33) to use virtual button : '%s'",aqdata->aqbuttons[i].label);
+          ( ! is_aqualink_touch_id(_aqconfig_.extended_device_id))) {
+          //(_aqconfig_.extended_device_id < 0x30 || _aqconfig_.extended_device_id > 0x33 ) ){
+      setMASK(errors, ERR_VBUTTON_NO_EXTENDEDID);
+      //LOG(AQUA_LOG,LOG_WARNING, "Config error, extended_device_id must be one of the folowing (0x30,0x31,0x32,0x33) to use virtual button : '%s'",aqdata->aqbuttons[i].label);
     }
 
   }
@@ -1895,7 +1929,40 @@ void check_print_config (struct aqualinkdata *aqdata)
          (aqdata->sensors[i].regex==NULL?"":aqdata->sensors[i].regex));
   }
 
-  
+
+  if (isMASK_SET(errors, ERR_INVALID_SENSORS)) {
+    LOG(AQUA_LOG,LOG_ERR, "Config error, Invalid sensor was removed!\n");
+  }
+  if (isMASK_SET(errors, ERR_FORCE_CHILLER)) {
+    LOG(AQUA_LOG,LOG_ERR, "Config error, '%s' can only be enabled, if using an iAqualink Touch ID for '%s', Turned off!\n",CFG_N_force_chiller, CFG_N_extended_device_id );
+  }
+  if (isMASK_SET(errors, ERR_ENABLE_IAQUALINK)) {
+    LOG(AQUA_LOG,LOG_ERR, "Config error, 'enable_iaqualink', is only valed with AqualinkTouch ID's, ignoring!\n");
+  }
+  if (isMASK_SET(errors, ERR_READ_IAQUALINK)) {
+    LOG(AQUA_LOG,LOG_ERR, "Config error, 'read_RS485_iAqualink' is not valid when 'enable_iaqualink=yes', ignoring read_RS485_iAqualink!\n");
+  }
+  if (isMASK_SET(errors, ERR_VSP_EXTENDEDID)) {
+    LOG(AQUA_LOG,LOG_ERR, "Config error, '%s' must be set for VSP's\n", CFG_N_extended_device_id_programming);
+  }
+  if (isMASK_SET(errors, ERR_LIGHT_ADVANCE_MODE)) {
+    LOG(AQUA_LOG,LOG_ERR, "Config error, '%s' must be enabled for '%s', enabeling!",CFG_N_save_light_programming_value,CFG_N_light_programming_advance_mode);
+  }
+  if (isMASK_SET(errors, ERR_PDA_DIMMER2)) {
+    LOG(AQUA_LOG,LOG_ERR, "Config error, PDA does not support lightmode %d setting to %d\n",LC_DIMMER2,LC_DIMMER);
+  }
+  if (isMASK_SET(errors, ERR_SCHEDULER_DISABLED_PUMP_EVENT_ENABLED)) {
+    LOG(AQUA_LOG,LOG_ERR,"Config error, Scheduler is disabled, but use pump times from scheduler is enabled\n");
+  }
+  if (isMASK_SET(errors, ERR_VBUTTON_NO_EXTENDEDID)) {
+    LOG(AQUA_LOG,LOG_ERR, "Config error, for Virtual Buttons '%s' must be set to an ID between 0x%02hhx & 0x%02hhx' ",CFG_N_extended_device_id,  AQUALINKTOUCH_MIN, AQUALINKTOUCH_MAX);
+  }
+  if (isMASK_SET(errors, ERR_VBUTTON_4_BOOSTON)) {
+    LOG(AQUA_LOG,LOG_ERR, "Config error, couldn't find button '%s' from config option '%s'\n",_aqconfig_.sched_chk_booston_device,CFG_N_event_check_booston_device);
+  }
+  if (isMASK_SET(errors, ERR_HEATPUMP_CHILLER)) {
+    LOG(AQUA_LOG,LOG_ERR, "Config error, Heat pump / Chiller was not configured correctly\n");
+  }
 
 }
 

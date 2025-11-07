@@ -512,7 +512,11 @@ void _processMessage(char *message, struct aqualinkdata *aqdata, bool reset)
     if (_initWithRS == true && strlen(aqdata->date) > 1 && checkAqualinkTime() != true)
     {
       LOG(ALLB_LOG,LOG_NOTICE, "Time is NOT accurate '%s %s', re-setting on controller!\n", aqdata->time, aqdata->date);
+#ifdef NEW_AQ_PROGRAMMER
+      aq_programmer(AQ_SET_TIME, NULL, AQP_NULL, AQP_NULL, aqdata);
+#else
       aq_programmer(AQ_SET_TIME, NULL, aqdata);
+#endif
     }
     else if (_initWithRS == false || _aqconfig_.sync_panel_time == false)
     {
@@ -536,13 +540,13 @@ void _processMessage(char *message, struct aqualinkdata *aqdata, bool reset)
   { // '8157 REV MMM'
     // A master firmware revision message.
     //strcpy(aqdata->version, msg);
-    SET_IF_CHANGED_STRCPY(aqdata->version, msg, aqdata->is_dirty);
-    rsm_get_revision(aqdata->revision, aqdata->version, strlen(aqdata->version));
+    //SET_IF_CHANGED_STRCPY(aqdata->version, msg, aqdata->is_dirty);
+    //rsm_get_revision(aqdata->revision, aqdata->version, strlen(aqdata->version));
     setPanelInformationFromPanelMsg(aqdata, msg, PANEL_CPU | PANEL_REV, ALLBUTTON);
     //setBoardCPURevision(aqdata, aqdata->version, strlen(aqdata->version), ALLB_LOG);
     //_gotREV = true;
-    LOG(ALLB_LOG,LOG_DEBUG, "Control Panel version %s\n", aqdata->version);
-    LOG(ALLB_LOG,LOG_DEBUG, "Control Panel revision %s\n", aqdata->revision);
+    //LOG(ALLB_LOG,LOG_DEBUG, "Control Panel version %s\n", aqdata->version);
+    //LOG(ALLB_LOG,LOG_DEBUG, "Control Panel revision %s\n", aqdata->revision);
     if (_initWithRS == false)
     {
       //LOG(ALLBUTTON,LOG_NOTICE, "Standard protocol initialization complete\n");

@@ -453,7 +453,8 @@ void _broadcast_aqualinkstate(struct mg_connection *nc)
   
   if (_mqtt_exit_flag == true) {
     mqtt_count++;
-    if (mqtt_count >= 10) {
+    //if (mqtt_count >= 10) {
+    if (mqtt_count >= 1) { // changed to 1 when cleaned up all the MQTT spaming.  may want to delete count completely in the future
       start_mqtt(nc->mgr);
       mqtt_count = 0;
     }
@@ -965,8 +966,11 @@ const char actionName[][5] = {"MQTT", "API", "WS", "DZ"};
 #ifdef AQ_PDA
 void create_PDA_on_off_request(aqkey *button, bool isON) 
 {
+#ifdef NEW_AQ_PROGRAMMER
+      aq_programmer(AQ_PDA_DEVICE_ON_OFF, button, (isON? ON : OFF), AQP_NULL, _aqualink_data);
+#else
   int i;
-   char msg[PTHREAD_ARG];
+  char msg[PTHREAD_ARG];
 
   for (i=0; i < _aqualink_data->total_buttons; i++) {
     if (_aqualink_data->aqbuttons[i].code == button->code) {
@@ -975,6 +979,7 @@ void create_PDA_on_off_request(aqkey *button, bool isON)
       break;
     }
   }
+#endif
 }
 #endif
 

@@ -289,13 +289,24 @@ One Touch: OneTouch Menu Line 11 =
 */
 bool log_panelversion(struct aqualinkdata *aqdata)
 {
-  char *end;
-  static bool revTest=false;
+  //char *end;
+  //static bool revTest=false;
 
   setPanelInformationFromPanelMsg(aqdata, _menu[4], PANEL_CPU, ONETOUCH);
   setPanelInformationFromPanelMsg(aqdata, _menu[5], PANEL_STRING, ONETOUCH);
   setPanelInformationFromPanelMsg(aqdata, _menu[7], PANEL_REV, ONETOUCH);
 
+  if ( strcmp(aqdata->panel_rev, "O.1") == 0 || strcmp(aqdata->panel_rev, "O.2") == 0 ) {
+    LOG(ONET_LOG,LOG_NOTICE, "Setting early version for OneTouch\n");
+    _panel_version_P2 = true;
+    // NSF should probably use the below now.
+    //_panel_version_P2 = (( aqdata->panel_support_options & RSP_SUP_ONET_EARLY) == RSP_SUP_ONET_EARLY);
+  }
+
+  //printPanelSupport(aqdata);
+
+  return true;
+  /*
   // It's already been set
   if (strlen(aqdata->version) > 0) {
     // If another protocol set the version, we need to check the rev.
@@ -338,6 +349,7 @@ bool log_panelversion(struct aqualinkdata *aqdata)
   LOG(ONET_LOG,LOG_DEBUG, "**** '%s' ****\n",aqdata->version);
 
   return true;
+  */
 }
 
 //Info:   OneTouch Menu Line 3 = Temp        38`F

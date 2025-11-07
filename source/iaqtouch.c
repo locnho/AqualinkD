@@ -784,7 +784,7 @@ void processPage(struct aqualinkdata *aqdata)
       setPanelInformationFromPanelMsg(aqdata, (char *)_tableInformation[2], PANEL_STRING, IAQTOUCH);
       setPanelInformationFromPanelMsg(aqdata, (char *)_tableInformation[3], PANEL_REV, IAQTOUCH);
       setPanelInformationFromPanelMsg(aqdata, (char *)_tableInformation[4], PANEL_CPU, IAQTOUCH);
-
+/*
       if (isPDA_PANEL && ((char *)_tableInformation[03]) > 0) {
         if ( rsm_get_revision(aqdata->revision,(char *)_tableInformation[3], sizeof(aqdata->revision) ) == TRUE) {
           int len = rsm_get_boardcpu(aqdata->version, sizeof(aqdata->version), (char *)_tableInformation[4], IAQT_TABLE_MSGLEN );
@@ -794,6 +794,7 @@ void processPage(struct aqualinkdata *aqdata)
           SET_DIRTY(aqdata->is_dirty);
         }
       }
+*/
 
     break;
 

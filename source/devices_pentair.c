@@ -31,6 +31,7 @@ bool processPentairPacket(unsigned char *packet, int packet_length, struct aqual
 {
   bool changedAnything = false;
   int i;
+  static bool logOnce = false;
 
   // Only log if we are pentair debug move and not serial (otherwise it'll print twice)
   if (getLogLevel(DPEN_LOG) == LOG_DEBUG && getLogLevel(RSSD_LOG) < LOG_DEBUG ) {
@@ -83,8 +84,8 @@ bool processPentairPacket(unsigned char *packet, int packet_length, struct aqual
         changedAnything = true;
         break;
       }
-      if (changedAnything != true) {
-        LOG(DPEN_LOG, LOG_NOTICE, "Pentair Pump found at ID 0x%02hhx values RPM %d | WATTS %d | PGM %d | Mode %d | DriveState %d | Status %d | PresureCurve %d\n",
+      if (changedAnything != true && logOnce == false) {
+        LOG(DPEN_LOG, LOG_WARNING, "Unconfigured Pentair Pump found at ID 0x%02hhx values RPM %d | WATTS %d | PGM %d | Mode %d | DriveState %d | Status %d | PresureCurve %d\n",
                                packet[PEN_PKT_FROM],
                                (packet[PEN_HI_B_RPM] * 256) + packet[PEN_LO_B_RPM],
                                (packet[PEN_HI_B_WAT] * 256) + packet[PEN_LO_B_WAT],
@@ -93,6 +94,7 @@ bool processPentairPacket(unsigned char *packet, int packet_length, struct aqual
                                packet[PEN_DRIVE_STATE],
                               (packet[PEN_HI_B_STATUS] * 256) + packet[PEN_LO_B_STATUS],
                                packet[PEN_PPC]);
+        logOnce=true;
       }
     }
     // 

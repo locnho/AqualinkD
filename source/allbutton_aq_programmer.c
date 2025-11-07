@@ -263,8 +263,13 @@ BOOST POOL
 <find menu>
 STOP BOOST POOL
 <press enter>
- */
+*/
+
+#ifdef NEW_AQ_PROGRAMMER
+  int val = threadCtrl->pArgs.value;
+#else
   int val = atoi((char*)threadCtrl->thread_args);
+#endif
 
   LOG(ALLB_LOG, LOG_DEBUG, "programming BOOST to %s\n", val==true?"On":"Off");
 
@@ -343,7 +348,12 @@ void *set_allbutton_SWG( void *ptr )
 
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_SWG_PERCENT);
 
+#ifdef NEW_AQ_PROGRAMMER
+  int val = threadCtrl->pArgs.value;
+#else
   int val = atoi((char*)threadCtrl->thread_args);
+#endif
+
   val = setpoint_check(SWG_SETPOINT, val, aqdata);
 
   //LOG(ALLB_LOG, LOG_NOTICE, "programming SWG percent to %d\n", val);
@@ -450,12 +460,22 @@ void *set_allbutton_light_colormode( void *ptr )
   
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_LIGHTCOLOR_MODE);
 
+#ifdef NEW_AQ_PROGRAMMER
+  struct programmerArgs *pargs = &threadCtrl->pArgs;
+  aqkey *button = threadCtrl->pArgs.button;
+  //unsigned char code = pargs->button->code;
+  int val = pargs->value;
+  //bool useDefaultIfValid = pargs->alt_value;
+  bool use_current_mode = false;
+  const char *mode_name;
+#else
   char *buf = (char*)threadCtrl->thread_args;
   const char *mode_name;
   int val = atoi(&buf[0]);
   int btn = atoi(&buf[5]);
   int typ = atoi(&buf[10]);
   bool use_current_mode = false;
+
 
   if (btn < 0 || btn >= aqdata->total_buttons ) {
     LOG(ALLB_LOG, LOG_ERR, "Can't program light mode on button %d\n", btn);
@@ -465,21 +485,28 @@ void *set_allbutton_light_colormode( void *ptr )
 
   aqkey *button = &aqdata->aqbuttons[btn];
   unsigned char code = button->code;
+#endif
+
+  if (!isPLIGHT(button->special_mask)) {
+    LOG(ALLB_LOG, LOG_ERR, "Can't program light for button '%d', configuration is incorrect\n", button->label);
+    cleanAndTerminateThread(threadCtrl);
+    return ptr;
+  }
 
   //LOG(ALLB_LOG, LOG_NOTICE, "Light Programming #: %d, on button: %s, color light type: %d\n", val, button->label, typ);
   
   if (val <= 0) {
     use_current_mode = true;
-    LOG(ALLB_LOG, LOG_INFO, "Light Programming #: %d, on button: %s, color light type: %d, using current mode\n", val, button->label, typ);
+    LOG(ALLB_LOG, LOG_INFO, "Light Programming #: %d, on button: %s, color light type: %d, using current mode\n", val, button->label, ((clight_detail *)button->special_mask_ptr)->lightType);
   } else {
-    mode_name = light_mode_name(typ, val-1, ALLBUTTON);
+    mode_name = light_mode_name(((clight_detail *)button->special_mask_ptr)->lightType, val-1, ALLBUTTON);
     use_current_mode = false;
     if (mode_name == NULL) {
-      LOG(ALLB_LOG, LOG_ERR, "Light Programming #: %d, on button: %s, color light type: %d, couldn't find mode name '%s'\n", val, button->label, typ, mode_name);
+      LOG(ALLB_LOG, LOG_ERR, "Light Programming #: %d, on button: %s, color light type: %d, couldn't find mode name '%s'\n", val, button->label, ((clight_detail *)button->special_mask_ptr)->lightType, mode_name);
       cleanAndTerminateThread(threadCtrl);
       return ptr;
     } else {
-      LOG(ALLB_LOG, LOG_INFO, "Light Programming #: %d, on button: %s, color light type: %d, name '%s'\n", val, button->label, typ, mode_name);
+      LOG(ALLB_LOG, LOG_INFO, "Light Programming #: %d, on button: %s, color light type: %d, name '%s'\n", val, button->label, ((clight_detail *)button->special_mask_ptr)->lightType, mode_name);
     }
   }
 /*
@@ -495,14 +522,14 @@ void *set_allbutton_light_colormode( void *ptr )
   // Needs to start programming sequence with light off
   if ( button->led->state == ON ) {
     LOG(ALLB_LOG, LOG_INFO, "Light Programming Initial state on, turning off\n");
-    send_cmd(code);
+    send_cmd(button->code);
     waitfor_queue2empty();
     if ( !waitForMessage(threadCtrl->aqdata, "OFF", 5)) // Message like 'Aux3 Off'
       LOG(ALLB_LOG, LOG_ERR, "Light Programming didn't receive OFF message\n");
   }
 
   // Now turn on and wait for the message "color mode name<>*"
-  send_cmd(code);
+  send_cmd(button->code);
   waitfor_queue2empty();
   i=0;
   int waitCounter=12;
@@ -559,16 +586,22 @@ void *set_allbutton_light_programmode( void *ptr )
   
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_LIGHTPROGRAM_MODE);
 
+
+#ifdef NEW_AQ_PROGRAMMER
+  struct programmerArgs *pargs = &threadCtrl->pArgs;
+  aqkey *button = threadCtrl->pArgs.button;
+  //unsigned char code = pargs->button->code;
+  int val = pargs->value;
+  //bool useDefaultIfValid = pargs->alt_value;
+  //bool use_current_mode = false;
+  //const char *mode_name;
+#else
   char *buf = (char*)threadCtrl->thread_args;
   int val = atoi(&buf[0]);
   int btn = atoi(&buf[5]);
-  int iOn = atoi(&buf[10]);
-  int iOff = atoi(&buf[15]);
-  float pmode = atof(&buf[20]);
-
-  int final_mode=val;
-
-  bool useProgAdvance = _aqconfig_.light_programming_advance_mode;
+  //int iOn = atoi(&buf[10]);
+  //int iOff = atoi(&buf[15]);
+  //float pmode = atof(&buf[20]);
 
   if (btn < 0 || btn >= aqdata->total_buttons ) {
     LOG(ALLB_LOG, LOG_ERR, "Can't program light mode on button %d\n", btn);
@@ -578,12 +611,25 @@ void *set_allbutton_light_programmode( void *ptr )
 
   aqkey *button = &aqdata->aqbuttons[btn];
   unsigned char code = button->code;
+#endif
+
+  if (!isPLIGHT(button->special_mask)) {
+    LOG(ALLB_LOG, LOG_ERR, "Can't program light for button '%d', configuration is incorrect\n", button->label);
+    cleanAndTerminateThread(threadCtrl);
+    return ptr;
+  }
+
+  int final_mode=val;
+  bool useProgAdvance = _aqconfig_.light_programming_advance_mode;
+  int iOn =  _aqconfig_.light_programming_initial_on;
+  int iOff = _aqconfig_.light_programming_initial_off;
+  float pmode =  _aqconfig_.light_programming_mode;
 
     // Simply turn the light off if value is 0
   if (val <= 0) {
     if ( button->led->state == ON ) {
       LOG(ALLB_LOG, LOG_INFO, "Light mode request set to 0, turning off\n");
-      send_cmd(code);
+      send_cmd(button->code);
     } else {
       LOG(ALLB_LOG, LOG_INFO, "Light mode request set to 0 and light is off. Not sure what to do!\n");
     }
@@ -601,7 +647,7 @@ void *set_allbutton_light_programmode( void *ptr )
       int adv_steps = (val - cmode + numPrograms) % numPrograms;
       LOG(ALLB_LOG, LOG_INFO, "Advancing Light program by %d (current=%d, new=%d, total=%d)\n",adv_steps, cmode, val, numPrograms);
       if (adv_steps > 0) {
-        send_cmd(code);
+        send_cmd(button->code);
         waitfor_queue2empty();
       }
       final_mode = val;
@@ -621,14 +667,14 @@ void *set_allbutton_light_programmode( void *ptr )
   // before we can send the next off.
   if ( button->led->state != ON && iOn > 0) {
     LOG(ALLB_LOG, LOG_INFO, "Light Programming Initial state off, turning on for %d seconds\n",iOn);
-    send_cmd(code);
+    send_cmd(button->code);
     delay(iOn * seconds);
   }
 
   // Now need to turn off for between 11 and 14 seconds to reset light.
   if (iOff > 0) {
     LOG(ALLB_LOG, LOG_INFO, "Light Programming turn off for %d seconds\n",iOff);
-    send_cmd(code);
+    send_cmd(button->code);
     delay(iOff * seconds);
   }
 
@@ -639,7 +685,7 @@ void *set_allbutton_light_programmode( void *ptr )
   if (pmode > 0 && val > 0) {
     for (i = 1; i < (val * 2); i++) {
       LOG(ALLB_LOG, LOG_INFO, "Light Programming button press number %d - %s of %d\n", i, i % 2 == 0 ? "Off" : "On", val);
-      send_cmd(code);
+      send_cmd(button->code);
       waitfor_queue2empty();
       delay(pmode * seconds); // 0.3 works, but using 0.4 to be safe
     }
@@ -648,17 +694,17 @@ void *set_allbutton_light_programmode( void *ptr )
       const int dt = 0.5;  // Time to wait after receiving conformation of light on/off
       waitfor_queue2empty();
       LOG(ALLB_LOG, LOG_INFO, "Light Programming button press number %d - %s of %d\n", i, "ON", val);
-      send_cmd(code);
+      send_cmd(button->code);
       waitForButtonState(aqdata, button, ON, 2);
       delay(dt * seconds);
       waitfor_queue2empty();
       LOG(ALLB_LOG, LOG_INFO, "Light Programming button press number %d - %s of %d\n", i, "OFF", val);
-      send_cmd(code);
+      send_cmd(button->code);
       waitForButtonState(aqdata, button, OFF, 2);
       delay(dt * seconds);
     }
     LOG(ALLB_LOG, LOG_INFO, "Finished - Light Programming button press number %d - %s of %d\n", i, "ON", val);
-    send_cmd(code);
+    send_cmd(button->code);
     //waitfor_queue2empty();
     longwaitfor_queue2empty();
   }
@@ -831,9 +877,11 @@ void *set_allbutton_pool_heater_temps( void *ptr )
   char *menu_name;
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_POOL_HEATER_TEMP);
   
-  // NSF When we move over to new structure use below
-  //int val = threadCtrl->pArgs.value;
+#ifdef NEW_AQ_PROGRAMMER
+  int val = threadCtrl->pArgs.value;
+#else
   int val = atoi((char*)threadCtrl->thread_args);
+#endif
   
   /*
   if (val > HEATER_MAX) {
@@ -902,7 +950,13 @@ void *set_allbutton_spa_heater_temps( void *ptr )
   
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_SPA_HEATER_TEMP);
   
+#ifdef NEW_AQ_PROGRAMMER
+  int val = threadCtrl->pArgs.value;
+#else
   int val = atoi((char*)threadCtrl->thread_args);
+#endif
+  
+
   char *name;
   char *menu_name;
   /*
@@ -973,7 +1027,12 @@ void *set_allbutton_freeze_heater_temps( void *ptr )
   
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_FRZ_PROTECTION_TEMP);
   
+#ifdef NEW_AQ_PROGRAMMER
+  int val = threadCtrl->pArgs.value;
+#else
   int val = atoi((char*)threadCtrl->thread_args);
+#endif
+
   /*
   if (val > FREEZE_PT_MAX) {
     val = FREEZE_PT_MAX;

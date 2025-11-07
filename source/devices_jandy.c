@@ -265,7 +265,11 @@ bool processPacketFromSWG(unsigned char *packet, int packet_length, struct aqual
     if (aqdata->swg_delayed_percent != TEMP_UNKNOWN && aqdata->ar_swg_device_status == SWG_STATUS_ON) { // We have a delayed % to set.
       char sval[10];
       snprintf(sval, 9, "%d", aqdata->swg_delayed_percent);
+#ifdef NEW_AQ_PROGRAMMER
+      aq_programmer(AQ_SET_SWG_PERCENT, NULL, aqdata->swg_delayed_percent, AQP_NULL, aqdata);
+#else
       aq_programmer(AQ_SET_SWG_PERCENT, sval, aqdata);
+#endif
       LOG(DJAN_LOG, LOG_NOTICE, "Setting SWG %% to %d, from delayed message\n", aqdata->swg_delayed_percent);
       aqdata->swg_delayed_percent = TEMP_UNKNOWN;
     }

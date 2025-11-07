@@ -34,6 +34,11 @@
 #define RSP_EXT_PROG (1 << 15) // 128
 // ....Remeber no more for int16_t.......
 
+#ifdef AQ_PANEL_C_
+const uint32_t PANEL_COMPARISON_MASK = (1U << 12) - 1;  // We only care about bits 1 to 12 (ie nothing higher than RSP_ONET)
+#endif
+
+
 // Bitmask for pannel support against board rev
 // used in getPanelSupport()
 #define RSP_SUP_ONET   (1 << 0)  // OneTouch

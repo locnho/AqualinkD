@@ -138,7 +138,6 @@ int pda_find_m_index_swcase(char *text, int limit)
 */
 pda_menu_type pda_m_type()
 {
-  
   if (strncasecmp(_menu[1],"AIR  ", 5) == 0) {
     return PM_HOME;
   } else if (strncasecmp(_menu[0],"EQUIPMENT STATUS", 16) == 0) {

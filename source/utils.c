@@ -516,6 +516,9 @@ void test(int msg_level, char *msg)
 
 void addDebugLogMask(logmask_t flag)
 {
+
+  //PRINTF("Adding logmask %s %d\n",logmask2name(flag), flag);
+
   _logforcemask |= flag;
 
   if (flag == IAQT_LOG) // If AQTouch add iAqualink

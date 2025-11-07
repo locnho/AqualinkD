@@ -218,7 +218,7 @@ unsigned const char waitfor_iaqt_messages(struct aqualinkdata *aqdata, int numMe
   {
     //LOG(IAQT_LOG,LOG_DEBUG, "waitfor_iaqt_nextPage (%d of %d)\n",i,numMessageReceived);
     pthread_cond_wait(&aqdata->active_thread.thread_cond, &aqdata->active_thread.thread_mutex);
-    
+    LOG(IAQT_LOG,LOG_DEBUG, "waitfor_iaqt_message (%d of %d) - received message 0x%02hhx\n",i,numMessageReceived,iaqtLastMsg());
   }
 
   LOG(IAQT_LOG,LOG_DEBUG, "waitfor_iaqt_messages finished in (%d of %d)\n",i,numMessageReceived);
@@ -243,6 +243,8 @@ unsigned const char waitfor_iaqt_nextPage(struct aqualinkdata *aqdata) {
     //LOG(IAQT_LOG,LOG_DEBUG, "waitfor_iaqt_nextPage (%d of %d)\n",i,numMessageReceived);
     pthread_cond_wait(&aqdata->active_thread.thread_cond, &aqdata->active_thread.thread_mutex);
     if(wasiaqtThreadKickTypePage()) break;
+
+    LOG(IAQT_LOG,LOG_DEBUG, "waitfor_iaqt_nextPage (%d of %d) - received message 0x%02hhx\n",i,numMessageReceived,iaqtLastMsg());
   }
 
   LOG(IAQT_LOG,LOG_DEBUG, "waitfor_iaqt_nextPage finished in (%d of %d)\n",i,numMessageReceived);
@@ -271,10 +273,13 @@ unsigned const char waitfor_iaqt_nextMessage(struct aqualinkdata *aqdata, const 
     LOG(IAQT_LOG,LOG_DEBUG, "waitfor_iaqt_nextMessage 0x%02hhx (%d of %d)\n",msg_type,i,numMessageReceived);
     pthread_cond_wait(&aqdata->active_thread.thread_cond, &aqdata->active_thread.thread_mutex);
     if( msg_type == NUL || iaqtLastMsg() == msg_type) break;
+
+    LOG(IAQT_LOG,LOG_DEBUG, "waitfor_iaqt_nextMessage (%d of %d) - received message 0x%02hhx\n",i,numMessageReceived,iaqtLastMsg());
   }
 
   pthread_mutex_unlock(&aqdata->active_thread.thread_mutex);
 
+  LOG(IAQT_LOG,LOG_DEBUG, "waitfor_iaqt_nextMessage finished (%d of %d) - received message 0x%02hhx\n",i,numMessageReceived,iaqtLastMsg());
   return iaqtLastMsg();
 }
 
@@ -486,6 +491,87 @@ bool goto_iaqt_page(const unsigned char pageID, struct aqualinkdata *aqdata) {
   return false;
 }
 
+
+#ifdef NEW_AQ_PROGRAMMER
+void *set_aqualink_iaqtouch_device_on_off( void *ptr )
+{
+  struct programmingThreadCtrl *threadCtrl;
+  threadCtrl = (struct programmingThreadCtrl *) ptr;
+  struct aqualinkdata *aqdata = threadCtrl->aqdata;
+  //char *buf = (char*)threadCtrl->thread_args;
+  //char device_name[15];
+  struct iaqt_page_button *pButton;
+
+  //unsigned int device = atoi(&buf[0]);
+  //unsigned int state = atoi(&buf[5]);
+  
+  struct programmerArgs *pargs = &threadCtrl->pArgs;
+  aqkey *button = threadCtrl->pArgs.button;
+  //unsigned char code = pargs->button->code;
+  int state = pargs->value;
+
+  waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_IAQTOUCH_DEVICE_ON_OFF);
+
+  LOG(IAQT_LOG,LOG_INFO, "PDA Device On/Off, device '%s', state %d\n",button->label,state);
+
+  // See if it's on the current page
+  pButton = iaqtFindButtonByLabel(button->label);
+  
+  if (pButton == NULL && isVBUTTON_ALTLABEL(button->special_mask) ) { // Try alt button name
+    pButton = iaqtFindButtonByLabel(((altlabel_detail *)button->special_mask_ptr)->altlabel);
+  }
+
+  if (pButton == NULL) {
+    // No luck, go to the device page
+    if ( goto_iaqt_page(IAQ_PAGE_DEVICES, aqdata) == false )
+      goto f_end;
+
+    pButton = iaqtFindButtonByLabel(button->label);
+
+    if (pButton == NULL && isVBUTTON_ALTLABEL(button->special_mask) ) { // Try alt button name
+      pButton = iaqtFindButtonByLabel(((altlabel_detail *)button->special_mask_ptr)->altlabel);
+    }
+ 
+  // If not found see if page has next
+    if (pButton == NULL && iaqtFindButtonByIndex(16)->type == 0x03 ) {
+      iaqt_queue_cmd(KEY_IAQTCH_NEXT_PAGE);
+      waitfor_iaqt_nextPage(aqdata);
+    // This will fail, since not looking at device page 2 buttons
+      pButton = iaqtFindButtonByLabel(button->label);
+    }
+  }
+
+  if (pButton == NULL) {  
+    LOG(IAQT_LOG, LOG_ERR, "IAQ Touch did not find '%s' button on device list\n", button->label);
+    goto f_end;
+  }
+
+  send_aqt_cmd(pButton->keycode);
+  //LOG(IAQT_LOG, LOG_ERR, "******* CURRENT MENU '0x%02hhx' *****\n",iaqtCurrentPage());
+  // NSF NEED TO CHECK FOR POPUP MESSAGE, AND KILL IT.
+  //page IAQ_PAGE_SET_TEMP hit button 0
+  //page IAQ_PAGE_COLOR_LIGHT hit button ???????
+  // Heater popup can be cleared with a home button and still turn on.
+  // Color light can be cleared with a home button, but won;t turn on.
+
+  waitfor_iaqt_queue2empty();
+  //waitfor_iaqt_messages(aqdata,1);
+
+  // OR maybe use waitfor_iaqt_messages(aqdata,1)
+
+  // Turn spa on when pump off, ned to remove message "spa will turn on after safty delay", home doesn't clear.
+  send_aqt_cmd(KEY_IAQTCH_HOME);
+
+  // Turn spa off need to read message if heater is on AND hit ok......
+
+  f_end:
+  goto_iaqt_page(IAQ_PAGE_HOME, aqdata);
+  cleanAndTerminateThread(threadCtrl);
+
+  // just stop compiler error, ptr is not valid as it's just been freed
+  return ptr;
+}
+#else
 void *set_aqualink_iaqtouch_device_on_off( void *ptr )
 {
   struct programmingThreadCtrl *threadCtrl;
@@ -565,6 +651,7 @@ void *set_aqualink_iaqtouch_device_on_off( void *ptr )
   // just stop compiler error, ptr is not valid as it's just been freed
   return ptr;
 }
+#endif
 
 /*
  // Not complete, and not needed with 
@@ -606,21 +693,37 @@ void *set_aqualink_iaqtouch_light_colormode( void *ptr )
   struct programmingThreadCtrl *threadCtrl;
   threadCtrl = (struct programmingThreadCtrl *) ptr;
   struct aqualinkdata *aqdata = threadCtrl->aqdata;
-  char *buf = (char*)threadCtrl->thread_args;
+ 
   //char device_name[15];
-  struct iaqt_page_button *button;
+  struct iaqt_page_button *pButton;
   const char *mode_name;
+  bool use_current_mode = false;
+  bool turn_off = false;
+  
+  waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_IAQTOUCH_LIGHTCOLOR_MODE);
+
+
+#ifdef NEW_AQ_PROGRAMMER
+  struct programmerArgs *pargs = &threadCtrl->pArgs;
+  aqkey *key = threadCtrl->pArgs.button;
+  //unsigned char code = pargs->button->code;
+  int val = pargs->value;
+  
+  if (!isPLIGHT(key->special_mask)) {
+    LOG(ALLB_LOG, LOG_ERR, "Can't program light for button '%d', configuration is incorrect\n", key->label);
+    cleanAndTerminateThread(threadCtrl);
+    return ptr;
+  }
+
+  int typ = ((clight_detail *)key->special_mask_ptr)->lightType;
+
+#else
+  char *buf = (char*)threadCtrl->thread_args;
   int val = atoi(&buf[0]);
   int btn = atoi(&buf[5]);
   int typ = atoi(&buf[10]);
-  bool use_current_mode = false;
-  bool turn_off = false;
   aqkey *key = NULL;
 
-  waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_IAQTOUCH_LIGHTCOLOR_MODE);
-
-  //char *buf = (char*)threadCtrl->thread_args;
-  
   struct programmerArgs *pargs = &threadCtrl->pArgs;
   if (pargs->button != NULL) {
     key = threadCtrl->pArgs.button;
@@ -640,6 +743,7 @@ void *set_aqualink_iaqtouch_light_colormode( void *ptr )
     }
     key = &aqdata->aqbuttons[btn];
   }
+#endif
 
   //unsigned char code = key->code;
   
@@ -665,43 +769,43 @@ void *set_aqualink_iaqtouch_light_colormode( void *ptr )
   
   
   // See if it's on the current page
-  button = iaqtFindButtonByLabel(key->label);
+  pButton = iaqtFindButtonByLabel(key->label);
 
-PRINTF("First button find = %s\n",button==NULL?"null":button->name);
+PRINTF("First button find = %s\n",pButton==NULL?"null":pButton->name);
 
-  if (button == NULL) {
+  if (pButton == NULL) {
     // No luck, go to the device page
     if ( goto_iaqt_page(IAQ_PAGE_DEVICES, aqdata) == false )
       goto f_end;
 
-    button = iaqtFindButtonByLabel(key->label);
+    pButton = iaqtFindButtonByLabel(key->label);
  
-PRINTF("Second button find = %s\n",button==NULL?"null":button->name);
+PRINTF("Second button find = %s\n",pButton==NULL?"null":pButton->name);
   // If not found see if page has next
-    if (button == NULL && iaqtFindButtonByIndex(16)->type == 0x03 ) {
+    if (pButton == NULL && iaqtFindButtonByIndex(16)->type == 0x03 ) {
       iaqt_queue_cmd(KEY_IAQTCH_NEXT_PAGE);
       waitfor_iaqt_nextPage(aqdata);
     // This will fail, since not looking at device page 2 buttons
-      button = iaqtFindButtonByLabel(key->label);
-PRINTF("Third button find = %s\n",button==NULL?"null":button->name);
+      pButton = iaqtFindButtonByLabel(key->label);
+PRINTF("Third button find = %s\n",pButton==NULL?"null":pButton->name);
     }
   }
 
-  if (button == NULL) {  
+  if (pButton == NULL) {  
     LOG(IAQT_LOG, LOG_ERR, "IAQ Touch did not find '%s' button on device list\n", key->label);
     goto f_end;
   }
-PRINTF("FOUND button = %s\n",button==NULL?"null":button->name);
+PRINTF("FOUND button = %s\n",pButton==NULL?"null":pButton->name);
   // WE have a iaqualink button, press it.
-  LOG(IAQT_LOG, LOG_DEBUG, "IAQ Touch found '%s' sending keycode '0x%02hhx'\n", key->label, button->keycode);
-  send_aqt_cmd(button->keycode);
+  LOG(IAQT_LOG, LOG_DEBUG, "IAQ Touch found '%s' sending keycode '0x%02hhx'\n", key->label, pButton->keycode);
+  send_aqt_cmd(pButton->keycode);
 
   // See if we want to use the last color, or turn it off
   if (use_current_mode || turn_off) {
     // After pressing the button, Just need to wait for 5 seconds and it will :- 
     // a) if off turn on and default to last color.
     // b) if on, turn off. (pain that we need to wait 5 seconds.)
-PRINTF("******** WAIT for next message\n");
+PRINTF("******** WAIT for next page\n");
     waitfor_iaqt_queue2empty();
     waitfor_iaqt_nextPage(aqdata);
     if (use_current_mode) {
@@ -717,32 +821,34 @@ PRINTF("******** WAIT for next message\n");
   }
 
   // BELOW WE NEED TO CATER FOR OK POPUP IF LIGHT IS ALREADY ON
-  if (button->state == 0x01) { // Light is on, need to select the BUTTON
+  if (pButton->state == 0x01) { // Light is on, need to select the BUTTON
     waitfor_iaqt_queue2empty();
     // We Should wait for popup message, before sending code
     send_aqt_cmd(KEY_IAQTCH_OK);
   }
 
   if (waitfor_iaqt_nextPage(aqdata) != IAQ_PAGE_COLOR_LIGHT) {
-    LOG(IAQT_LOG, LOG_ERR, "IAQ Touch did not color light page\n");
+    LOG(IAQT_LOG, LOG_ERR, "IAQ Touch did not find color light page\n");
     goto f_end;
   }
 
   // Now find the light mode and press it.
-  button = iaqtFindButtonByLabel(mode_name);
+  pButton = iaqtFindButtonByLabel(mode_name);
   
-  if (button == NULL) {
+  if (pButton == NULL) {
     LOG(IAQT_LOG, LOG_ERR, "IAQ Touch did find color '%s' in color light page\n",mode_name);
     goto f_end;
   }
   
-  LOG(IAQT_LOG, LOG_DEBUG, "IAQ Touch found '%s' sending keycode '0x%02hhx'\n", mode_name, button->keycode);
-  send_aqt_cmd(button->keycode);
+  LOG(IAQT_LOG, LOG_DEBUG, "IAQ Touch found '%s' sending keycode '0x%02hhx'\n", mode_name, pButton->keycode);
+  PRINTF("******** current page is '0x%02hhx'\n",iaqtCurrentPage());
+  send_aqt_cmd(pButton->keycode);
   waitfor_iaqt_queue2empty();
   // Wait for popup message to disapera
   unsigned char page;
+  PRINTF("******** current page is '0x%02hhx'\n",iaqtCurrentPage());
   while ( (page = waitfor_iaqt_nextPage(aqdata)) != NUL) {
-     PRINTF("******** next page is '0x%02hhx'\n",page);
+     PRINTF("******** next page is '0x%02hhx'\n",page);       // page = 0x48 IAQ_PAGE_COLOR_LIGHT
   }
 
   //LOG(IAQT_LOG, LOG_ERR, "IAQ Touch WAIYING FOR 1 MESSAGES\n");
@@ -766,16 +872,24 @@ void *set_aqualink_iaqtouch_pump_rpm( void *ptr )
   struct programmingThreadCtrl *threadCtrl;
   threadCtrl = (struct programmingThreadCtrl *) ptr;
   struct aqualinkdata *aqdata = threadCtrl->aqdata;
-  char *buf = (char*)threadCtrl->thread_args;
   char VSPstr[20];
-  int structIndex;
-  struct iaqt_page_button *button;
+  struct iaqt_page_button *pButton;
   char *pumpName = NULL;
+  int structIndex;
 
   //printf("**** program string '%s'\n",buf);
+#ifdef NEW_AQ_PROGRAMMER
+  struct programmerArgs *pargs = &threadCtrl->pArgs;
+  //aqkey *button = threadCtrl->pArgs.button;
+  int pumpIndex = pargs->alt_value;
+  int pumpRPM = pargs->value;
+#else
+  char *buf = (char*)threadCtrl->thread_args;
   
   int pumpIndex = atoi(&buf[0]);
-  int pumpRPM = -1;
+  int pumpRPM = atoi(&buf[2]);
+#endif
+
   //int pumpRPM = atoi(&buf[2]);
   for (structIndex=0; structIndex < aqdata->num_pumps; structIndex++) {
     if (aqdata->pumps[structIndex].pumpIndex == pumpIndex) {
@@ -785,16 +899,15 @@ void *set_aqualink_iaqtouch_pump_rpm( void *ptr )
         cleanAndTerminateThread(threadCtrl);
         return ptr;
       }
-      pumpRPM = RPM_check(aqdata->pumps[structIndex].pumpType, atoi(&buf[2]), aqdata);
+      pumpRPM = RPM_check(aqdata->pumps[structIndex].pumpType, pumpRPM, aqdata);
       break;
     }
   }
-  
+
   //int pumpRPM = atoi(&buf[2]);
   //int pumpIndex = 1;
 
 
-  
   // NSF Should probably check pumpRPM is not -1 here
 
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_IAQTOUCH_PUMP_RPM);
@@ -805,19 +918,19 @@ void *set_aqualink_iaqtouch_pump_rpm( void *ptr )
     goto f_end;
 
   sprintf(VSPstr, "VSP%1d Spd ADJ",pumpIndex);
-  button = iaqtFindButtonByLabel(VSPstr);
-  if (button == NULL && pumpName[0] != '\0') {
+  pButton = iaqtFindButtonByLabel(VSPstr);
+  if (pButton == NULL && pumpName[0] != '\0') {
     // Try by name
     sprintf(VSPstr, "%s ADJ",pumpName);
-    button = iaqtFindButtonByLabel(VSPstr);
+    pButton = iaqtFindButtonByLabel(VSPstr);
   }
 
-  if (button == NULL) {
+  if (pButton == NULL) {
       LOG(IAQT_LOG, LOG_ERR, "IAQ Touch did not Pump by index 'VSP%1d Spd ADJ' or by name '%s' button on page setup\n", pumpIndex, VSPstr);
       goto f_end;
   }
 
-  send_aqt_cmd(button->keycode);
+  send_aqt_cmd(pButton->keycode);
   if (waitfor_iaqt_nextPage(aqdata) != IAQ_PAGE_SET_VSP) {
     LOG(IAQT_LOG, LOG_ERR, "IAQ Touch did not find %s page\n", VSPstr);
     goto f_end;
@@ -836,7 +949,7 @@ void *set_aqualink_iaqtouch_pump_rpm( void *ptr )
 
   //goto_iaqt_page(IAQ_PAGE_STATUS, aqdata);
 /*
-  // Send Devices button.
+  // Send Devices pButton.
   send_aqt_cmd(KEY_IAQTCH_HOME);
   waitfor_iaqt_queue2empty();
   sleep(1);
@@ -928,8 +1041,10 @@ void *get_aqualink_iaqtouch_freezeprotect( void *ptr )
   // The Message at index 0 is the deg that freeze protect is set to.
   int frz = rsm_atoi(iaqtGetMessageLine(0));
   if (frz >= 0) {
-    aqdata->frz_protect_set_point = frz;
-    aqdata->frz_protect_state = ON;
+    //aqdata->frz_protect_set_point = frz;
+    //aqdata->frz_protect_state = ON;
+    SET_IF_CHANGED( aqdata->frz_protect_set_point, frz, aqdata->is_dirty);
+    SET_IF_CHANGED( aqdata->frz_protect_state, ON, aqdata->is_dirty);
     LOG(IAQT_LOG,LOG_NOTICE, "IAQ Touch Freeze Protection setpoint %d\n",frz);
   }
 
@@ -965,12 +1080,14 @@ void *get_aqualink_iaqtouch_setpoints( void *ptr )
   // Button 2 is "Spa Heat 100"
   button = iaqtFindButtonByLabel("Pool Heat");
   if (button != NULL) {
-    aqdata->pool_htr_set_point = rsm_atoi((char *)&button->name + 9);
+    //aqdata->pool_htr_set_point = rsm_atoi((char *)&button->name + 9);
+    SET_IF_CHANGED( aqdata->pool_htr_set_point, rsm_atoi((char *)&button->name + 9), aqdata->is_dirty);
     LOG(IAQT_LOG,LOG_DEBUG, "IAQ Touch got to Pool heater setpoint %d\n",aqdata->pool_htr_set_point);
   } else {
     button = iaqtFindButtonByLabel("Temp1");
     if (button != NULL) {
-      aqdata->pool_htr_set_point = rsm_atoi((char *)&button->name + 5);
+      //aqdata->pool_htr_set_point = rsm_atoi((char *)&button->name + 5);
+      SET_IF_CHANGED( aqdata->pool_htr_set_point, rsm_atoi((char *)&button->name + 5), aqdata->is_dirty);
       LOG(IAQT_LOG,LOG_DEBUG, "IAQ Touch got to Temp1 setpoint %d\n",aqdata->pool_htr_set_point);
       if (isSINGLE_DEV_PANEL != true)
       {
@@ -982,12 +1099,14 @@ void *get_aqualink_iaqtouch_setpoints( void *ptr )
 
   button = iaqtFindButtonByLabel("Spa Heat");
   if (button != NULL) {
-    aqdata->spa_htr_set_point = rsm_atoi((char *)&button->name + 8);
+    //aqdata->spa_htr_set_point = rsm_atoi((char *)&button->name + 8);
+    SET_IF_CHANGED( aqdata->spa_htr_set_point, rsm_atoi((char *)&button->name + 8), aqdata->is_dirty);
     LOG(IAQT_LOG,LOG_DEBUG, "IAQ Touch got to Spa heater setpoint %d\n",aqdata->spa_htr_set_point);
   } else {
     button = iaqtFindButtonByLabel("Temp2");
     if (button != NULL) {
-      aqdata->spa_htr_set_point = rsm_atoi((char *)&button->name + 5);
+      //aqdata->spa_htr_set_point = rsm_atoi((char *)&button->name + 5);
+      SET_IF_CHANGED( aqdata->spa_htr_set_point, rsm_atoi((char *)&button->name + 5), aqdata->is_dirty);
       LOG(IAQT_LOG,LOG_DEBUG, "IAQ Touch got to Temp2 setpoint %d\n",aqdata->spa_htr_set_point);
       if (isSINGLE_DEV_PANEL != true)
       {
@@ -999,7 +1118,8 @@ void *get_aqualink_iaqtouch_setpoints( void *ptr )
 
   button = iaqtFindButtonByLabel("Chiller");
   if (button != NULL) {
-    aqdata->chiller_set_point = rsm_atoi((char *)&button->name + 8);
+    //aqdata->chiller_set_point = rsm_atoi((char *)&button->name + 8);
+    SET_IF_CHANGED( aqdata->chiller_set_point, rsm_atoi((char *)&button->name + 8), aqdata->is_dirty);
     LOG(IAQT_LOG,LOG_DEBUG, "IAQ Touch got to Chiller setpoint %d\n",aqdata->chiller_set_point);
   }
 
@@ -1009,7 +1129,8 @@ void *get_aqualink_iaqtouch_setpoints( void *ptr )
   // The Message at index 0 is the deg that freeze protect is set to.
   int frz = rsm_atoi(iaqtGetMessageLine(0));
   if (frz >= 0) {
-    aqdata->frz_protect_set_point = frz;
+   // aqdata->frz_protect_set_point = frz;
+    SET_IF_CHANGED( aqdata->frz_protect_set_point, frz, aqdata->is_dirty);
     LOG(IAQT_LOG,LOG_NOTICE, "IAQ Touch Freeze Protection setpoint %d\n",frz);
   }
 
@@ -1022,7 +1143,8 @@ void *get_aqualink_iaqtouch_setpoints( void *ptr )
     if ( waitfor_iaqt_nextPage(aqdata) != IAQ_PAGE_SYSTEM_SETUP )
     {
       LOG(IAQT_LOG,LOG_ERR, "Couldn't get back to setup page, Temperature units unknown, default to DegF\n");
-      aqdata->temp_units = FAHRENHEIT;
+      //aqdata->temp_units = FAHRENHEIT;
+      SET_IF_CHANGED( aqdata->temp_units, FAHRENHEIT, aqdata->is_dirty);
       goto f_end;
     }
 
@@ -1031,7 +1153,8 @@ void *get_aqualink_iaqtouch_setpoints( void *ptr )
     if ( waitfor_iaqt_nextPage(aqdata) != IAQ_PAGE_SYSTEM_SETUP2 )
     {
       LOG(IAQT_LOG,LOG_ERR, "Couldn't get back to setup page, Temperature units unknown, default to DegF\n");
-      aqdata->temp_units = FAHRENHEIT;
+      //aqdata->temp_units = FAHRENHEIT;
+      SET_IF_CHANGED( aqdata->temp_units, FAHRENHEIT, aqdata->is_dirty);
       goto f_end;
     }
 
@@ -1041,10 +1164,12 @@ void *get_aqualink_iaqtouch_setpoints( void *ptr )
       LOG(IAQT_LOG,LOG_NOTICE, "Temperature units are '%s'\n",button->name);
       if (button->name[8] == 'C') {
         LOG(IAQT_LOG,LOG_NOTICE, "Temperature unit message is '%s' set to degC\n",button->name);
-        aqdata->temp_units = CELSIUS;
+        //aqdata->temp_units = CELSIUS;
+        SET_IF_CHANGED( aqdata->temp_units, CELSIUS, aqdata->is_dirty);
       } else {
         LOG(IAQT_LOG,LOG_NOTICE, "Temperature unit message is '%s' set to degF\n",button->name);
-        aqdata->temp_units = FAHRENHEIT;
+        //aqdata->temp_units = FAHRENHEIT;
+        SET_IF_CHANGED( aqdata->temp_units, FAHRENHEIT, aqdata->is_dirty);
       }
       
 
@@ -1202,7 +1327,14 @@ void *set_aqualink_iaqtouch_swg_percent( void *ptr )
   struct aqualinkdata *aqdata = threadCtrl->aqdata;
 
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_IAQTOUCH_SWG_PERCENT);
+
+#ifdef NEW_AQ_PROGRAMMER
+  struct programmerArgs *pargs = &threadCtrl->pArgs;
+  int val = pargs->value;
+#else
   int val = atoi((char*)threadCtrl->thread_args);
+#endif
+ 
   val = setpoint_check(SWG_SETPOINT, val, aqdata);
 
   if (set_aqualink_iaqtouch_aquapure(aqdata, false, val))
@@ -1221,7 +1353,13 @@ void *set_aqualink_iaqtouch_swg_boost( void *ptr )
   struct aqualinkdata *aqdata = threadCtrl->aqdata;
 
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_IAQTOUCH_SWG_BOOST);
+
+#ifdef NEW_AQ_PROGRAMMER
+  struct programmerArgs *pargs = &threadCtrl->pArgs;
+  int val = pargs->value;
+#else
   int val = atoi((char*)threadCtrl->thread_args);
+#endif
 
   //logMessage(LOG_DEBUG, "programming BOOST to %s\n", val==true?"On":"Off");
 
@@ -1302,7 +1440,13 @@ void *set_aqualink_iaqtouch_spa_heater_temp( void *ptr )
   
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_IAQTOUCH_SPA_HEATER_TEMP);
 
+#ifdef NEW_AQ_PROGRAMMER
+  struct programmerArgs *pargs = &threadCtrl->pArgs;
+  int val = pargs->value;
+#else
   int val = atoi((char*)threadCtrl->thread_args);
+#endif
+
   val = setpoint_check(SPA_HTR_SETPOINT, val, aqdata);
 
   set_aqualink_iaqtouch_heater_setpoint(aqdata, SP_SPA, val);
@@ -1321,7 +1465,13 @@ void *set_aqualink_iaqtouch_pool_heater_temp( void *ptr )
 
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_IAQTOUCH_POOL_HEATER_TEMP);
   
+#ifdef NEW_AQ_PROGRAMMER
+  struct programmerArgs *pargs = &threadCtrl->pArgs;
+  int val = pargs->value;
+#else
   int val = atoi((char*)threadCtrl->thread_args);
+#endif
+
   val = setpoint_check(POOL_HTR_SETPOINT, val, aqdata);
 
   set_aqualink_iaqtouch_heater_setpoint(aqdata, SP_POOL, val);
@@ -1340,7 +1490,13 @@ void *set_aqualink_iaqtouch_chiller_temp( void *ptr )
 
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_IAQTOUCH_POOL_HEATER_TEMP);
   
+#ifdef NEW_AQ_PROGRAMMER
+  struct programmerArgs *pargs = &threadCtrl->pArgs;
+  int val = pargs->value;
+#else
   int val = atoi((char*)threadCtrl->thread_args);
+#endif
+
   //val = setpoint_check(POOL_HTR_SETPOINT, val, aqdata);
 
   set_aqualink_iaqtouch_heater_setpoint(aqdata, SP_CHILLER, val);
@@ -1356,16 +1512,27 @@ void *set_aqualink_iaqtouch_pump_vs_program( void *ptr )
   struct programmingThreadCtrl *threadCtrl;
   threadCtrl = (struct programmingThreadCtrl *) ptr;
   struct aqualinkdata *aqdata = threadCtrl->aqdata;
-  char *buf = (char*)threadCtrl->thread_args;
+  //char *buf = (char*)threadCtrl->thread_args;
   char VSPstr[20];
+  //int structIndex;
+  struct iaqt_page_button *pButton;
   int structIndex;
-  struct iaqt_page_button *button;
 
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_IAQTOUCH_PUMP_VS_PROGRAM);
 
+#ifdef NEW_AQ_PROGRAMMER
+  struct programmerArgs *pargs = &threadCtrl->pArgs;
+  //aqkey *button = threadCtrl->pArgs.button;
+  //unsigned char code = pargs->button->code;
+  int vspindex = pargs->alt_value;
+  int pumpIndex = pargs->value;
+#else
+  char *buf = (char*)threadCtrl->thread_args;
   int pumpIndex = atoi(&buf[0]);
   //int pumpRPM = -1;
   int vspindex = atoi(&buf[2]);
+#endif
+
   for (structIndex=0; structIndex < aqdata->num_pumps; structIndex++) {
     if (aqdata->pumps[structIndex].pumpIndex == pumpIndex) {
       if (aqdata->pumps[structIndex].pumpType == PT_UNKNOWN) {
@@ -1377,6 +1544,7 @@ void *set_aqualink_iaqtouch_pump_vs_program( void *ptr )
       break;
     }
   }
+
   //int pumpRPM = atoi(&buf[2]);
   //int pumpIndex = 1;
 
@@ -1387,13 +1555,13 @@ void *set_aqualink_iaqtouch_pump_vs_program( void *ptr )
   if ( goto_iaqt_page(IAQ_PAGE_DEVICES, aqdata) == false )
     goto f_end;
 
-  button = iaqtFindButtonByLabel(VSPstr);
-  if (button == NULL) {
+  pButton = iaqtFindButtonByLabel(VSPstr);
+  if (pButton == NULL) {
     LOG(IAQT_LOG, LOG_ERR, "Did not find '%s' button on page setup\n", VSPstr);
     goto f_end;
   }
 
-  send_aqt_cmd(button->keycode);
+  send_aqt_cmd(pButton->keycode);
   if (waitfor_iaqt_nextPage(aqdata) != IAQ_PAGE_SET_VSP) {
     LOG(IAQT_LOG, LOG_ERR, "Did not find %s page\n", VSPstr);
     goto f_end;
@@ -1401,13 +1569,13 @@ void *set_aqualink_iaqtouch_pump_vs_program( void *ptr )
   LOG(IAQT_LOG, LOG_INFO, "Got to %s page\n", VSPstr);
 
   // Select the button index.
-  button = iaqtFindButtonByIndex(vspindex);
-  if (button == NULL) {
+  pButton = iaqtFindButtonByIndex(vspindex);
+  if (pButton == NULL) {
     LOG(IAQT_LOG, LOG_ERR, "Did not find '%d' button on page\n", vspindex);
     goto f_end;
   }
 
-  send_aqt_cmd(button->keycode);
+  send_aqt_cmd(pButton->keycode);
   waitfor_iaqt_queue2empty();
   // Probably wait.
 

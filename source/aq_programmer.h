@@ -5,6 +5,8 @@
 #include <pthread.h>
 //#include "aqualink.h"
 
+#define NEW_AQ_PROGRAMMER
+
 #define PROGRAMMING_POLL_DELAY_TIME 10
 //#define PROGRAMMING_POLL_DELAY_TIME 2
 //#define PROGRAMMING_POLL_DELAY_TIME 5
@@ -29,8 +31,10 @@
 #define SWG_PERCENT_MAX 101
 #define SWG_PERCENT_MIN 0
 
+#ifndef NEW_AQ_PROGRAMMER
 #define PTHREAD_ARG 25
 #define LIGHT_MODE_BUFER PTHREAD_ARG
+#endif
 
 typedef enum emulation_type{
   SIM_NONE = -1,
@@ -170,8 +174,10 @@ struct programmingThreadCtrl {
   pthread_t thread_id;
   //void *thread_args;
   struct programmerArgs pArgs;
-  char thread_args[PTHREAD_ARG];
   struct aqualinkdata *aqdata;
+#ifndef NEW_AQ_PROGRAMMER
+  char thread_args[PTHREAD_ARG];
+#endif
 };
  
 
@@ -184,8 +190,14 @@ typedef enum pump_type {
 
 
 //void aq_programmer(program_type type, void *args, struct aqualinkdata *aq_data);
+
+#ifndef NEW_AQ_PROGRAMMER
 void aq_programmer(program_type type, char *args, struct aqualinkdata *aq_data);
+#else
 // Below is NEW version of above.
+void aq_programmer(program_type r_type, aqkey *button, int value, int value2, struct aqualinkdata *aq_data);
+#endif
+// Needs to be removed with NEW_AQ_PROGRAMMER
 void aq_program(program_type r_type, aqkey *button, int value, int value2, struct aqualinkdata *aq_data);
 
 //void kick_aq_program_thread(struct aqualinkdata *aq_data); 
@@ -196,6 +208,7 @@ bool in_iaqt_programming_mode(struct aqualinkdata *aq_data);
 bool in_swg_programming_mode(struct aqualinkdata *aq_data);
 bool in_light_programming_mode(struct aqualinkdata *aq_data);
 bool in_allb_programming_mode(struct aqualinkdata *aq_data);
+const char *get_current_programming_mode_name(struct aqualinkdata *aqdata);
 //void aq_send_cmd(unsigned char cmd);
 void queueGetProgramData(emulation_type source_type, struct aqualinkdata *aq_data);
 //void queueGetExtendedProgramData(emulation_type source_type, struct aqualinkdata *aq_data, bool labels);

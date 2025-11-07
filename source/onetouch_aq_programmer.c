@@ -400,14 +400,25 @@ void *set_aqualink_onetouch_pump_rpm( void *ptr )
   struct programmingThreadCtrl *threadCtrl;
   threadCtrl = (struct programmingThreadCtrl *) ptr;
   struct aqualinkdata *aqdata = threadCtrl->aqdata;
-  char *buf = (char*)threadCtrl->thread_args;
   char VSPstr[20];
-  int i, structIndex;
+  int i;
+  int structIndex;
 
   //printf("**** program string '%s'\n",buf);
   
+#ifdef NEW_AQ_PROGRAMMER
+  struct programmerArgs *pargs = &threadCtrl->pArgs;
+  //aqkey *button = threadCtrl->pArgs.button;
+  //unsigned char code = pargs->button->code;
+  int pumpIndex = pargs->alt_value;
+  int pumpRPM = pargs->value;
+#else
+  char *buf = (char*)threadCtrl->thread_args;
+  
   int pumpIndex = atoi(&buf[0]);
-  int pumpRPM = -1;
+  int pumpRPM = atoi(&buf[2]);
+#endif
+
   //int pumpRPM = atoi(&buf[2]);
   for (structIndex=0; structIndex < aqdata->num_pumps; structIndex++) {
     if (aqdata->pumps[structIndex].pumpIndex == pumpIndex) {
@@ -416,16 +427,17 @@ void *set_aqualink_onetouch_pump_rpm( void *ptr )
         cleanAndTerminateThread(threadCtrl);
         return ptr;
       }
-      pumpRPM = RPM_check(aqdata->pumps[structIndex].pumpType, atoi(&buf[2]), aqdata);
+      pumpRPM = RPM_check(aqdata->pumps[structIndex].pumpType, pumpRPM, aqdata);
       break;
     }
   }
   // NSF Should probably check pumpRPM is not -1 here
 
+  
+
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_ONETOUCH_PUMP_RPM);
 
   LOG(ONET_LOG,LOG_INFO, "OneTouch Set Pump %d to RPM %d\n",pumpIndex,pumpRPM);
-
 
   if (! goto_onetouch_menu(aqdata, OTM_EQUIPTMENT_ONOFF) ){
     LOG(ONET_LOG,LOG_ERR, "OneTouch device programmer didn't get Equiptment on/off menu\n");
@@ -499,7 +511,7 @@ void *set_aqualink_onetouch_pump_rpm( void *ptr )
             } else if (GPM < pumpRPM) {
               send_ot_cmd(KEY_ONET_UP);
             } else {
-              aqdata->pumps[structIndex].gpm = rsm_atoi(&onetouch_menu_hlight()[8]);;
+              aqdata->pumps[structIndex].gpm = rsm_atoi(&onetouch_menu_hlight()[8]);
               send_ot_cmd(KEY_ONET_SELECT);
               waitfor_ot_queue2empty();
               break;
@@ -563,15 +575,22 @@ void *set_aqualink_onetouch_macro( void *ptr )
 
   //sprintf(msg, "%-5d%-5d",index, (strcmp(value, "on") == 0)?ON:OFF);
   // Use above to set
+#ifdef NEW_AQ_PROGRAMMER
+  struct programmerArgs *pargs = &threadCtrl->pArgs;
+  aqkey *button = threadCtrl->pArgs.button;
+  //unsigned char code = pargs->button->code;
+  int state = pargs->value;
+#else
   char *buf = (char*)threadCtrl->thread_args;
   unsigned int device = atoi(&buf[0]);
   unsigned int state = atoi(&buf[5]);
+#endif
 
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_ONETOUCH_MACRO);
   
   LOG(ONET_LOG,LOG_DEBUG, "OneTouch Marco\n");
 
-  LOG(ONET_LOG,LOG_ERR, "OneTouch Macro not implimented (device=%d|state=%d)\n",device,state);
+  LOG(ONET_LOG,LOG_ERR, "OneTouch Macro not implimented (device=%d|state=%d)\n",button->label,state);
 
   cleanAndTerminateThread(threadCtrl);
 
@@ -724,8 +743,13 @@ void *set_aqualink_onetouch_pool_heater_temp( void *ptr )
   struct aqualinkdata *aqdata = threadCtrl->aqdata;
 
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_ONETOUCH_POOL_HEATER_TEMP);
-  
+
+#ifdef NEW_AQ_PROGRAMMER
+  struct programmerArgs *pargs = &threadCtrl->pArgs;
+  int val = pargs->value;
+#else
   int val = atoi((char*)threadCtrl->thread_args);
+#endif
   val = setpoint_check(POOL_HTR_SETPOINT, val, aqdata);
 
   LOG(ONET_LOG,LOG_DEBUG, "OneTouch set pool heater temp to %d\n", val);
@@ -745,7 +769,12 @@ void *set_aqualink_onetouch_spa_heater_temp( void *ptr )
 
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_ONETOUCH_SPA_HEATER_TEMP);
   
+#ifdef NEW_AQ_PROGRAMMER
+  struct programmerArgs *pargs = &threadCtrl->pArgs;
+  int val = pargs->value;
+#else
   int val = atoi((char*)threadCtrl->thread_args);
+#endif
   val = setpoint_check(SPA_HTR_SETPOINT, val, aqdata);
 
   LOG(ONET_LOG,LOG_DEBUG, "OneTouch set spa heater temp to %d\n", val);
@@ -764,8 +793,13 @@ void *set_aqualink_onetouch_boost( void *ptr )
   struct aqualinkdata *aqdata = threadCtrl->aqdata;
 
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_ONETOUCH_BOOST);
-  
+
+#ifdef NEW_AQ_PROGRAMMER
+  struct programmerArgs *pargs = &threadCtrl->pArgs;
+  int val = pargs->value;
+#else
   int val = atoi((char*)threadCtrl->thread_args);
+#endif
 
   LOG(ONET_LOG,LOG_DEBUG, "OneTouch request set Boost to '%d'\n",val==true?"On":"Off");
 
@@ -818,7 +852,14 @@ void *set_aqualink_onetouch_swg_percent( void *ptr )
   unsigned char direction = KEY_ONET_UP;
 
   waitForSingleThreadOrTerminate(threadCtrl, AQ_SET_ONETOUCH_SWG_PERCENT);
+
+#ifdef NEW_AQ_PROGRAMMER
+  struct programmerArgs *pargs = &threadCtrl->pArgs;
+  int val = pargs->value;
+#else
   int val = atoi((char*)threadCtrl->thread_args);
+#endif
+
   val = setpoint_check(SWG_SETPOINT, val, aqdata);
 
   LOG(ONET_LOG,LOG_DEBUG, "OneTouch set SWG Percent to %d\n",val);

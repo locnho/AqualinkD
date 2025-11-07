@@ -606,17 +606,108 @@ bool goto_pda_menu(struct aqualinkdata *aqdata, pda_menu_type menu) {
         return false;
         break;
     }
-    LOG(PDA_LOG,LOG_DEBUG, "PDA Device programmer request for menu %d, current %d\n", menu, pda_m_type());
+    LOG(PDA_LOG,LOG_DEBUG, "PDA Device programmer '%s' request for menu %d, current %d\n", get_current_programming_mode_name(aqdata), menu, pda_m_type());
     cnt++;
   }
   if (pda_m_type() != menu) {
-    LOG(PDA_LOG,LOG_ERR, "PDA Device programmer didn't find a requested menu %d, current %d\n", menu, pda_m_type());
+    LOG(PDA_LOG,LOG_ERR, "PDA Device programmer '%s' didn't find a requested menu %d, current %d\n", get_current_programming_mode_name(aqdata), menu, pda_m_type());
     return false;
   }
 
   return true;
 }
 
+#ifdef NEW_AQ_PROGRAMMER
+void *set_aqualink_PDA_device_on_off( void *ptr )
+{
+  struct programmingThreadCtrl *threadCtrl;
+  threadCtrl = (struct programmingThreadCtrl *) ptr;
+  struct aqualinkdata *aqdata = threadCtrl->aqdata;
+  //int i=0;
+  //int found;
+  char device_name[15];
+  
+  struct programmerArgs *pargs = &threadCtrl->pArgs;
+  aqkey *button = threadCtrl->pArgs.button;
+  //unsigned char code = pargs->button->code;
+  int state = pargs->value;
+  int device = pargs->alt_value;
+
+  waitForSingleThreadOrTerminate(threadCtrl, AQ_PDA_DEVICE_ON_OFF);
+  
+  LOG(PDA_LOG,LOG_INFO, "PDA Device On/Off, device '%s', state %d\n",button->label,state);
+
+  if (! goto_pda_menu(aqdata, PM_EQUIPTMENT_CONTROL)) {
+    LOG(PDA_LOG,LOG_ERR, "PDA Device On/Off :- can't find EQUIPTMENT CONTROL menu\n");
+    cleanAndTerminateThread(threadCtrl);
+    return ptr;
+  }
+
+  // If single config (Spa OR pool) rather than (Spa AND pool) heater is TEMP1 and TEMP2
+  if (isSINGLE_DEV_PANEL && device == aqdata->pool_heater_index) { // rename Heater and Spa
+    sprintf(device_name,"%-13s\n","TEMP1");
+  } else if (isSINGLE_DEV_PANEL && device == aqdata->spa_heater_index)  {// rename Heater and Spa
+    sprintf(device_name,"%-13s\n","TEMP2");
+  } else {
+    //Pad name with spaces so something like "SPA" doesn't match "SPA BLOWER"
+    sprintf(device_name,"%-13s\n",button->label);
+  }
+
+  // NSF Added this since DEBUG hitting wrong command
+  //waitfor_pda_queue2empty();
+
+  if ( find_pda_menu_item(aqdata, device_name, 12) ) { // Remove 1 char to account for '100%' (4 chars not the usual 3)
+    if (button->led->state != state) {
+      //printf("*** Select State ***\n");
+      LOG(PDA_LOG,LOG_INFO, "PDA Device On/Off, found device '%s', changing state\n",button->label);
+      force_queue_delete(); // NSF This is a bad thing to do.  Need to fix this
+      send_pda_cmd(KEY_PDA_SELECT);
+      while (get_pda_queue_length() > 0) { delay(500); }
+      // If you are turning on a heater there will be a sub menu to set temp
+      if ((state == ON) && ((device == aqdata->pool_heater_index) || (device == aqdata->spa_heater_index))) {
+        if (! waitForPDAnextMenu(aqdata)) {
+          LOG(PDA_LOG,LOG_ERR, "PDA Device On/Off: %s on - waitForPDAnextMenu\n", button->label);
+        } else {
+          send_pda_cmd(KEY_PDA_SELECT);
+	        while (get_pda_queue_length() > 0) { delay(500); }
+          if (!waitForPDAMessageType(aqdata,CMD_PDA_HIGHLIGHT,20)) {
+            LOG(PDA_LOG,LOG_ERR, "PDA Device On/Off: %s on - wait for CMD_PDA_HIGHLIGHT\n",button->label);
+          }
+        }
+      } else if ( isPLIGHT(button->special_mask) ) {
+        // THIS EXTRA ENTER IS ONLY FOR ON, NOT OFF
+        // PDA Menu Line 0 =    Set Color   // for color light
+        // PDA Menu Line 0 =       Set      // for dimmer light
+        if ( state == ON ) {
+          waitForPDAMessageTypes(aqdata,CMD_PDA_HIGHLIGHT,CMD_PDA_HIGHLIGHTCHARS,5);
+          if (strncasecmp(pda_m_line(0),"Set", 3) == 0) {
+            LOG(PDA_LOG,LOG_DEBUG, "PDA Device On/Off, '%s' is programmable light, but no mode using default\n",button->label);
+            send_pda_cmd(KEY_PDA_SELECT);
+          } else {
+            LOG(PDA_LOG,LOG_ERR, "PDA Device On/Off: expected Set menu for programmable light '%s', not found\n",button->label);
+          }
+        }
+      } else { // not turning on heater wait for line update
+          // worst case spa when pool is running
+          if (!waitForPDAMessageType(aqdata,CMD_MSG_LONG,2)) {
+              LOG(PDA_LOG,LOG_ERR, "PDA Device On/Off: %s on - wait for CMD_MSG_LONG\n",button->label);
+          }
+      }
+      
+    } else {
+      LOG(PDA_LOG,LOG_INFO, "PDA Device On/Off, found device '%s', not changing state, is same\n",button->label,state);
+    }
+  } else {
+    LOG(PDA_LOG,LOG_ERR, "PDA Device On/Off, device '%s' not found\n",button->label);
+  }
+
+  cleanAndTerminateThread(threadCtrl);
+  
+  // just stop compiler error, ptr is not valid as it's just been freed
+  return ptr;
+
+}
+#else
 void *set_aqualink_PDA_device_on_off( void *ptr )
 {
   struct programmingThreadCtrl *threadCtrl;
@@ -711,6 +802,7 @@ void *set_aqualink_PDA_device_on_off( void *ptr )
   return ptr;
 
 }
+#endif
 
 
 void *set_aqualink_PDA_light_mode( void *ptr )
@@ -718,18 +810,25 @@ void *set_aqualink_PDA_light_mode( void *ptr )
   struct programmingThreadCtrl *threadCtrl;
   threadCtrl = (struct programmingThreadCtrl *) ptr;
   struct aqualinkdata *aqdata = threadCtrl->aqdata;
+  bool use_current_mode = false;
+  const char *mode_name = NULL;
   //int i=0;
   //int found;
   //char device_name[15];
 
-  waitForSingleThreadOrTerminate(threadCtrl, AQ_PDA_SET_LIGHT_MODE);
+  waitForSingleThreadOrTerminate(threadCtrl, AQ_PDA_SET_LIGHT_MODE); 
 
+#ifdef NEW_AQ_PROGRAMMER
+  struct programmerArgs *pargs = &threadCtrl->pArgs;
+  aqkey *button = threadCtrl->pArgs.button;
+  //unsigned char code = pargs->button->code;
+  int val = pargs->value;
+  int typ = ((clight_detail *)button->special_mask_ptr)->lightType;
+#else
   char *buf = (char*)threadCtrl->thread_args;
-  const char *mode_name = NULL;
   int val = atoi(&buf[0]);
   int btn = atoi(&buf[5]);
   int typ = atoi(&buf[10]);
-  bool use_current_mode = false;
 
   if (btn < 0 || btn >= aqdata->total_buttons ) {
     LOG(PDA_LOG, LOG_ERR, "Can't program light mode on button %d\n", btn);
@@ -738,10 +837,10 @@ void *set_aqualink_PDA_light_mode( void *ptr )
   }
 
   aqkey *button = &aqdata->aqbuttons[btn];
-
+#endif
 
   if ( ! isPLIGHT(button->special_mask) ) {
-    LOG(PDA_LOG, LOG_ERR, "Can't program light mode on button %d, it's not a programmable light\n", btn);
+    LOG(PDA_LOG, LOG_ERR, "Can't program light mode on button %d, it's not a programmable light\n", button->label);
     cleanAndTerminateThread(threadCtrl);
     return ptr;
   }
@@ -851,6 +950,11 @@ void *set_aqualink_PDA_init( void *ptr )
     } else {
       _PDA_Type = PDA;
     }
+
+    setPanelInformationFromPanelMsg(aqdata, pda_m_line(1), PANEL_STRING,AQUAPDA);
+    setPanelInformationFromPanelMsg(aqdata, pda_m_line(5), PANEL_REV, AQUAPDA);
+    //setPanelInformationFromPanelMsg(aqdata, "     PDA: 7.1.0", PANEL_REV, AQUAPDA);
+/*
     char *ptr1 = pda_m_line(1);
     char *ptr2 = pda_m_line(5);
     ptr1[AQ_MSGLEN+1] = '\0';
@@ -860,7 +964,7 @@ void *set_aqualink_PDA_init( void *ptr )
 
     //printf("****** Version '%s' ********\n",aqdata->version);
     LOG(PDA_LOG,LOG_DEBUG, "PDA type=%d, version=%s\n", _PDA_Type, aqdata->version);
-    
+ */   
     // don't wait for version menu to time out press back to get to home menu faster
     send_pda_cmd(KEY_PDA_BACK);
     
@@ -880,19 +984,22 @@ void *set_aqualink_PDA_init( void *ptr )
     LOG(PDA_LOG,LOG_ERR, "PDA Init :- can't find menu\n");
   }
 */
+
   // Get heater setpoints
   if (! _get_PDA_aqualink_pool_spa_heater_temps(aqdata)) {
     LOG(PDA_LOG,LOG_ERR, "PDA Init :- Error getting heater setpoints\n");
   }
+
+  //goto_pda_menu(aqdata, PM_HOME);
 
   // Get freeze protect setpoint, AquaPalm doesn't have freeze protect in menu.
   if (_PDA_Type != AQUAPALM && ! _get_PDA_freeze_protect_temp(aqdata)) {
     LOG(PDA_LOG,LOG_ERR, "PDA Init :- Error getting freeze setpoints\n");
   }
 
-  pda_reset_sleep();
-
   goto_pda_menu(aqdata, PM_HOME);
+
+  pda_reset_sleep();
 
   cleanAndTerminateThread(threadCtrl);
 
@@ -1158,8 +1265,14 @@ void *set_PDA_aqualink_SWG_setpoint(void *ptr) {
 
   waitForSingleThreadOrTerminate(threadCtrl, AQ_PDA_SET_SWG_PERCENT);
 
+#ifdef NEW_AQ_PROGRAMMER
+  struct programmerArgs *pargs = &threadCtrl->pArgs;
+  int val = pargs->value;
+#else
   int val = atoi((char*)threadCtrl->thread_args);
-  val = setpoint_check(SWG_SETPOINT, val, aqdata);
+#endif
+
+   val = setpoint_check(SWG_SETPOINT, val, aqdata);
 
   if (! goto_pda_menu(aqdata, PM_AQUAPURE)) {
     LOG(PDA_LOG,LOG_ERR, "Error finding SWG setpoints menu\n");
@@ -1198,7 +1311,12 @@ void *set_PDA_aqualink_boost(void *ptr)
 
   waitForSingleThreadOrTerminate(threadCtrl, AQ_PDA_SET_BOOST);
 
+#ifdef NEW_AQ_PROGRAMMER
+  struct programmerArgs *pargs = &threadCtrl->pArgs;
+  int val = pargs->value;
+#else
   int val = atoi((char*)threadCtrl->thread_args);
+#endif
 
   if (! goto_pda_menu(aqdata, PM_BOOST)) {
     LOG(PDA_LOG,LOG_ERR, "Error finding BOOST menu\n");
@@ -1276,8 +1394,14 @@ void *set_aqualink_PDA_pool_heater_temps( void *ptr )
   //char *name;
   //char *menu_name;
   waitForSingleThreadOrTerminate(threadCtrl, AQ_PDA_SET_POOL_HEATER_TEMPS);
-  
+
+#ifdef NEW_AQ_PROGRAMMER
+  struct programmerArgs *pargs = &threadCtrl->pArgs;
+  int val = pargs->value;
+#else
   int val = atoi((char*)threadCtrl->thread_args);
+#endif
+
   val = setpoint_check(POOL_HTR_SETPOINT, val, aqdata);
 
   set_PDA_aqualink_heater_setpoint(aqdata, val, true);
@@ -1296,8 +1420,14 @@ void *set_aqualink_PDA_spa_heater_temps( void *ptr )
   //char *name;
   //char *menu_name;
   waitForSingleThreadOrTerminate(threadCtrl, AQ_PDA_SET_SPA_HEATER_TEMPS);
-  
+
+#ifdef NEW_AQ_PROGRAMMER
+  struct programmerArgs *pargs = &threadCtrl->pArgs;
+  int val = pargs->value;
+#else
   int val = atoi((char*)threadCtrl->thread_args);
+#endif
+
   val = setpoint_check(SPA_HTR_SETPOINT, val, aqdata);
 
   set_PDA_aqualink_heater_setpoint(aqdata, val, false);
@@ -1317,8 +1447,14 @@ void *set_aqualink_PDA_freeze_protectsetpoint( void *ptr )
   struct aqualinkdata *aqdata = threadCtrl->aqdata;
   
   waitForSingleThreadOrTerminate(threadCtrl, AQ_PDA_SET_FREEZE_PROTECT_TEMP);
-  
+ 
+#ifdef NEW_AQ_PROGRAMMER
+  struct programmerArgs *pargs = &threadCtrl->pArgs;
+  int val = pargs->value;
+#else
   int val = atoi((char*)threadCtrl->thread_args);
+#endif
+
 
   val = setpoint_check(FREEZE_SETPOINT, val, aqdata);
   

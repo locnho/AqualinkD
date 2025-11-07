@@ -183,6 +183,7 @@ struct action {
   time_t requested;
   int value;
   int id; // Only used for Pumps at the moment.
+  aqkey *button;
   //char value[10];
 };
 
@@ -330,6 +331,24 @@ typedef struct clightd
 
 #include "aq_panel.h"
 
+// Macro to print the positions (0 to 31) of all set bits in a uint32_t mask.
+// The use of 'do-while(0)' allows the macro to be used safely in if/else statements.
+#include <limits.h> // Required for CHAR_BIT
+#define PRINT_SET_BITS(mask) do { \
+    const uint32_t m = (mask); /* Use a const variable for safety and to avoid side effects */ \
+    int printed_count = 0; \
+    printf("Set bits at positions: "); \
+    for (int i = 0; i < (sizeof(uint32_t) * CHAR_BIT); i++) { \
+        if ((m >> i) & 1U) { /* Check the i-th bit by shifting right */ \
+            printf("%d ", i); \
+            printed_count++; \
+        } \
+    } \
+    if (printed_count == 0) { \
+        printf("None"); \
+    } \
+    printf("\n"); \
+} while(0)
 
 
 /**
@@ -414,8 +433,8 @@ struct aqualinkdata
 {
   //panel_status panelstatus;
   uint16_t status_mask;
-  char version[AQ_MSGLEN*2]; // Will be replaced by below in future
-  char revision[AQ_MSGLEN]; // Will be replaced by below in future
+  //char version[AQ_MSGLEN*2]; // Will be replaced by below in future
+  //char revision[AQ_MSGLEN]; // Will be replaced by below in future
   uint8_t updatetype;
   // The below 4 are set (sometimes) but not used yet
   char panel_rev[AQ_MSGLEN];    // From panel
