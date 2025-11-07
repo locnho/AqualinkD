@@ -19,7 +19,7 @@ jobs:
           operations-per-run: 60
           days-before-issue-stale: 120
           days-before-issue-close: 10
-          stale-issue-message: "This issue has been automatically marked as stale because it has not had recent activity. It will be closed if no further activity occurs within 30 days."
+          stale-issue-message: "This issue has been automatically marked as stale because it has not had recent activity. It will be closed if no further activity occurs within 10 days."
           close-issue-message: "This issue has been automatically closed due to sustained inactivity."
           stale-issue-label: "stale"
           # Optional: specify exempt labels, such as "bug" or "feature"
