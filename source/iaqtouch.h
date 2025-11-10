@@ -22,6 +22,7 @@ struct iaqt_page_button *iaqtFindButtonByIndex(int index);
 const char *iaqtGetMessageLine(int index);
 const char *iaqtGetTableInfoLine(int index);
 unsigned char iaqtLastMsg();
+const char *iaqtPopupMsg();
 const char *iaqt_page_name(const unsigned char page);
 int num2iaqtRSset (unsigned char* packetbuffer, int num, bool pad4unknownreason);
 int char2iaqtRSset (unsigned char* packetbuffer, char *msg, int msg_len);

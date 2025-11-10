@@ -73,6 +73,8 @@ unsigned char _currentPage;
 unsigned char _lastMsgType = 0x00;
 //unsigned char _last_kick_type = -1;
 
+static char _popupMsg[AQ_MSGLONGLEN + 1];
+
 int _deviceStatusLines = 0;
 char _homeStatus[IAQ_STATUS_PAGE_LINES][AQ_MSGLEN+1];
 char _deviceStatus[IAQ_STATUS_PAGE_LINES][AQ_MSGLEN+1];
@@ -87,6 +89,11 @@ struct iaqt_page_button _deviceSystemSetupButtons[3][IAQ_PAGE_BUTTONS];
 unsigned char iaqtLastMsg()
 {
   return _lastMsgType;
+}
+
+const char *iaqtPopupMsg()
+{
+  return _popupMsg;
 }
 
 void set_iaqtouch_lastmsg(unsigned char msgtype)
@@ -836,7 +843,7 @@ bool process_iaqtouch_packet(unsigned char *packet, int length, struct aqualinkd
   //static int _pollCnt = 0;
   //static int probesSinceLastPageCMD=0;
   static bool gotStatus = true;
-  static char message[AQ_MSGLONGLEN + 1];
+  //static char message[AQ_MSGLONGLEN + 1];
   bool fake_pageend = false;
   //char buff[1024];
   // NSF Take this out
@@ -967,17 +974,17 @@ bool process_iaqtouch_packet(unsigned char *packet, int length, struct aqualinkd
   } else if (packet[PKT_CMD] == CMD_IAQ_MSG_LONG) {
     char *sp;
     // Set disply message if PDA panel
-    memset(message, 0, AQ_MSGLONGLEN + 1);
-    rsm_strncpy(message, packet + 6, AQ_MSGLONGLEN, length-9);
-    LOG(IAQT_LOG,LOG_NOTICE, "Popup message '%s'\n",message);
+    memset(_popupMsg, 0, AQ_MSGLONGLEN + 1);
+    rsm_strncpy(_popupMsg, packet + 6, AQ_MSGLONGLEN, length-9);
+    LOG(IAQT_LOG,LOG_NOTICE, "Popup message '%s'\n",_popupMsg);
     
     // Change this message, since you can't press OK.  'Light will turn off in 5 seconds. To change colors press Ok now.'
-     if ((sp = rsm_strncasestr(message, "To change colors press Ok now", strlen(message))) != NULL)
+     if ((sp = rsm_strncasestr(_popupMsg, "To change colors press Ok now", strlen(_popupMsg))) != NULL)
      {
        *sp = '\0';
      }
 
-    SET_IF_CHANGED_STRCPY(aqdata->last_display_message, message, aqdata->is_dirty); // Also display the message on web UI
+    SET_IF_CHANGED_STRCPY(aqdata->last_display_message, _popupMsg, aqdata->is_dirty); // Also display the message on web UI
    
     if (in_programming_mode(aqdata)) {
       SET_IF_CHANGED(aqdata->is_display_message_programming, true, aqdata->is_dirty);
@@ -1069,6 +1076,13 @@ if not programming && poll packet {
       // We probably only need to go over this loop if iaqualink2 is NOT enabled.
       // But may be better to simply increase FULL_STATUS_POLL_COUNT when it's not enabled.
       uint8_t nextPageRequestKey = KEY_IAQTCH_HOME;
+
+      if (_pollCnt > FULL_STATUS_POLL_COUNT + 5) {
+        LOG(IAQT_LOG,LOG_ERR,"Poll count=%d, too high, looks like page is stuck\n",_pollCnt);
+        _pollCnt=0;
+      } else {
+        LOG(IAQT_LOG,LOG_DEBUG,"Poll count=%d, Curent Page=0x%02hhx\n",_pollCnt, _currentPage);
+      }
 
       if (_pollCnt++ > FULL_STATUS_POLL_COUNT) {
         switch(_currentPage) {

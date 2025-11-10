@@ -940,7 +940,7 @@ void mqtt_broadcast_aqualinkstate(struct mg_connection *nc)
   for (i=0; i < _aqualink_data->num_sensors; i++) {
     if ( _aqualink_data->sensors[i].value != TEMP_UNKNOWN && _last_mqtt_aqualinkdata.sensors[i].value != _aqualink_data->sensors[i].value) {
       char topic[50];
-      sprintf(topic, "%s/%s", SENSOR_TOPIC, _aqualink_data->sensors[i].ID);
+      sprintf(topic, "%s%s", FULL_SENSOR_TOPIC, _aqualink_data->sensors[i].ID);
       send_mqtt_float_msg(nc, topic, _aqualink_data->sensors[i].value);
       _last_mqtt_aqualinkdata.sensors[i].value = _aqualink_data->sensors[i].value;
     }

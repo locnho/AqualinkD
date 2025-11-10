@@ -11,13 +11,19 @@
 Jandy Colors
 Jandy LED Light
 Sam/SL
-                          Color Logic
+Color Logic
 Intelibright
 Haywood Universal Color
-
 */
 bool isShowMode(const char *mode);
 
+/*
+Jandy Colors 	
+Jandy LED Light 	
+SAm/SAL Light 	
+IntelliBrite 	
+Hayw Univ Color
+*/
 
 /****** This list MUST be in order of clight_type enum *******/
 char *_color_light_options[NUMBER_LIGHT_COLOR_TYPES][LIGHT_COLOR_OPTIONS] = 

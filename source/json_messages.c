@@ -556,26 +556,30 @@ int build_device_JSON(struct aqualinkdata *aqdata, char* buffer, int size, bool 
       temperatureUOM t_uom = getTemperatureUOM(aqdata->sensors[i].uom);
 
       if (aqdata->sensors[i].uom == NULL) {
-        length += sprintf(buffer+length, "{\"type\": \"value\", \"id\": \"%s\", \"name\": \"%s\", \"state\": \"on\", \"value\": \"%.*f\", \"uom\": \"\" },",
+        length += sprintf(buffer+length, "{\"type\": \"value\", \"id\": \"%s%s\", \"name\": \"%s\", \"state\": \"on\", \"value\": \"%.*f\", \"uom\": \"\" },",
+        FULL_SENSOR_TOPIC,
         aqdata->sensors[i].ID,
         aqdata->sensors[i].label,
         2,
         aqdata->sensors[i].value);
       } else if (t_uom == UNKNOWN) {
-        length += sprintf(buffer+length, "{\"type\": \"value\", \"id\": \"%s\", \"name\": \"%s\", \"state\": \"on\", \"value\": \"%.*f\", \"uom\": \"%s\" },",
+        length += sprintf(buffer+length, "{\"type\": \"value\", \"id\": \"%s%s\", \"name\": \"%s\", \"state\": \"on\", \"value\": \"%.*f\", \"uom\": \"%s\" },",
+        FULL_SENSOR_TOPIC,
         aqdata->sensors[i].ID,
         aqdata->sensors[i].label,
         2,
         aqdata->sensors[i].value,
         aqdata->sensors[i].uom);
       } else if ( !homekit && (aqdata->temp_units == FAHRENHEIT && t_uom == CELSIUS) ) {
-        length += sprintf(buffer+length, "{\"type\": \"temperature\", \"id\": \"%s\", \"name\": \"%s\", \"state\": \"on\", \"value\": \"%.*f\" },",
+        length += sprintf(buffer+length, "{\"type\": \"temperature\", \"id\": \"%s%s\", \"name\": \"%s\", \"state\": \"on\", \"value\": \"%.*f\" },",
+        FULL_SENSOR_TOPIC,
         aqdata->sensors[i].ID,
         aqdata->sensors[i].label,
         2,
         degCtoF(aqdata->sensors[i].value));
       } else {
-        length += sprintf(buffer+length, "{\"type\": \"temperature\", \"id\": \"%s\", \"name\": \"%s\", \"state\": \"%s\", \"value\": \"%.*f\" },",
+        length += sprintf(buffer+length, "{\"type\": \"temperature\", \"id\": \"%s%s\", \"name\": \"%s\", \"state\": \"%s\", \"value\": \"%.*f\" },",
+        FULL_SENSOR_TOPIC,
         aqdata->sensors[i].ID,
         aqdata->sensors[i].label,
         "on",

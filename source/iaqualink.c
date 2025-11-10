@@ -26,6 +26,8 @@
 #include "serialadapter.h"
 #include "rs_msg_utils.h"
 
+#include "color_lights.h"
+
 #define IAQUA_QLEN 20
 
 typedef struct iaqulnkcmd
@@ -330,6 +332,83 @@ void iAqSetButtonState(struct aqualinkdata *aqdata, int index, const unsigned ch
   }
 }
 
+
+
+const char* colorLightNameFromHex(unsigned char hexid) {
+  switch (hexid) {
+    case 0x01:
+      return "Jandy Color Light";
+    break;
+    case 0x02:
+      return "Sam/SAL light";
+    break;
+     case 0x03:
+      return "Color Logic (Guess)";
+    break;
+    case 0x04:
+      return "Jandy LED Light";
+    break;
+    case 0x05:
+      return "Intelibrite Light";
+    break;
+    case 0x06:
+      return "Haywood universal color Light";
+    break;
+    default:
+      return "Unknown Color Light";
+    break;
+  }
+}
+
+const char* decodeTypeBits(unsigned char BIT2, unsigned char BIT3, unsigned char BIT4) {
+  switch (BIT3) {
+    case 0x01:
+      return "Dimable light";
+    break;
+    case 0x02:
+      return colorLightNameFromHex(BIT4);
+    break;
+    case 0x00:
+    default:
+      return "";
+    break;
+  }
+}
+
+/*
+
+ This is not right. BIT2 is not the mode. it's always 0x07 for color light
+
+const char* getColorLightMode(unsigned char BIT2, unsigned char BIT3, unsigned char BIT4) {
+  // BIT2 = Mode
+  // BIT4 = Light Type.
+  switch (BIT4) {
+    case 0x01:
+      return light_mode_name(LC_JANDY, BIT2, IAQUALNK); //"Jandy Color Light";
+    break;
+    case 0x02:
+      return light_mode_name(LC_SAL, BIT2, IAQUALNK); //"Sam/SAL light";
+    break;
+     case 0x03:
+      return light_mode_name(LC_CLOGIG, BIT2, IAQUALNK); //"Color Logic (Guess)";
+    break;
+    case 0x04:
+      return light_mode_name(LC_JANDYLED, BIT2, IAQUALNK); //"Jandy LED Light";
+    break;
+    case 0x05:
+      return light_mode_name(LC_INTELLIB, BIT2, IAQUALNK); //"Intelibrite Light";
+    break;
+    case 0x06:
+      return light_mode_name(LC_HAYWCL, BIT2, IAQUALNK); //"Haywood universal color Light";
+    break;
+    default:
+      return "Unknown Mode";
+    break;
+  }
+}
+*/
+
+
 /*  
     Status packets are requested on iAqualink ID 0xA? but received on AqualinkTouch ID 0x3?
     They are also sent when iAqualink is connected and a device changes.
@@ -509,6 +588,31 @@ bool process_iAqualinkStatusPacket(unsigned char *packet, int length, struct aqu
   }
   else if (packet[PKT_CMD] == CMD_IAQ_AUX_STATUS)
   {
+    /*
+    Example output.  We can get color light information from here.
+    Aux7 bit2=0x07. (This is not the MODE.  it's always 0x07 for color light)
+        Bit3 = (0x01=Dimmer, 0x02=ColorLight)
+        Bit4 = (Type of color light)
+    Info:  iAqualink2:Cleaner         = On  | bit1=0x01 bit2=0x01 bit3=0x00 bit4=0x00
+    Info:  iAqualink2:Waterfall       = On  | bit1=0x01 bit2=0x01 bit3=0x00 bit4=0x00
+    Info:  iAqualink2:Air Blower      = Off | bit1=0x00 bit2=0x01 bit3=0x00 bit4=0x00
+    Info:  iAqualink2:Pool Light      = Off | bit1=0x00 bit2=0x01 bit3=0x00 bit4=0x00
+    Info:  iAqualink2:Aux5            = Off | bit1=0x00 bit2=0x01 bit3=0x00 bit4=0x00
+    Info:  iAqualink2:Aux6            = Off | bit1=0x00 bit2=0x01 bit3=0x00 bit4=0x00
+    Info:  iAqualink2:Aux7            = On  | bit1=0x01 bit2=0x07 bit3=0x02 bit4=0x01  
+    Info:  iAqualink2:Extra Aux       = Off | bit1=0x00 bit2=0x01 bit3=0x00 bit4=0x00
+
+    Jandy Color = JC
+    Info:  iAqualink2:Aux7            = On  | bit1=0x01 bit2=0x07 bit3=0x02 bit4=0x01
+    Jandy LED = JL
+    Info:  iAqualink2:Aux7            = On  | bit1=0x01 bit2=0x07 bit3=0x02 bit4=0x04
+    Sam/SAL = SL
+    Info:  iAqualink2:Aux7            = On  | bit1=0x01 bit2=0x07 bit3=0x02 bit4=0x02
+    Intelibrite = IB
+    Info:  iAqualink2:Aux7            = On  | bit1=0x01 bit2=0x07 bit3=0x02 bit4=0x05
+    Haywood universal color = HU
+    Info:  iAqualink2:Aux7            = On  | bit1=0x01 bit2=0x07 bit3=0x02 bit4=0x06
+    */
     logPacket(IAQL_LOG, LOG_INFO, packet, length, true);
     // Look at notes in iaqualink.c for how this packet is made up
     // Since this is so similar to above CMD_IAQ_1TOUCH_STATUS, we should look at using same logic for both.
@@ -521,7 +625,15 @@ bool process_iAqualinkStatusPacket(unsigned char *packet, int length, struct aqu
       int labellen = packet[status + 4];
       if (labelstart + labellen < length)
       {
-        LOG(IAQL_LOG, LOG_INFO, "%-15.*s = %s | bit1=0x%02hhx bit2=0x%02hhx bit3=0x%02hhx bit4=0x%02hhx\n", labellen, &packet[labelstart], (packet[status] == 0x00 ? "Off" : "On "), packet[status], packet[status + 1], packet[status + 2], packet[status + 3]);
+        LOG(IAQL_LOG, LOG_INFO, "%-15.*s = %s | bit1=0x%02hhx bit2=0x%02hhx bit3=0x%02hhx bit4=0x%02hhx %s\n", 
+            labellen, 
+            &packet[labelstart], 
+            (packet[status] == 0x00 ? "Off" : "On "), 
+            packet[status], packet[status + 1], 
+            packet[status + 2], 
+            packet[status + 3],
+            decodeTypeBits(packet[status + 1], packet[status + 2], packet[status + 3])
+          );
       }
       if (isPDA_PANEL) {
         for (int bi=2 ; bi < aqdata->total_buttons ; bi++) {
@@ -543,6 +655,8 @@ bool process_iAqualinkStatusPacket(unsigned char *packet, int length, struct aqu
 
   return true;
 }
+
+
 
 bool process_iaqualink_packet(unsigned char *packet, int length, struct aqualinkdata *aqdata)
 {

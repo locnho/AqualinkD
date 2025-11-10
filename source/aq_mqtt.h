@@ -62,6 +62,7 @@
 #define LIGHT_DIMMER_VALUE_TOPIC "/brightness"
 
 #define SENSOR_TOPIC "Sensor"
+#define FULL_SENSOR_TOPIC SENSOR_TOPIC "/"
 
 /*
 #define AIR_TEMPERATURE   "Air"

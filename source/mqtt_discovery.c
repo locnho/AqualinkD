@@ -739,7 +739,7 @@ void publish_mqtt_discovery(struct aqualinkdata *aqdata, struct mg_connection *n
   for (i=0; i < aqdata->num_sensors; i++) {
     //sprintf(idbuf, "%s_%s","sensor",aqdata->sensors[i].label);
     //sprintf(topic, "%s/%s",SENSOR_TOPIC,aqdata->sensors[i].label);
-    sprintf(topic, "%s/%s",SENSOR_TOPIC,aqdata->sensors[i].ID);
+    sprintf(topic, "%s%s",FULL_SENSOR_TOPIC,aqdata->sensors[i].ID);
     rsm_char_replace(idbuf, topic, "/", "_");
     //sprintf(msg, HASSIO_SENSOR_DISCOVER,connections,_aqconfig_.mqtt_aq_topic,idbuf,aqdata->sensors[i].label,_aqconfig_.mqtt_aq_topic,topic, "°C", "mdi:thermometer");
     // Use HASSIO_TEMP_SENSOR_DISCOVER over HASSIO_SENSOR_DISCOVER since it has device class temperature and HA will convert automatically.

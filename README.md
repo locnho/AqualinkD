@@ -155,10 +155,10 @@ NEED TO FIX FOR THIS RELEASE.
 * Autoconfigure will *try* to work for PDA panels.
 * Added example script to generate HTTPS certificates. (./extras/generate-certs.sh)
 * Cleaned up exit & errors when running as daemon and docker.
+* Fixed issues with external sensors and homekit.
+* Added preliminary support for Jandy Infinite water color lights
 - Need to finish off :-
   * HAT serial optimizations broke some USB serial adapters
-  * Finish off assigning light mode & functionality to a vbutton (for Jandy Infinite water color support )
-  * cleanup rs_msg_utils.c
   * WebUI Config in aqmanager.
 
   

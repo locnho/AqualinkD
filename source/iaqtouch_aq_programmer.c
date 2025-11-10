@@ -836,21 +836,41 @@ PRINTF("******** WAIT for next page\n");
   pButton = iaqtFindButtonByLabel(mode_name);
   
   if (pButton == NULL) {
-    LOG(IAQT_LOG, LOG_ERR, "IAQ Touch did find color '%s' in color light page\n",mode_name);
+    LOG(IAQT_LOG, LOG_ERR, "IAQ Touch didn't find color '%s' in color light page\n",mode_name);
     goto f_end;
   }
   
-  LOG(IAQT_LOG, LOG_DEBUG, "IAQ Touch found '%s' sending keycode '0x%02hhx'\n", mode_name, pButton->keycode);
+  LOG(IAQT_LOG, LOG_DEBUG, "IAQ Touch found '%s' sending keycode '0x%02hhx' = '0x%02hhx' for light selection\n", mode_name, pButton->keycode, pButton->keycode+16);
   PRINTF("******** current page is '0x%02hhx'\n",iaqtCurrentPage());
-  send_aqt_cmd(pButton->keycode);
+  // NSF Key code is +16 for some reason.  ie key 0x07=(send 0x17).  0x0a=(send 0x1a)
+  send_aqt_cmd(pButton->keycode + 16);
   waitfor_iaqt_queue2empty();
   // Wait for popup message to disapera
+  // This is iAq Popup messag    | HEX: 0x10|0x02|0x33|0x2c|0x00|0x01|0x50|0x6c|0x65|0x61|0x73|0x65|0x20|0x77|0x61|0x69|0x74|0x2e|0x2e|0x2e|0x0a|0x20|0x43|0x79|0x63|0x6c|0x69|0x6e|0x67|0x20|0x74|0x6f|0x20|0x63|0x68|0x6f|0x73|0x65|0x6e|0x20|0x63|0x6f|0x6c|0x6f|0x72|0x2e|0x00|0x00|0x00|0x00|0x2e|0x10|0x03| 
+  // This is popup message clear | HEX: 0x10|0x02|0x33|0x2c|0x00|0x00|0x20|0x00|0x00|0x00|0x00|0x91|0x10|0x03|
+  // 5th bit 0x00 = clear. (anything else message)
+
+  unsigned char msg;
+  int i=0;
+  while ( (msg = waitfor_iaqt_nextMessage(aqdata, CMD_IAQ_MSG_LONG)) != NUL) {
+    const char *pmsg = iaqtPopupMsg();
+    PRINTF("******** popupMsg = %s ********\n",pmsg);
+    if (pmsg[0] == ' ') {
+      PRINTF("******** popupMsg clear ********\n");
+      break;
+    }
+    if (++i > 5) {
+       LOG(IAQT_LOG, LOG_WARNING, "IAQ Touch didn't see correct messages, color may no change\n");
+       break;
+    }
+  }
+/*
   unsigned char page;
   PRINTF("******** current page is '0x%02hhx'\n",iaqtCurrentPage());
   while ( (page = waitfor_iaqt_nextPage(aqdata)) != NUL) {
      PRINTF("******** next page is '0x%02hhx'\n",page);       // page = 0x48 IAQ_PAGE_COLOR_LIGHT
   }
-
+*/
   //LOG(IAQT_LOG, LOG_ERR, "IAQ Touch WAIYING FOR 1 MESSAGES\n");
   //waitfor_iaqt_messages(aqdata, 1);
 
