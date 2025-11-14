@@ -43,7 +43,6 @@ mqtt_convert_temp_to_c=YES
 #dzidx_SWG_percent=
 #dzidx_SWG_PPM=
 #dzidx_SWG_Status=
-dz_convert_temp_to_c=YES
 
 read_RS485_swg=YES
 read_RS485_ePump=YES
@@ -92,10 +91,10 @@ button_02_label=Spa
 button_03_label=Cleaner
 # Must be all CAP's
 button_04_label=SPA LIGHT
-button_04_lightMode=0
+button_04_lightMode=5
 # Must be all CAP's
 button_05_label=POOL LIGHT
-button_05_lightMode=0
+button_05_lightMode=5
 button_06_label=Air Blower
 button_07_label=Deck Jets
 button_08_label=Pool Heat
@@ -105,6 +104,7 @@ button_10_label=Solar Heat
 sensor_01_path=/sys/class/thermal/thermal_zone0/temp
 sensor_01_label=CPU
 sensor_01_factor=0.001000
+sensor_01_uom=°C
 
 light_programming_mode=0
 light_programming_initial_on=15
