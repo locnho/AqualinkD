@@ -1597,7 +1597,7 @@ void programDeviceLightBrightness(struct aqualinkdata *aqdata, int value, int de
     return;
   }
 
-  if  (light == NULL || (light->lightType != LC_DIMMER2 && light->lightType != LC_DIMMER)) {
+  if  (light == NULL || (light->lightType != LC_DIMMER2 && light->lightType != LC_DIMMER && light->lightType != LC_INTELLIB)) {
     LOG(PANL_LOG,LOG_ERR, "Can not set light brightness on device '%s'\n",aqdata->aqbuttons[deviceIndex].label);
     return;
   }
@@ -1608,7 +1608,12 @@ void programDeviceLightBrightness(struct aqualinkdata *aqdata, int value, int de
   }
 
   if (isPDA_PANEL) {
-    aq_programmer(AQ_SET_LIGHTCOLOR_MODE, light->button, dimmer_percent_to_mode_index(value), false, aqdata);
+    if (light->lightType == LC_INTELLIB) {
+      value /= 100 / (get_num_light_modes(light->lightType) - 1);
+      aq_programmer(AQ_SET_LIGHTCOLOR_MODE, light->button, value, false, aqdata);
+    } else {    
+      aq_programmer(AQ_SET_LIGHTCOLOR_MODE, light->button, dimmer_percent_to_mode_index(value), false, aqdata);
+    }
     return;
   }
 
