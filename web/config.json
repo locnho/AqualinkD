@@ -58,6 +58,7 @@
     "tile_icon_background_color_disabled": "rgb(110, 110, 110)",
     "tile_off_opacity": "0.90"
   },
+  "external_script":"mqtt_sensors.js",
   "devices": {
     "Filter_Pump": {
       "display": "true"
