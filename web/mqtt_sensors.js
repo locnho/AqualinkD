@@ -46,6 +46,14 @@ client.on("message", (topic, message) => {
       setTileOn("switch.ph_alarm", jsonObj.value == true ? 'on' : 'off', null);
       setTileAttribute("switch.ph_alarm", "last", jsonObj.value == true ? 'on' : 'off');
     }
+  } else if (jsonObj.name == 'ORP Alarm') {
+    if ((tile = document.getElementById("switch.orp_alarm")) == null) {
+      create_mytitle("switch.orp_alarm", "ORP Alarm", "switch", "");
+    }
+    if (jsonObj.characteristic == 'On') {
+      setTileOn("switch.orp_alarm", jsonObj.value == true ? 'on' : 'off', null);
+      setTileAttribute("switch.orp_alarm", "last", jsonObj.value == true ? 'on' : 'off');
+    }
   }
 });
 
