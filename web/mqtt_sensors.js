@@ -30,7 +30,7 @@ client.on("message", (topic, message) => {
   const jsonObj = JSON.parse(message.toString());
   if (jsonObj.name == 'Acid Tank Level') {
     if ((tile = document.getElementById("lightbulb.acid_tank_level")) == null) {
-      create_mytitle("lightbulb.acid_tank_level", "Acid Tank Level", "value", "%");
+       create_mytitle("lightbulb.acid_tank_level", "Acid Tank Level", "value", "%", false);
     }
     if (jsonObj.characteristic == 'On') {
       setTileOn("lightbulb.acid_tank_level", jsonObj.value == true ? 'on' : 'off', null);
@@ -40,7 +40,7 @@ client.on("message", (topic, message) => {
     }
   } else if (jsonObj.name == 'pH Alarm') {
     if ((tile = document.getElementById("switch.ph_alarm")) == null) {
-      create_mytitle("switch.ph_alarm", "pH Alarm", "switch", "");
+      create_mytitle("switch.ph_alarm", "pH Alarm", "switch", "", false);
     }
     if (jsonObj.characteristic == 'On') {
       setTileOn("switch.ph_alarm", jsonObj.value == true ? 'on' : 'off', null);
@@ -48,11 +48,19 @@ client.on("message", (topic, message) => {
     }
   } else if (jsonObj.name == 'ORP Alarm') {
     if ((tile = document.getElementById("switch.orp_alarm")) == null) {
-      create_mytitle("switch.orp_alarm", "ORP Alarm", "switch", "");
+      create_mytitle("switch.orp_alarm", "ORP Alarm", "switch", "", false);
     }
     if (jsonObj.characteristic == 'On') {
       setTileOn("switch.orp_alarm", jsonObj.value == true ? 'on' : 'off', null);
       setTileAttribute("switch.orp_alarm", "last", jsonObj.value == true ? 'on' : 'off');
+    }
+  } else if (jsonObj.name == 'Auto SWG') {
+    if ((tile = document.getElementById("switch.auto_swg")) == null) {
+      create_mytitle("switch.auto_swg", "Auto SWG", "switch", "", true);
+    }
+    if (jsonObj.characteristic == 'On') {
+      setTileOn("switch.auto_swg", jsonObj.value == true ? 'on' : 'off', null);
+      setTileAttribute("switch.auto_swg", "last", jsonObj.value == true ? 'on' : 'off');
     }
   }
 });
@@ -61,7 +69,7 @@ client.on("error", (err) => {
     console.error('Connection error:', err);
 });
 
-function create_mytitle(tile_id, tile_name, title_type, uom = "") {
+function create_mytitle(tile_id, tile_name, title_type, uom = "", changeable = false) {
   if ((tile = document.getElementById(tile_id)) == null) {
     var tile = {};
     tile["id"] = tile_id;
@@ -77,6 +85,7 @@ function create_mytitle(tile_id, tile_name, title_type, uom = "") {
     }
     tile["status"] = tile["state"]; // status and state are different for AqualinkD, but for purposes of a switch or sensor they are the same.
     tile["last"] = 'off';
+    tile["changeable"] = changeable;
 
     // Call AqualinkD function to create the tile and add to display.
     createTile(tile);
@@ -88,11 +97,26 @@ function create_mytitle(tile_id, tile_name, title_type, uom = "") {
 }
 
 function mqttTilePressedCallback(tile_id) {
-  // These tile state can not be changed
-  if (getTileAttribute(tile_id, 'last') == 'off') {
-    setTileOn(tile_id, 'off', null);
+  if (getTileAttribute(tile_id, 'changeable') == false) {
+    // These tile state can not be changed
+    if (getTileAttribute(tile_id, 'last') == 'off') {
+      setTileOn(tile_id, 'off', null);
+    } else {
+      setTileOn(tile_id, 'on', null);
+    }
   } else {
-    setTileOn(tile_id, 'on', null);
+    var msg = ""
+    if (getTileAttribute(tile_id, 'last') == 'on') {
+	  msg = "{\"name\":\"Auto SWG\",\"service_name\":\"Auto SWG\",\"characteristic\":\"On\",\"value\":false}"
+          setTileOn(tile_id, 'off', null);
+          setTileAttribute(tile_id, "last", 'off');
+    } else {	
+	  msg = "{\"name\":\"Auto SWG\",\"service_name\":\"Auto SWG\",\"characteristic\":\"On\",\"value\":true}"
+          setTileOn(tile_id, 'on', null);
+          setTileAttribute(tile_id, "last", 'on');
+    }
+    client.publish(mqtt_topic, msg, (err) => {
+     })
   }
 }
 
